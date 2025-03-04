@@ -35,7 +35,7 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 		print_node(result, nodes, 0, &context_stack, -1)
 	}
 
-	print_node :: proc(result : ^str.Builder, ast : []AstNode, current_node_index : AstNodeIndex, context_stack : ^[dynamic]NameContext, indent := 0, prefix := "")
+	print_node :: proc(result : ^str.Builder, ast : []AstNode, current_node_index : AstNodeIndex, context_stack : ^[dynamic]NameContext, indent := 0, prefix := "") -> (requires_termination, requires_new_paragraph : bool)
 	{
 		ONE_INDENT :: "\t"
 		current_node := ast[current_node_index]
@@ -45,13 +45,16 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 
 			case .Sequence:
 				previous_requires_termination := false
-				for ci in current_node.sequence {
+				previous_requires_new_paragraph := false
+				for ci, cii in current_node.sequence {
 					node_type := ast[ci].kind
 					if previous_requires_termination && node_type != .NewLine { str.write_string(result, "; ") }
+					if previous_requires_new_paragraph && len(current_node.sequence) > cii + 1 {
+						if node_type != .NewLine { str.write_string(result, "\n\n") }
+						else if ast[current_node.sequence[cii + 1]].kind != .NewLine { str.write_byte(result, '\n') }
+					}
 
-					print_node(result, ast, ci, context_stack, indent + 1)
-
-					previous_requires_termination = node_type != .NewLine
+					previous_requires_termination, previous_requires_new_paragraph = print_node(result, ast, ci, context_stack, indent + 1)
 				}
 
 			case .FunctionDefinition:
@@ -110,7 +113,7 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 				str.write_string(result, current_node.kind == .Struct ? " :: struct {\n" : " :: struct #raw_union {\n")
 
 				if structure.base_type != nil {
-					definition, _ := find_definition_for_name(ast, context_stack, structure.base_type)
+					definition, _ := find_definition_for_name(ast, context_stack[:], structure.base_type)
 					append(context_stack, structure_to_context(ast, definition^)) // @perf: this has already been done at some point and is repeated work
 
 					str.write_string(result, current_member_indent_str)
@@ -245,11 +248,15 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 								str.write_byte(result, '\n')
 							}
 							str.write_string(result, current_indent_str); str.write_byte(result, '}')
-					
+
+							requires_new_paragraph = true
+
 						case .Struct, .Union:
 							str.write_string(result, "\n\n")
 							ast[midx].struct_or_union.name = slice.concatenate([][]Token{structure.name, ast[midx].struct_or_union.name})
 							print_node(result, ast, midx, context_stack, indent)
+
+							requires_new_paragraph = true
 					}
 				}
 
@@ -266,6 +273,7 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 					str.write_string(result, " = ")
 					print_node(result, ast, vardef.initializer_expression, context_stack)
 				}
+				requires_termination = true
 
 			case .Return:
 				str.write_string(result, "return")
@@ -296,12 +304,16 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 						print_node(result, ast, current_node.unary.right, context_stack)
 				}
 
+				requires_termination = true
+
 			case .ExprBinary:
 				print_node(result, ast, current_node.binary.left, context_stack)
 				str.write_byte(result, ' ')
 				str.write_byte(result, u8(current_node.binary.operator))
 				str.write_byte(result, ' ')
 				print_node(result, ast, current_node.binary.right, context_stack)
+
+				requires_termination = true
 
 			case .MemberAccess:
 				member := ast[current_node.member_access.member]
@@ -312,14 +324,29 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 					is_ptr : bool
 					expr := ast[current_node.member_access.expression]
 					if expr.kind == .Identifier {
-						var, _ := find_definition_for_name(ast, context_stack, expr.identifier)
+						var, _ := find_definition_for_name(ast, context_stack[:], expr.identifier)
 						assert_eq(var.kind, AstNodeKind.VariableDeclaration)
-
-						this_type, _ = find_definition_for_name(ast, context_stack, ast[var.var_declaration.type].type[:]) // wont work for complex / ptr types
-						assert(this_type.kind == .Struct || this_type.kind == .Union, fmt.tprintf("Unexpected %v", this_type))
 
 						last_type_segment := last(ast[var.var_declaration.type].type[:])
 						is_ptr = last_type_segment.kind == .Star || last_type_segment.kind == .Ampersand
+
+						// check if the function actually exists on this type, if not climb base types
+						this_type_sequence := ast[var.var_declaration.type].type[:]
+						this_context := context_stack[:]
+						base_loop: for {
+							this_type, this_context = find_definition_for_name(ast, this_context, this_type_sequence)
+							assert(this_type.kind == .Struct || this_type.kind == .Union, fmt.tprintf("Unexpected %v", this_type))
+
+							for midx in this_type.struct_or_union.members {
+								if ast[midx].kind == .FunctionDefinition {
+									if last(ast[midx].function_def.function_name).source == last(fncall.qualified_name).source {
+										break base_loop
+									}
+								}
+							}
+
+							this_type_sequence = this_type.struct_or_union.base_type
+						}
 					}
 					else { // expression
 						panic("not implemented")
@@ -345,6 +372,8 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 					print_node(result, ast, current_node.member_access.member, context_stack)
 				}
 
+				requires_termination = true
+
 			case .ExprIndex:
 				print_node(result, ast, current_node.index.array_expression, context_stack)
 				str.write_byte(result, '[')
@@ -352,9 +381,9 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 				str.write_byte(result, ']')
 
 			case .Identifier:
-				_, name_context := find_definition_for_name(ast, context_stack, current_node.identifier)
+				_, name_context := find_definition_for_name(ast, context_stack[:], current_node.identifier)
 
-				if name_context.is_structure {
+				if last(name_context).is_structure {
 					str.write_string(result, "this.")
 				}
 
@@ -371,10 +400,13 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 				}
 				str.write_byte(result, ')')
 
+				requires_termination = true
+
 			case:
 				log.error("Unknown ast node:", current_node)
 				runtime.trap();
 		}
+		return
 	}
 
 	print_token_range :: proc(result : ^str.Builder, r : TokenRange, glue := "_")
@@ -577,21 +609,19 @@ NameContext :: struct {
 	is_structure : bool,
 }
 
-find_definition_for_name :: proc(ast : []AstNode, context_stack : ^[dynamic]NameContext, compound_identifier : TokenRange) -> (declaration : ^AstNode, final_context : ^NameContext)
+find_definition_for_name :: proc(ast : []AstNode, context_stack : []NameContext, compound_identifier : TokenRange) -> (declaration : ^AstNode, final_context : []NameContext)
 {
 	stack: #reverse for &cc, ci in context_stack[:len(context_stack) - len(compound_identifier) + 1] {
 		nidx : AstNodeIndex; found : bool
 		for identifier, ii in compound_identifier {
 			nidx, found = context_stack[ci + ii].definitions[identifier.source]
 			if !found { continue stack }
-
 		}
-		return &ast[nidx], &cc
+		return &ast[nidx], context_stack[:ci + 1]
 	}
 
 	loc := runtime.Source_Code_Location{ compound_identifier[0].location.file_path, cast(i32) compound_identifier[0].location.row, cast(i32) compound_identifier[0].location.column, "" }
-	_ = loc
-	panic(fmt.tprintf("%v..'%v' was not found in context %#v.", len(compound_identifier) - 1, last(compound_identifier).source, context_stack)/*, loc*/)
+	panic(fmt.tprintf("%v..'%v' was not found in context %#v.", len(compound_identifier) - 1, last(compound_identifier).source, context_stack), loc)
 }
 
 structure_to_context :: proc(ast : []AstNode, structure : AstNode) -> (name_context : NameContext) {

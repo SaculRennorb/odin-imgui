@@ -1,1 +1,3 @@
-g200 : i32 = 1
+package test
+
+g201 : i32 = 1

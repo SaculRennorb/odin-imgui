@@ -5,7 +5,7 @@ A11 :: struct {
 }
 
 B11 :: struct {
-	using _base_A11 : A11,
+	using __base_a11 : A11,
 }
 
 B11_C :: proc(this : ^B11) -> i32

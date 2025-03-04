@@ -22,7 +22,7 @@ tokenize :: proc(tokens : ^[dynamic]Token, text : string, file_path : string)
 				continue
 
 			case '#', ',', ';', '*', '+', '^', '?', '~', '(', '[', '{', ')', ']', '}':
-				append(tokens, Token{cast(TokenType) c, transmute(string)remaining[:1], loc})
+				append(tokens, Token{cast(TokenKind) c, transmute(string)remaining[:1], loc})
 				remaining = remaining[1:]
 
 			case '&': 
@@ -165,11 +165,13 @@ tokenize :: proc(tokens : ^[dynamic]Token, text : string, file_path : string)
 					}
 				}
 				str := str_from_se(start, remaining)
-				if str == "true" || str == "false" {
-					append(tokens, Token{.LiteralBool, str, loc})
-				}
-				else {
-					append(tokens, Token{.Identifier, str, loc})
+				switch str {
+					case "true", "false":
+						append(tokens, Token{.LiteralBool, str, loc})
+					case "NULL", "nullptr":
+						append(tokens, Token{.LiteralNull, str, loc})
+					case:
+						append(tokens, Token{.Identifier, str, loc})
 				}
 
 			case '.':
@@ -209,7 +211,9 @@ tokenize :: proc(tokens : ^[dynamic]Token, text : string, file_path : string)
 	}
 }
 
-TokenType :: enum {
+TokenKind :: enum {
+	AstNode = 1,
+
 	NewLine              = '\n',
 	Exclamationmark      = '!',
 	Pound                = '#',
@@ -244,6 +248,7 @@ TokenType :: enum {
 	LiteralInteger,
 	LiteralFloat,
 	LiteralCharacter,
+	LiteralNull,
 	Comment,
 	
 	DoubleAmpersand = 255,
@@ -255,7 +260,7 @@ TokenType :: enum {
 }
 
 Token :: struct {
-	type : TokenType,
+	kind : TokenKind,
 	source : string,
 	location : SourceLocation,
 }
@@ -280,7 +285,7 @@ fmt_token_a : fmt.User_Formatter : proc(fi: ^fmt.Info, arg: any, verb: rune) -> 
 fmt_token :: proc(fi: ^fmt.Info, token: ^Token, verb: rune) -> bool
 {
 	if verb == 'v' {
-		fmt.fmt_string(fi, fmt.tprintf("%v:%v @ %v", token.type, token.source, token.location), 'v')
+		fmt.fmt_string(fi, fmt.tprintf("%v:%v @ %v", token.kind, token.source, token.location), 'v')
 
 		return true
 	}

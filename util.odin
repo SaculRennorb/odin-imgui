@@ -2,6 +2,7 @@ package program
 
 import "core:mem"
 import "base:runtime"
+import "base:intrinsics"
 import "core:fmt"
 
 //bug in the compiler to sub multiptr
@@ -47,6 +48,13 @@ append_return_ptr :: proc(arr : ^[dynamic]$T, v : T) -> (added : ^T)
 last :: #force_inline proc "contextless" (arr : []$T) -> ^T
 {
 	return &arr[len(arr) - 1]
+}
+
+assert_eq :: proc(a, b : $T, ax := #caller_expression(a), bx := #caller_expression(b), loc := #caller_location) where intrinsics.type_is_comparable(T)
+{
+	if a != b {
+		panic(fmt.tprintf("Expected %v == %v, but was %v == %v.\n", ax, bx, a, b), loc)
+	}
 }
 
 

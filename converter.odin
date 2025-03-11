@@ -11,6 +11,7 @@ import      "base:builtin"
 import      "core:math"
 import      "core:slice"
 import      "core:log"
+import      "core:io"
 
 merge_ast :: proc(folded : ^[dynamic]AstNode, preprocessed : [][]AstNode)
 {
@@ -28,14 +29,15 @@ merge_ast :: proc(folded : ^[dynamic]AstNode, preprocessed : [][]AstNode)
 convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 {
 	if nodes[0].kind != nil {
-		context_stack : [dynamic]NameContext
-		append(&context_stack, NameContext{}) // root context
-		
+		name_context_heap : [dynamic]NameContext
+		current_name_context_heap = &name_context_heap
+		append(&name_context_heap, NameContext{ parent = -1 })
+
 		str.write_string(result, "package test\n\n")
-		print_node(result, nodes, 0, &context_stack, -1)
+		print_node(result, nodes, 0, &name_context_heap, 0, -1)
 	}
 
-	print_node :: proc(result : ^str.Builder, ast : []AstNode, current_node_index : AstNodeIndex, context_stack : ^[dynamic]NameContext, indent := 0, prefix := "") -> (requires_termination, requires_new_paragraph : bool)
+	print_node :: proc(result : ^str.Builder, ast : []AstNode, current_node_index : AstNodeIndex, context_heap : ^[dynamic]NameContext, name_context : NameContextIndex, indent := 0, prefix := "") -> (requires_termination, requires_new_paragraph : bool)
 	{
 		ONE_INDENT :: "\t"
 		current_node := ast[current_node_index]
@@ -54,7 +56,7 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 						else if ast[current_node.sequence[cii + 1]].kind != .NewLine { str.write_byte(result, '\n') }
 					}
 
-					previous_requires_termination, previous_requires_new_paragraph = print_node(result, ast, ci, context_stack, indent + 1)
+					previous_requires_termination, previous_requires_new_paragraph = print_node(result, ast, ci, context_heap, name_context, indent + 1)
 				}
 
 			case .FunctionDefinition:
@@ -62,17 +64,20 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 				current_member_indent_str := str.concatenate({ current_indent_str, ONE_INDENT }, context.temp_allocator)
 				fndef := current_node.function_def
 
-				last(context_stack[:]).definitions[last(fndef.function_name).source] = current_node_index
+				assert(len(fndef.function_name) == 1)
+				name_context := insert_new_definition(context_heap, name_context, last(fndef.function_name[:]).source, current_node_index)
+				name_ctx_reset := len(context_heap)
+				defer { // reset, function content is never again relevant after its body
+					clear(&context_heap[name_context].definitions)
+					resize(context_heap, name_ctx_reset)
+				}
 
-				name_context := append_return_ptr(context_stack, NameContext{})
-				defer pop(context_stack)
-
-				print_token_range(result, fndef.function_name); str.write_string(result, " :: proc(")
+				print_token_range(result, fndef.function_name[:]); str.write_string(result, " :: proc(")
 				for nidx, i in fndef.arguments {
 					if i != 0 { str.write_string(result, ", ") }
 					arg := ast[nidx].var_declaration
 
-					name_context.definitions[arg.var_name.source] = arg.type
+					insert_new_definition(context_heap, name_context, arg.var_name.source, nidx)
 
 					str.write_string(result, arg.var_name.source)
 					str.write_string(result, " : ")
@@ -80,7 +85,7 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 
 					if arg.initializer_expression != {} {
 						str.write_string(result, " = ")
-						print_node(result, ast, arg.initializer_expression, context_stack)
+						print_node(result, ast, arg.initializer_expression, context_heap, name_context)
 					}
 				}
 				str.write_byte(result, ')')
@@ -93,7 +98,7 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 
 				for ci in fndef.body_sequence {
 					str.write_string(result, current_member_indent_str)
-					print_node(result, ast, ci, context_stack, indent + 1)
+					print_node(result, ast, ci, context_heap, name_context, indent + 1)
 					str.write_byte(result, '\n')
 				}
 				str.write_string(result, current_indent_str); str.write_byte(result, '}')
@@ -103,35 +108,44 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 				current_member_indent_str := str.concatenate({ current_indent_str, ONE_INDENT }, context.temp_allocator)
 				structure := current_node.struct_or_union
 
-				last(context_stack[:]).definitions[last(structure.name).source] = current_node_index
-
-				context_stack_reset := len(context_stack)
-				defer resize(context_stack, context_stack_reset)
-
 				str.write_string(result, current_indent_str);
 				print_token_range(result, structure.name)
 				str.write_string(result, current_node.kind == .Struct ? " :: struct {\n" : " :: struct #raw_union {\n")
 
+				og_name_context := name_context
+				name_context := name_context
+
 				if structure.base_type != nil {
-					definition, _ := find_definition_for_name(ast, context_stack[:], structure.base_type)
-					append(context_stack, structure_to_context(ast, definition^)) // @perf: this has already been done at some point and is repeated work
+					// copy over defs from base type, using their location
+					base_context := find_definition_for_name(context_heap, name_context, structure.base_type)
+
+					base_member_name := str.concatenate({ "__base_", str.to_lower(structure.base_type[len(structure.base_type) - 1].source, context.temp_allocator) })
+					name_context = transmute(NameContextIndex) append_return_index(context_heap, NameContext{
+						parent      = name_context,
+						node        = base_context.node,
+						definitions = base_context.definitions, // make sure not to modify these! ok because we push another context right after
+					})
 
 					str.write_string(result, current_member_indent_str)
-					str.write_string(result, "using __base_")
-					str.write_string(result, str.to_lower(structure.base_type[len(structure.base_type) - 1].source, context.temp_allocator))
+					str.write_string(result, "using ")
+					str.write_string(result, base_member_name)
 					str.write_string(result, " : ")
 					print_token_range(result, structure.base_type)
 					str.write_string(result, ",\n")
 				}
 
-				name_context := append_return_ptr(context_stack, NameContext{ is_structure = true }) // after the base type
+				name_context = transmute(NameContextIndex) append_return_index(context_heap, NameContext{ node = current_node_index, parent = name_context})
+				context_heap[og_name_context].definitions[last(structure.name).source] = name_context
+				// no reset here, struct context might be relevant later on
 
+				has_static_var_members := false
 				has_inplicit_initializer := false
 				for ci in structure.members {
 					if ast[ci].kind != .VariableDeclaration { continue }
 					member := ast[ci].var_declaration
+					if .Static in member.flags { has_static_var_members = true; continue }
 
-					name_context.definitions[member.var_name.source] = ci
+					insert_new_definition(context_heap, name_context, member.var_name.source, ci)
 
 					str.write_string(result, current_member_indent_str);
 					str.write_string(result, member.var_name.source);
@@ -141,16 +155,43 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 
 					has_inplicit_initializer |= member.initializer_expression != {}
 				}
-				
+
 				str.write_string(result, current_indent_str); str.write_byte(result, '}')
+
+				if has_static_var_members {
+					str.write_byte(result, '\n')
+					for midx in structure.members {
+						if ast[midx].kind != .VariableDeclaration || .Static not_in ast[midx].var_declaration.flags { continue }
+						member := ast[midx].var_declaration
+
+						insert_new_definition(context_heap, name_context, member.var_name.source, midx)
+
+						str.write_byte(result, '\n')
+						str.write_string(result, current_indent_str);
+						print_token_range(result, structure.name)
+						str.write_byte(result, '_');
+						str.write_string(result, member.var_name.source);
+						str.write_string(result, " : ")
+						print_type(result, ast, ast[member.type])
+
+						if member.initializer_expression != {} {
+							str.write_string(result, " = ");
+							print_node(result, ast, member.initializer_expression, context_heap, name_context)
+						}
+					}
+				}
 
 				if has_inplicit_initializer || structure.initializer != {} {
 					initializer := ast[structure.initializer]
 
-					name_context := append_return_ptr(context_stack, NameContext{})
-					defer pop(context_stack)
+					name_context := insert_new_definition(context_heap, name_context, last(initializer.function_def.function_name[:]).source, structure.initializer)
+					context_heap_reset := len(context_heap)
+					defer {
+						clear(&context_heap[name_context].definitions)
+						resize(context_heap, context_heap_reset)
+					}
 
-					name_context.definitions["this"] = current_node_index
+					insert_new_definition(context_heap, name_context, "this", current_node_index /* wrong */)
 
 					str.write_string(result, "\n\n")
 					str.write_string(result, current_indent_str);
@@ -162,15 +203,15 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 							str.write_string(result, ", ")
 							arg := ast[nidx].var_declaration
 
-							name_context.definitions[arg.var_name.source] = nidx
+							insert_new_definition(context_heap, name_context, arg.var_name.source, nidx)
 
 							str.write_string(result, arg.var_name.source)
 							str.write_string(result, " : ")
 							print_type(result, ast, ast[arg.type])
-		
+
 							if arg.initializer_expression != {} {
 								str.write_string(result, " = ")
-								print_node(result, ast, arg.initializer_expression, context_stack)
+								print_node(result, ast, arg.initializer_expression, context_heap, name_context)
 							}
 						}
 					}
@@ -186,13 +227,13 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 						str.write_string(result, "this.")
 						str.write_string(result, member.var_name.source)
 						str.write_string(result, " = ")
-						print_node(result, ast, member.initializer_expression, context_stack)
+						print_node(result, ast, member.initializer_expression, context_heap, name_context)
 						str.write_byte(result, '\n')
 					}
 					if initializer.kind == .FunctionDefinition {
 						for ci in initializer.function_def.body_sequence {
 							str.write_string(result, current_member_indent_str)
-							print_node(result, ast, ci, context_stack, indent + 1)
+							print_node(result, ast, ci, context_heap, name_context, indent + 1)
 							str.write_byte(result, '\n')
 						}
 					}
@@ -204,10 +245,14 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 						case .FunctionDefinition:
 							member_fn := ast[midx].function_def
 
-							name_context := append_return_ptr(context_stack, NameContext{ })
-							defer pop(context_stack)
+							name_context := insert_new_definition(context_heap, name_context, last(member_fn.function_name[:]).source, structure.initializer)
+							context_heap_reset := len(context_heap)
+							defer {
+								clear(&context_heap[name_context].definitions)
+								resize(context_heap, context_heap_reset)
+							}
 
-							name_context.definitions["this"] = current_node_index
+							insert_new_definition(context_heap, name_context, "this", current_node_index /* wrong */)
 
 							str.write_string(result, "\n\n")
 							str.write_string(result, current_indent_str);
@@ -221,15 +266,15 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 								str.write_string(result, ", ")
 								arg := ast[nidx].var_declaration
 
-								name_context.definitions[arg.var_name.source] = nidx
+								insert_new_definition(context_heap, name_context, arg.var_name.source, nidx)
 
 								str.write_string(result, arg.var_name.source)
 								str.write_string(result, " : ")
 								print_type(result, ast, ast[arg.type])
-			
+
 								if arg.initializer_expression != {} {
 									str.write_string(result, " = ")
-									print_node(result, ast, arg.initializer_expression, context_stack)
+									print_node(result, ast, arg.initializer_expression, context_heap, name_context)
 								}
 							}
 							str.write_byte(result, ')')
@@ -244,7 +289,7 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 							str.write_string(result, current_indent_str); str.write_string(result, "{\n")
 							for ci in member_fn.body_sequence {
 								str.write_string(result, current_member_indent_str)
-								print_node(result, ast, ci, context_stack, indent + 1)
+								print_node(result, ast, ci, context_heap, name_context, indent + 1)
 								str.write_byte(result, '\n')
 							}
 							str.write_string(result, current_indent_str); str.write_byte(result, '}')
@@ -254,7 +299,7 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 						case .Struct, .Union:
 							str.write_string(result, "\n\n")
 							ast[midx].struct_or_union.name = slice.concatenate([][]Token{structure.name, ast[midx].struct_or_union.name})
-							print_node(result, ast, midx, context_stack, indent)
+							print_node(result, ast, midx, context_heap, name_context, indent)
 
 							requires_new_paragraph = true
 					}
@@ -263,7 +308,7 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 			case .VariableDeclaration:
 				vardef := current_node.var_declaration
 
-				context_stack[len(context_stack) - 1].definitions[vardef.var_name.source] = current_node_index
+				insert_new_definition(context_heap, name_context, vardef.var_name.source, current_node_index)
 
 				str.write_string(result, vardef.var_name.source)
 				str.write_string(result, " : ")
@@ -271,7 +316,7 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 
 				if vardef.initializer_expression != {} {
 					str.write_string(result, " = ")
-					print_node(result, ast, vardef.initializer_expression, context_stack)
+					print_node(result, ast, vardef.initializer_expression, context_heap, name_context)
 				}
 				requires_termination = true
 
@@ -280,7 +325,7 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 
 				if current_node.return_.expression != {} {
 					str.write_byte(result, ' ')
-					print_node(result, ast, current_node.return_.expression, context_stack)
+					print_node(result, ast, current_node.return_.expression, context_heap, name_context)
 				}
 
 			case .LiteralBool, .LiteralFloat, .LiteralInteger, .LiteralString, .LiteralCharacter, .Continue, .Break:
@@ -293,63 +338,53 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 				switch current_node.unary.operator {
 					case .Invert:
 						str.write_byte(result, '!')
-						print_node(result, ast, current_node.unary.right, context_stack)
+						print_node(result, ast, current_node.unary.right, context_heap, name_context)
 
 					case .Dereference:
-						print_node(result, ast, current_node.unary.right, context_stack)
+						print_node(result, ast, current_node.unary.right, context_heap, name_context)
 						str.write_byte(result, '^')
 
 					case .Minus:
 						str.write_byte(result, '-')
-						print_node(result, ast, current_node.unary.right, context_stack)
+						print_node(result, ast, current_node.unary.right, context_heap, name_context)
 				}
 
 				requires_termination = true
 
 			case .ExprBinary:
-				print_node(result, ast, current_node.binary.left, context_stack)
+				print_node(result, ast, current_node.binary.left, context_heap, name_context)
 				str.write_byte(result, ' ')
 				str.write_byte(result, u8(current_node.binary.operator))
 				str.write_byte(result, ' ')
-				print_node(result, ast, current_node.binary.right, context_stack)
+				print_node(result, ast, current_node.binary.right, context_heap, name_context)
 
 				requires_termination = true
 
 			case .MemberAccess:
 				member := ast[current_node.member_access.member]
 				if member.kind == .FunctionCall {
-					fncall := member.function_call;
+					fncall := member.function_call
 
 					this_type : ^AstNode
 					is_ptr : bool
 					expr := ast[current_node.member_access.expression]
-					if expr.kind == .Identifier {
-						var, _ := find_definition_for_name(ast, context_stack[:], expr.identifier)
-						assert_eq(var.kind, AstNodeKind.VariableDeclaration)
+					#partial switch expr.kind {
+						case .Identifier:
+							var_def := find_definition_for_name(context_heap, name_context, expr.identifier[:])
+							assert_eq(ast[var_def.node].kind, AstNodeKind.VariableDeclaration)
+							var_def_node := ast[var_def.node].var_declaration
 
-						last_type_segment := last(ast[var.var_declaration.type].type[:])
-						is_ptr = last_type_segment.kind == .Star || last_type_segment.kind == .Ampersand
+							is_ptr = current_node.member_access.through_pointer
 
-						// check if the function actually exists on this type, if not climb base types
-						this_type_sequence := ast[var.var_declaration.type].type[:]
-						this_context := context_stack[:]
-						base_loop: for {
-							this_type, this_context = find_definition_for_name(ast, this_context, this_type_sequence)
-							assert(this_type.kind == .Struct || this_type.kind == .Union, fmt.tprintf("Unexpected %v", this_type))
+							var_type_ctx := find_definition_for_name(context_heap, var_def.parent, ast[var_def_node.type].type[:]) // todo ptrs
+							var_type_idx := transmute(NameContextIndex) mem.ptr_sub(var_type_ctx, &context_heap[0])
 
-							for midx in this_type.struct_or_union.members {
-								if ast[midx].kind == .FunctionDefinition {
-									if last(ast[midx].function_def.function_name).source == last(fncall.qualified_name).source {
-										break base_loop
-									}
-								}
-							}
+							fn_call := find_definition_for_name(context_heap, var_type_idx, fncall.qualified_name[:])
 
-							this_type_sequence = this_type.struct_or_union.base_type
-						}
-					}
-					else { // expression
-						panic("not implemented")
+							this_type = &ast[context_heap[fn_call.parent].node]
+
+						case:  // expression
+							panic("not implemented")
 					}
 
 					print_token_range(result, this_type.struct_or_union.name)
@@ -359,44 +394,45 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 
 					str.write_byte(result, '(')
 					if !is_ptr { str.write_byte(result, '&') }
-					print_node(result, ast, current_node.member_access.expression, context_stack)
+					print_node(result, ast, current_node.member_access.expression, context_heap, name_context)
 					for pidx, i in fncall.parameters {
 						str.write_string(result, ", ")
-						print_node(result, ast, pidx, context_stack)
+						print_node(result, ast, pidx, context_heap, name_context)
 					}
 					str.write_byte(result, ')')
 				}
 				else {
-					print_node(result, ast, current_node.member_access.expression, context_stack)
+					print_node(result, ast, current_node.member_access.expression, context_heap, name_context)
 					str.write_byte(result, '.')
-					print_node(result, ast, current_node.member_access.member, context_stack)
+					print_node(result, ast, current_node.member_access.member, context_heap, name_context)
 				}
 
 				requires_termination = true
 
 			case .ExprIndex:
-				print_node(result, ast, current_node.index.array_expression, context_stack)
+				print_node(result, ast, current_node.index.array_expression, context_heap, name_context)
 				str.write_byte(result, '[')
-				print_node(result, ast, current_node.index.index_expression, context_stack)
+				print_node(result, ast, current_node.index.index_expression, context_heap, name_context)
 				str.write_byte(result, ']')
 
 			case .Identifier:
-				_, name_context := find_definition_for_name(ast, context_stack[:], current_node.identifier)
+				def := find_definition_for_name(context_heap, name_context, current_node.identifier[:])
+				parent := ast[context_heap[def.parent].node]
 
-				if last(name_context).is_structure {
+				if ((parent.kind == .Struct || parent.kind == .Union) && .Static not_in ast[def.node].var_declaration.flags) {
 					str.write_string(result, "this.")
 				}
 
-				print_token_range(result, current_node.identifier)
+				print_token_range(result, current_node.identifier[:])
 
 			case .FunctionCall:
 				fncall := current_node.function_call
 
-				str.write_string(result, last(fncall.qualified_name).source)
+				str.write_string(result, last(fncall.qualified_name[:]).source)
 				str.write_byte(result, '(')
 				for pidx, i in fncall.parameters {
 					if i != 0 { str.write_string(result, ", ") }
-					print_node(result, ast, pidx, context_stack)
+					print_node(result, ast, pidx, context_heap, name_context)
 				}
 				str.write_byte(result, ')')
 
@@ -453,11 +489,11 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 				remaining_input = input
 				append(output, Token{ kind = .Identifier, source = prefix+"32" })
 			}
-			else if input[0].source == "int" { // long int 
+			else if input[0].source == "int" { // long int
 				remaining_input = input[1:]
 				append(output, Token{ kind = .Identifier, source = prefix+"32" })
 			}
-			else if input[0].source == "long" { // long long 
+			else if input[0].source == "long" { // long long
 				if len(input) == 1 || input[1].kind != .Identifier { // long long, long long*
 					remaining_input = input[2:]
 					append(output, Token{ kind = .Identifier, source = prefix+"64" })
@@ -491,7 +527,7 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 
 							case "short":
 								remaining_input = transform_from_short(output, input[2:], "i")
-							
+
 							case "long":
 								remaining_input = transform_from_long(output, input[2:], "i")
 						}
@@ -508,7 +544,7 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 
 							case "short":
 								remaining_input = transform_from_short(output, input[2:], "u")
-							
+
 							case "long":
 								remaining_input = transform_from_long(output, input[2:], "u")
 						}
@@ -539,7 +575,7 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 						append(output, input[0])
 						remaining_input = input[1:]
 				}
-			
+
 			case .Star:
 				remaining_input = input[1:]
 				inject_at(output, 0, Token{ kind = .Circumflex, source = "^" })
@@ -604,43 +640,80 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 	}
 }
 
+NameContextIndex :: distinct int
 NameContext :: struct {
-	definitions : map[string]AstNodeIndex,
-	is_structure : bool,
+	node : AstNodeIndex,
+	parent : NameContextIndex,
+	definitions : map[string]NameContextIndex,
 }
 
-find_definition_for_name :: proc(ast : []AstNode, context_stack : []NameContext, compound_identifier : TokenRange) -> (declaration : ^AstNode, final_context : []NameContext)
+insert_new_definition :: proc(context_heap : ^[dynamic]NameContext, current_index : NameContextIndex, name : string, node : AstNodeIndex) -> NameContextIndex
 {
-	stack: #reverse for &cc, ci in context_stack[:len(context_stack) - len(compound_identifier) + 1] {
-		nidx : AstNodeIndex; found : bool
-		for identifier, ii in compound_identifier {
-			nidx, found = context_stack[ci + ii].definitions[identifier.source]
-			if !found { continue stack }
+	idx := transmute(NameContextIndex) append_return_index(context_heap, NameContext{ node = node, parent = current_index})
+	context_heap[current_index].definitions[name] = idx
+	return idx
+}
+
+find_definition_for_name :: proc(context_heap : ^[dynamic]NameContext, current_index : NameContextIndex, compound_identifier : TokenRange) -> ^NameContext
+{
+	im_root_context := &context_heap[current_index]
+
+	ctx_stack: for {
+		current_context := im_root_context
+
+		for segment in compound_identifier {
+			child_idx, exists := current_context.definitions[segment.source]
+			if !exists {
+				if current_context.parent == -1 { break ctx_stack }
+
+				im_root_context = &context_heap[current_context.parent]
+
+				continue ctx_stack
+			}
+
+			current_context = &context_heap[child_idx]
 		}
-		return &ast[nidx], context_stack[:ci + 1]
+
+		return current_context
 	}
 
 	loc := runtime.Source_Code_Location{ compound_identifier[0].location.file_path, cast(i32) compound_identifier[0].location.row, cast(i32) compound_identifier[0].location.column, "" }
-	panic(fmt.tprintf("%v..'%v' was not found in context %#v.", len(compound_identifier) - 1, last(compound_identifier).source, context_stack), loc)
+	panic(fmt.tprintf("'%v' was not found in context %#v.", compound_identifier, context_heap[current_index]), loc)
 }
 
-structure_to_context :: proc(ast : []AstNode, structure : AstNode) -> (name_context : NameContext) {
-	name_context.is_structure = true
-	for midx in structure.struct_or_union.members {
-		member := ast[midx]
-		#partial switch member.kind {
-			case .Struct, .Union:
-				name_context.definitions[last(member.struct_or_union.name).source] = midx
+@(thread_local) current_name_context_heap : ^[dynamic]NameContext
+fmt_name_ctx_idx_a : fmt.User_Formatter : proc(fi: ^fmt.Info, arg: any, verb: rune) -> bool
+{
+	node := transmute(^NameContextIndex)arg.data
+	return fmt_name_ctx_idx(fi, node, verb)
+}
 
-			case .FunctionDefinition:
-				name_context.definitions[last(member.function_def.function_name).source] = midx
-
-			case .VariableDeclaration:
-				name_context.definitions[member.var_declaration.var_name.source] = midx
-
-			case:
-				panic(fmt.tprintf("Trying to convert unknown member type %v.", member))
-		}
+fmt_name_ctx_idx :: proc(fi: ^fmt.Info, idx: ^NameContextIndex, verb: rune) -> bool
+{
+	if current_name_context_heap == nil { return false }
+	if idx == nil {
+		io.write_string(fi.writer, "NameContextIndex <nil>")
+		return true
 	}
-	return
+	if idx^ == -1 {
+		io.write_string(fi.writer, "NameContextIndex -1")
+		return true
+	}
+
+
+	fmt.wprintf(fi.writer, "NameContextIndex %v -> ", transmute(int) idx^)
+
+	ctx := current_name_context_heap[idx^]
+	if len(ctx.definitions) == 0 {
+		io.write_string(fi.writer, "<leaf>")
+		return true
+	}
+
+	if fi.record_level > 3 {
+		io.write_string(fi.writer, "{ ... }")
+		return true
+	}
+
+	fmt.fmt_arg(fi, ctx , verb)
+	return true
 }

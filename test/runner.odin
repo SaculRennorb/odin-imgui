@@ -80,7 +80,8 @@ test :: proc(t : ^testing.T)
 		preprocessed : [dynamic][]converter.AstNode
 		folded : [dynamic]converter.AstNode
 		result : str.Builder
-		
+
+		converter.current_ast = &ast
 
 		loc.procedure = "os.read_entire_file"
 		content, err1 := os.read_entire_file(file.fullpath)

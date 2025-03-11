@@ -1,6 +1,7 @@
 package program
 
 import "core:fmt"
+import "core:io"
 
 tokenize :: proc(tokens : ^[dynamic]Token, text : string, file_path : string)
 {
@@ -274,45 +275,38 @@ SourceLocation :: struct {
 fmt_token_a : fmt.User_Formatter : proc(fi: ^fmt.Info, arg: any, verb: rune) -> bool
 {
 	tok := transmute(^Token)arg.data
-	if verb == 'v' {
-		return fmt_token(fi, tok, 'v')
-	}
-	else {
-		return false
-	}
+	return fmt_token(fi, tok, 'v')
 }
 
 fmt_token :: proc(fi: ^fmt.Info, token: ^Token, verb: rune) -> bool
 {
-	if verb == 'v' {
-		fmt.fmt_string(fi, fmt.tprintf("%v:%v @ %v", token.kind, token.source, token.location), 'v')
-
-		return true
-	}
-	else {
-		return false
-	}
+	fmt.fmt_string(fi, fmt.tprintf("%v:%v @ %v", token.kind, token.source, token.location), 'v')
+	return true
 }
 
 fmt_location_a : fmt.User_Formatter : proc(fi: ^fmt.Info, arg: any, verb: rune) -> bool
 {
 	loc := transmute(^SourceLocation)arg.data
-	if verb == 'v' {
-		return fmt_location(fi, loc, 'v')
-	}
-	else {
-		return false
-	}
+	return fmt_location(fi, loc, 'v')
 }
 
 fmt_location :: proc(fi: ^fmt.Info, location: ^SourceLocation, verb: rune) -> bool
 {
-	if verb == 'v' {
-		fmt.fmt_string(fi, fmt.tprintf("%v:%v:%v", location.file_path, location.row, location.column), verb)
+	fmt.fmt_string(fi, fmt.tprintf("%v:%v:%v", location.file_path, location.row, location.column), verb)
+	return true
+}
 
-		return true
+fmt_token_range_a : fmt.User_Formatter : proc(fi: ^fmt.Info, arg: any, verb: rune) -> bool
+{
+	range := transmute(^TokenRange)arg.data
+	return fmt_token_range(fi, range, 'v')
+}
+
+fmt_token_range :: proc(fi: ^fmt.Info, range: ^TokenRange, verb: rune) -> bool
+{
+	for segment, i in range {
+		if i != 0 { io.write_byte(fi.writer, ' ') }
+		io.write_string(fi.writer, segment.source)
 	}
-	else {
-		return false
-	}
+	return true
 }

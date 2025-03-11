@@ -1,19 +1,19 @@
 package test
 
-A211 :: struct {
+A110 :: struct {
 }
 
-A211_B :: proc(this : ^A211) -> ^i32
+A110_B :: proc(this : ^A110) -> ^i32
 {
 	return nil
 }
 
-B211 :: struct {
-	using __base_a211 : A211,
+B110 :: struct {
+	using __base_a110 : A110,
 }
 
 fn1110 :: proc()
 {
-	a : B211
-	b : ^i32 = A211_B(&a)
+	a : B110
+	b : ^i32 = A110_B(&a)
 }

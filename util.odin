@@ -30,9 +30,9 @@ remove_unordered :: #force_inline proc "contextless" (array : ^[]$T, index : int
 	raw.len -= 1
 }
 
-append_return_index :: proc(arr : ^[dynamic]$T, v : T) -> (idx : AstNodeIndex)
+append_return_index :: proc(arr : ^[dynamic]$T, v : T) -> (idx : int)
 {
-	idx = AstNodeIndex(len(arr))
+	idx = len(arr)
 	append(arr, v)
 	return
 }
@@ -64,6 +64,10 @@ _set_user_formatters :: proc()
 {
 	formatters[typeid_of(AstError)] = fmt_token_a
 	formatters[typeid_of(SourceLocation)] = fmt_location_a
+	formatters[typeid_of(AstNodeIndex)] = fmt_astindex_a
+	formatters[typeid_of(AstNode)] = fmt_astnode_a
+	formatters[typeid_of(TokenRange)] = fmt_token_range_a
+	formatters[typeid_of(NameContextIndex)] = fmt_name_ctx_idx_a
 
 	fmt.set_user_formatters(&formatters)
 }

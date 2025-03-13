@@ -245,14 +245,14 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 						case .FunctionDefinition:
 							member_fn := ast[midx].function_def
 
-							name_context := insert_new_definition(context_heap, name_context, last(member_fn.function_name[:]).source, structure.initializer)
+							name_context := insert_new_definition(context_heap, name_context, last(member_fn.function_name[:]).source, midx)
 							context_heap_reset := len(context_heap)
 							defer {
 								clear(&context_heap[name_context].definitions)
 								resize(context_heap, context_heap_reset)
 							}
 
-							insert_new_definition(context_heap, name_context, "this", current_node_index /* wrong */)
+							insert_new_definition(context_heap, name_context, "this", -1)
 
 							str.write_string(result, "\n\n")
 							str.write_string(result, current_indent_str);
@@ -365,27 +365,15 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 				if member.kind == .FunctionCall {
 					fncall := member.function_call
 
-					this_type : ^AstNode
-					is_ptr : bool
-					expr := ast[current_node.member_access.expression]
-					#partial switch expr.kind {
-						case .Identifier:
-							var_def := find_definition_for_name(context_heap, name_context, expr.identifier[:])
-							assert_eq(ast[var_def.node].kind, AstNodeKind.VariableDeclaration)
-							var_def_node := ast[var_def.node].var_declaration
+					is_ptr := current_node.member_access.through_pointer
+					this_context := resolve_type(ast, current_node.member_access.expression, context_heap, name_context)
 
-							is_ptr = current_node.member_access.through_pointer
+					// maybe find basetype for this member
+					this_idx := transmute(NameContextIndex) mem.ptr_sub(this_context, &context_heap[0])
+					actual_member_context := find_definition_for_name(context_heap, this_idx, fncall.qualified_name[:])
+					this_context = &context_heap[actual_member_context.parent]
 
-							var_type_ctx := find_definition_for_name(context_heap, var_def.parent, ast[var_def_node.type].type[:]) // todo ptrs
-							var_type_idx := transmute(NameContextIndex) mem.ptr_sub(var_type_ctx, &context_heap[0])
-
-							fn_call := find_definition_for_name(context_heap, var_type_idx, fncall.qualified_name[:])
-
-							this_type = &ast[context_heap[fn_call.parent].node]
-
-						case:  // expression
-							panic("not implemented")
-					}
+					this_type := ast[this_context.node]
 
 					print_token_range(result, this_type.struct_or_union.name)
 					str.write_byte(result, '_')
@@ -460,6 +448,84 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 		translate_type(&converted_type_tokens, ast, type_tokens)
 
 		print_token_range(result, converted_type_tokens[:], "")
+	}
+
+	strip_type :: proc(output : ^[dynamic]Token, input : TokenRange)
+	{
+		generic_depth := 0
+		for token in input {
+			#partial switch token.kind {
+				case .Identifier:
+					if generic_depth == 0 {
+						append(output, token)
+					}
+					
+				case .BracketTriangleOpen:
+					generic_depth += 1
+				case .BracketTriangleClose:
+					generic_depth -= 1
+			}
+		}
+	}
+
+	resolve_type :: proc(ast : []AstNode, current_node_index : AstNodeIndex, context_heap : ^[dynamic]NameContext, name_context : NameContextIndex) -> ^NameContext
+	{
+		current_node := ast[current_node_index]
+		#partial switch current_node.kind {
+			case .Identifier:
+				var_def := find_definition_for_name(context_heap, name_context, current_node.identifier[:])
+				assert_eq(ast[var_def.node].kind, AstNodeKind.VariableDeclaration)
+
+				return resolve_type(ast, var_def.node, context_heap, var_def.parent)
+			
+			case .ExprUnary:
+				return resolve_type(ast, current_node.unary.right, context_heap, name_context)
+
+			case .MemberAccess:
+				member_access := current_node.member_access
+				this_context := resolve_type(ast, member_access.expression, context_heap, name_context)
+				this_idx := transmute(NameContextIndex) mem.ptr_sub(this_context, &context_heap[0])
+
+				member := ast[member_access.member]
+				#partial switch member.kind {
+					case .Identifier:
+						return resolve_type(ast, member_access.member, context_heap, this_idx)
+
+					case .FunctionCall:
+						fndef_idx := this_context.definitions[last(member.function_call.qualified_name[:]).source]
+						fndef_ctx := context_heap[fndef_idx]
+
+						assert_eq(ast[fndef_ctx.node].kind, AstNodeKind.FunctionDefinition)
+						fndef := ast[fndef_ctx.node].function_def
+
+						return_type := ast[fndef.return_type].type
+
+						stripped_type := make([dynamic]Token, 0, len(return_type), context.temp_allocator)
+						strip_type(&stripped_type, return_type[:])
+
+						return find_definition_for_name(context_heap, this_idx, stripped_type[:])
+
+					case:
+						panic(fmt.tprintf("Not implemented %v", member))
+				}
+
+			case .VariableDeclaration:
+				def_node := current_node.var_declaration
+
+				stripped_type := make([dynamic]Token, 0, len(ast[def_node.type].type), context.temp_allocator)
+				strip_type(&stripped_type, ast[def_node.type].type[:])
+
+				return find_definition_for_name(context_heap, name_context, stripped_type[:])
+
+			// case .FunctionCall:
+			// 	fncall := current_node.function_call
+			// 	fncall.
+
+			case:
+				panic(fmt.tprintf("Not implemented %v", current_node))
+		}
+
+		unreachable();
 	}
 
 	translate_type :: proc(output : ^[dynamic]Token, ast : []AstNode, input : TokenRange)
@@ -664,9 +730,9 @@ find_definition_for_name :: proc(context_heap : ^[dynamic]NameContext, current_i
 		for segment in compound_identifier {
 			child_idx, exists := current_context.definitions[segment.source]
 			if !exists {
-				if current_context.parent == -1 { break ctx_stack }
+				if im_root_context.parent == -1 { break ctx_stack }
 
-				im_root_context = &context_heap[current_context.parent]
+				im_root_context = &context_heap[im_root_context.parent]
 
 				continue ctx_stack
 			}
@@ -678,7 +744,8 @@ find_definition_for_name :: proc(context_heap : ^[dynamic]NameContext, current_i
 	}
 
 	loc := runtime.Source_Code_Location{ compound_identifier[0].location.file_path, cast(i32) compound_identifier[0].location.row, cast(i32) compound_identifier[0].location.column, "" }
-	panic(fmt.tprintf("'%v' was not found in context %#v.", compound_identifier, context_heap[current_index]), loc)
+	dump_context_stack(context_heap[:], current_index)
+	panic(fmt.tprintf("'%v' was not found in context", compound_identifier), loc)
 }
 
 @(thread_local) current_name_context_heap : ^[dynamic]NameContext
@@ -716,4 +783,31 @@ fmt_name_ctx_idx :: proc(fi: ^fmt.Info, idx: ^NameContextIndex, verb: rune) -> b
 
 	fmt.fmt_arg(fi, ctx , verb)
 	return true
+}
+
+
+
+
+dump_context_stack :: proc(context_heap : []NameContext, name_context_idx : NameContextIndex, name := "", indent := " ", return_at : NameContextIndex = -1)
+{
+	name_context := context_heap[name_context_idx]
+	
+	fmt.eprintf("#%v %v%v -> ", transmute(int)name_context_idx, indent, name);
+
+	if len(name_context.definitions) == 0 {
+		fmt.eprintf("<leaf>\n");
+	}
+	else {
+		fmt.eprintf("%v children:\n", len(name_context.definitions))
+
+		indent := str.concatenate({ indent, "  " }, context.temp_allocator)
+		for name, didx in name_context.definitions {
+			dump_context_stack(context_heap, didx, name, indent, name_context_idx)
+		}
+	}
+
+	if name_context.parent == -1 || name_context.parent == return_at { return }
+
+	indent := str.concatenate({ indent, "  " }, context.temp_allocator)
+	dump_context_stack(context_heap, name_context.parent, "<parent>", indent, name_context_idx)
 }

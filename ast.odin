@@ -303,7 +303,7 @@ parse_ast_function_def_no_return_type_and_name :: proc(ast : ^[dynamic]AstNode, 
 					if nn, nns := peek_token(tokens); nn.kind == .Assign {
 						tokens^ = nns
 
-						initializer := parse_ast_expression(ast, tokens, false) or_return
+						initializer := parse_ast_expression(ast, tokens, { .StopAtComma }) or_return
 						arg_node.var_declaration.initializer_expression = transmute(AstNodeIndex) append_return_index(ast, initializer)
 					}
 				}
@@ -424,7 +424,7 @@ parse_ast_var_declaration_no_type :: proc(ast : ^[dynamic]AstNode, tokens : ^[]T
 				#partial switch next_next.kind {
 					case .Assign: // ... a =  ...
 						tokens^ = nns
-						value := parse_ast_expression(ast, tokens, false) or_return
+						value := parse_ast_expression(ast, tokens, { .StopAtComma }) or_return
 						decl_node := AstNode{ kind = .VariableDeclaration, var_declaration = {
 							type = transmute(AstNodeIndex) append_return_index(ast, base_type),
 							var_name = next,
@@ -437,10 +437,10 @@ parse_ast_var_declaration_no_type :: proc(ast : ^[dynamic]AstNode, tokens : ^[]T
 					case .BracketSquareOpen: // ... a[ ...
 						tokens^ = nns
 
-						length_expression := parse_ast_expression(ast, tokens, false) or_return
+						length_expression := parse_ast_expression(ast, tokens, { .StopAtComma }) or_return
 						eat_token_expect(tokens, .BracketSquareClose) or_return
 						
-						if current_type.kind == ._Unknown { current_type = clone_node(base_type) }
+						if current_type.kind == {} { current_type = clone_node(base_type) }
 						append(&current_type.type, Token{ kind = .AstNode, location = { column = transmute(int) transmute(AstNodeIndex) append_return_index(ast, length_expression) } })
 						err = nil
 
@@ -448,20 +448,20 @@ parse_ast_var_declaration_no_type :: proc(ast : ^[dynamic]AstNode, tokens : ^[]T
 						tokens^ = nns
 
 						decl_node := AstNode{ kind = .VariableDeclaration, var_declaration = {
-							type = transmute(AstNodeIndex) append_return_index(ast, current_type.kind == ._Unknown ? base_type : current_type),
+							type = transmute(AstNodeIndex) append_return_index(ast, current_type.kind == {} ? base_type : current_type),
 							var_name = next,
 							flags = storage_flags,
 						}}
 						append(sequence, transmute(AstNodeIndex) append_return_index(ast, decl_node))
 						
-						current_type.kind = ._Unknown // @leak
+						current_type.kind = {} // @leak
 						err = tokens[0]
 
 					case .Semicolon: // ... a;
 						tokens^ = ns // don't eat the semicolon
 
 						decl_node := AstNode{ kind = .VariableDeclaration, var_declaration = {
-							type = transmute(AstNodeIndex) append_return_index(ast, current_type.kind == ._Unknown ? base_type : current_type),
+							type = transmute(AstNodeIndex) append_return_index(ast, current_type.kind == {} ? base_type : current_type),
 							var_name = next,
 							flags = storage_flags,
 						}}
@@ -486,7 +486,7 @@ parse_ast_var_declaration_no_type :: proc(ast : ^[dynamic]AstNode, tokens : ^[]T
 				}}
 				append(sequence, transmute(AstNodeIndex) append_return_index(ast, decl_node))
 
-				current_type.kind = ._Unknown // @leak
+				current_type.kind = {} // @leak
 				err = tokens[0]
 
 
@@ -495,7 +495,7 @@ parse_ast_var_declaration_no_type :: proc(ast : ^[dynamic]AstNode, tokens : ^[]T
 				// int a, *b
 				tokens^ = ns
 
-				if current_type.kind == ._Unknown { current_type = clone_node(base_type) }
+				if current_type.kind == {} { current_type = clone_node(base_type) }
 				append(&current_type.type, next)
 				err = tokens[0]
 
@@ -505,7 +505,7 @@ parse_ast_var_declaration_no_type :: proc(ast : ^[dynamic]AstNode, tokens : ^[]T
 
 				// don't eat the semicolon
 
-				if current_type.kind != ._Unknown {
+				if current_type.kind != {} {
 					decl_node := AstNode{ kind = .VariableDeclaration, var_declaration = {
 						type = transmute(AstNodeIndex) append_return_index(ast, current_type),
 						var_name = last_name,
@@ -557,7 +557,7 @@ parse_ast_function_call :: proc(ast : ^[dynamic]AstNode, tokens : ^[]Token) -> (
 				continue
 
 			case:
-				arg := parse_ast_expression(ast, tokens, false) or_return
+				arg := parse_ast_expression(ast, tokens, { .StopAtComma }) or_return
 				
 				append(&arguments, transmute(AstNodeIndex) append_return_index(ast, arg))
 		}
@@ -659,7 +659,8 @@ ast_filter_qualified_name :: proc(tokens : TokenRange) -> (dest : [dynamic]Token
 	return
 }
 
-parse_ast_expression :: proc(ast : ^[dynamic]AstNode, tokens : ^[]Token, parse_comma_as_chain := true) -> (node : AstNode, err : AstError)
+ExpressionParserFlags :: bit_set[enum { StopAtComma, StopAtMemberAccess }]
+parse_ast_expression :: proc(ast : ^[dynamic]AstNode, tokens : ^[]Token, flags : ExpressionParserFlags = {}) -> (node : AstNode, err : AstError)
 {
 	token_reset := tokens^
 	ast_reset_size := len(ast)
@@ -689,9 +690,14 @@ parse_ast_expression :: proc(ast : ^[dynamic]AstNode, tokens : ^[]Token, parse_c
 		if err == nil {
 			#partial switch next.kind {
 				case .Dot, .DereferenceMember:
-					tokens^ = nexts
+					if .StopAtMemberAccess in flags {
+						if err == nil { fixup_sequence(&node, ast, &sequence) }
+						return
+					}
 
-					right_node := parse_ast_expression(ast, tokens) or_return
+					tokens^ = nexts // eat -> 
+
+					right_node := parse_ast_expression(ast, tokens, { .StopAtComma, .StopAtMemberAccess }) or_return
 
 					node = AstNode{ kind = .MemberAccess, member_access = {
 						expression = transmute(AstNodeIndex) append_return_index(ast, node),
@@ -730,7 +736,7 @@ parse_ast_expression :: proc(ast : ^[dynamic]AstNode, tokens : ^[]Token, parse_c
 		#partial switch next.kind {
 			case .Star, .Minus, .Tilde: 
 				tokens^ = nexts
-				right_node := parse_ast_expression(ast, tokens, false) or_return
+				right_node := parse_ast_expression(ast, tokens, { .StopAtComma }) or_return
 				node = AstNode{ kind = .ExprUnary, unary = {
 					operator = transmute(AstUnaryOp)next.kind,
 					right = transmute(AstNodeIndex) append_return_index(ast, right_node),
@@ -771,7 +777,7 @@ parse_ast_expression :: proc(ast : ^[dynamic]AstNode, tokens : ^[]Token, parse_c
 				continue
 
 			case .Comma:
-				if err == nil && parse_comma_as_chain {
+				if err == nil && .StopAtComma not_in flags {
 					tokens^ = nexts // eat the ,
 					append(&sequence, transmute(AstNodeIndex) append_return_index(ast, node))
 					err = next
@@ -881,8 +887,7 @@ AstBinaryOp :: enum {
 }
 
 AstNodeKind :: enum {
-	_Unknown = 0,
-	NewLine,
+	NewLine = 1,
 	LiteralString,
 	LiteralCharacter,
 	LiteralInteger,
@@ -1052,7 +1057,6 @@ fmt_astnode :: proc(fi: ^fmt.Info, node: ^AstNode, verb: rune) -> bool
 	}
 	
 	switch node.kind {
-		case ._Unknown           :
 		case .NewLine            : fmt.fmt_arg(fi, node.identifier, 'v')
 		case .LiteralString      : fmt.fmt_arg(fi, node.identifier, 'v')
 		case .LiteralCharacter   : fmt.fmt_arg(fi, node.identifier, 'v')

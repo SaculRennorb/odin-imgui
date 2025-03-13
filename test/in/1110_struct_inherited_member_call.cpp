@@ -1,11 +1,11 @@
-struct A110 {
+struct A1110 {
 	int* B() { return nullptr; }
 };
-struct B110 : A110 {
+struct B1110 : A1110 {
 };
 
-void fn1110()
+void fn11110()
 {
-	B110 a;
+	B1110 a;
 	int* b = a.B();
 }

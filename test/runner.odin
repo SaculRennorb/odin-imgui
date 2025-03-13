@@ -9,6 +9,7 @@ import "core:testing"
 import "core:thread"
 import "base:runtime"
 import "core:log"
+import "core:time"
 
 SEQUENTIAL :: #config(sequential, false)
  
@@ -21,6 +22,8 @@ test :: proc(t : ^testing.T)
 	assert(derr1 == nil)
 	files_in, ferr1 := os.read_dir(dir_in, 0)
 	assert(ferr1 == nil)
+
+	//testing.set_fail_timeout(t, 5 * time.Second)
 
 	context.user_ptr = t
 

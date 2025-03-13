@@ -22,7 +22,7 @@ tokenize :: proc(tokens : ^[dynamic]Token, text : string, file_path : string)
 				remaining = remaining[1:]
 				continue
 
-			case '#', ',', ';', '*', '+', '^', '?', '~', '(', '[', '{', ')', ']', '}':
+			case '#', ',', ';', '*', '^', '?', '~', '(', '[', '{', ')', ']', '}':
 				append(tokens, Token{cast(TokenKind) c, transmute(string)remaining[:1], loc})
 				remaining = remaining[1:]
 
@@ -109,12 +109,28 @@ tokenize :: proc(tokens : ^[dynamic]Token, text : string, file_path : string)
 				}
 
 			case '-':
-				if remaining < end[-1:] && remaining[1] == '>' {
+				if remaining < end[-1:] && remaining[1] == '-' {
+					kind : TokenKind = (remaining < end[-2:] && !is_valid_identifier_start(remaining[2])) ? .PostfixDecrement : .PrefixDecrement
+					append(tokens, Token{kind, transmute(string)remaining[:2], loc})
+					remaining = remaining[2:]
+				}
+				else if remaining < end[-1:] && remaining[1] == '>' {
 					append(tokens, Token{.DereferenceMember, transmute(string)remaining[:2], loc})
 					remaining = remaining[2:]
 				}
 				else {
 					append(tokens, Token{.Minus, transmute(string)remaining[:1], loc})
+					remaining = remaining[1:]
+				}
+
+			case '+':
+				if remaining < end[-1:] && remaining[1] == '+' {
+					kind : TokenKind = (remaining < end[-2:] && !is_valid_identifier_start(remaining[2])) ? .PostfixIncrement : .PrefixIncrement
+					append(tokens, Token{kind, transmute(string)remaining[:2], loc})
+					remaining = remaining[2:]
+				}
+				else {
+					append(tokens, Token{.Plus, transmute(string)remaining[:1], loc})
 					remaining = remaining[1:]
 				}
 
@@ -210,6 +226,14 @@ tokenize :: proc(tokens : ^[dynamic]Token, text : string, file_path : string)
 				assert(false, fmt.tprintf("Unexpected token '%c' (%v) at %v.", c, c, loc))
 		}
 	}
+
+	is_valid_identifier_start :: proc(g : u8) -> bool
+	{
+		switch g {
+			case '_', 'a'..='z', 'A'..='Z': return true;
+		}
+		return false
+	}
 }
 
 TokenKind :: enum {
@@ -243,6 +267,10 @@ TokenKind :: enum {
 
 	StaticScopingOperator,
 	DereferenceMember,
+	PrefixIncrement,
+	PrefixDecrement,
+	PostfixIncrement,
+	PostfixDecrement,
 	Identifier,
 	LiteralBool,
 	LiteralString,

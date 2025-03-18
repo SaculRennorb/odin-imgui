@@ -44,7 +44,7 @@ parse_ast_filescope_sequence :: proc(ast : ^[dynamic]AstNode, tokens : []Token) 
 							panic(fmt.tprintf("Failed to parse declaration at %v.", err))
 						}
 						else if _, err := eat_token_expect(&remaining_tokens, .Semicolon); err != nil {
-							if decltype != .FunctionDefinition {
+							if decltype != .FunctionDefinition && decltype != .Namespace {
 								panic(fmt.tprintf("Missing semicolon after %v at %v.", decltype, ast[last(sequence[:])^]))
 							}
 						}
@@ -195,6 +195,35 @@ parse_ast_declaration :: proc(ast : ^[dynamic]AstNode, tokens : ^[]Token, sequen
 
 			append(sequence, transmute(AstNodeIndex) append_return_index(ast, node))
 
+			parsed_type = node.kind
+			err = nil
+			return
+
+		case "namespace":
+			node := AstNode{ kind = .Namespace }
+
+			name, names := peek_token(tokens) // ffs cpp, namespace name is optional
+			if name.kind == .Identifier {
+				node.namespace.name = name
+				tokens^ = names
+			}
+
+			eat_token_expect(tokens, .BracketCurlyOpen) or_return
+
+			defer if err != nil && len(node.namespace.sequence) > 0 { delete(node.namespace.sequence) }
+			for {
+				t, ts := peek_token(tokens)
+				if t.kind == .BracketCurlyClose {
+					tokens^ = ts // eat the closing brace
+					break
+				}
+
+				parse_ast_declaration(ast, tokens, &node.namespace.sequence) or_return
+			}
+
+			append(sequence, transmute(AstNodeIndex) append_return_index(ast, node))
+
+			parsed_type = .Namespace
 			err = nil
 			return
 	}
@@ -896,6 +925,7 @@ AstNodeKind :: enum {
 	LiteralNull,
 	Identifier,
 	Sequence,
+	Namespace,
 	ExprUnary,
 	ExprBinary,
 	ExprIndex,
@@ -930,6 +960,10 @@ AstNode :: struct {
 			operator : AstBinaryOp,
 		},
 		sequence : [dynamic]AstNodeIndex,
+		namespace : struct {
+			name     : Token,
+			sequence : [dynamic]AstNodeIndex,
+		},
 		function_call : struct {
 			qualified_name : [dynamic]Token,
 			parameters : [dynamic]AstNodeIndex,
@@ -1057,15 +1091,16 @@ fmt_astnode :: proc(fi: ^fmt.Info, node: ^AstNode, verb: rune) -> bool
 	}
 	
 	switch node.kind {
-		case .NewLine            : fmt.fmt_arg(fi, node.identifier, 'v')
+		case .NewLine            :
 		case .LiteralString      : fmt.fmt_arg(fi, node.identifier, 'v')
 		case .LiteralCharacter   : fmt.fmt_arg(fi, node.identifier, 'v')
 		case .LiteralInteger     : fmt.fmt_arg(fi, node.identifier, 'v')
 		case .LiteralFloat       : fmt.fmt_arg(fi, node.identifier, 'v')
 		case .LiteralBool        : fmt.fmt_arg(fi, node.identifier, 'v')
-		case .LiteralNull        : fmt.fmt_arg(fi, node.identifier, 'v')
+		case .LiteralNull        :
 		case .Identifier         : fmt.fmt_arg(fi, node.identifier, 'v')
 		case .Sequence           : fmt.fmt_arg(fi, node.sequence, 'v')
+		case .Namespace          : fmt.fmt_arg(fi, node.namespace, 'v')
 		case .ExprUnary          : fmt.fmt_arg(fi, node.unary, 'v')
 		case .ExprBinary         : fmt.fmt_arg(fi, node.binary, 'v')
 		case .ExprIndex          : fmt.fmt_arg(fi, node.index, 'v')

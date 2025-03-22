@@ -13,18 +13,6 @@ import      "core:slice"
 import      "core:log"
 import      "core:io"
 
-merge_ast :: proc(folded : ^[dynamic]AstNode, preprocessed : [][]AstNode)
-{
-	nodes_len := 0
-	for s in preprocessed { nodes_len += len(s) }
-	resize(folded, nodes_len)
-
-	nodes_len = 0
-	for s in preprocessed {
-		copy(folded[nodes_len:], s)
-		nodes_len += len(s)
-	}
-}
 
 convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 {

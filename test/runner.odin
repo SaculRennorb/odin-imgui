@@ -76,46 +76,67 @@ test :: proc(t : ^testing.T)
 			line = 0,
 		}
 
+		inputs : []os.File_Info
 
-		toks : [dynamic]converter.Token
+		if !file.is_dir {
+			inputs = { file^ }
+		}
+		else {
+			// use whole directory of files as test input
+			dir, err1 := os.open(file.fullpath)
+			assert(err1 == nil)
+
+			err : os.Error
+			inputs, err = os.read_dir(dir, 0)
+			assert(err == nil)
+		}
+
+		input_map : map[string][]converter.Token
+		preprocessed : [dynamic]converter.Token
 		ast  : [dynamic]converter.AstNode
-		input_map : map[string][]converter.AstNode
-		preprocessed : [dynamic][]converter.AstNode
-		folded : [dynamic]converter.AstNode
 		result : str.Builder
 
 		converter.current_ast = &ast
 
-		loc.procedure = "os.read_entire_file"
-		content, err1 := os.read_entire_file(file.fullpath)
-		assert(err1, loc = loc)
+		
 		ref, err2 := os.read_entire_file(fmt.tprintf(BASEDIR+"/ref/%v.odin", path.stem(file.name)))
 		assert(err2, "Missing ref file?", loc)
 
-		clear(&toks)
-		loc.procedure = "converter.tokenize"
-		log.debug("tokenizing ... ", location = loc)
-		converter.tokenize(&toks, cast(string) content, file.name)
-
-		clear(&ast)
-		loc.procedure = "converter.parse_ast_filescope_sequence"
-		log.debug(len(toks), "tokens, building ast ... ", location = loc)
-		converter.parse_ast_filescope_sequence(&ast, toks[:])
-
+		for _, stream in input_map { delete(stream) }
 		clear(&input_map)
-		input_map["prim"] = ast[:]
-		
+		for file in inputs {
+			loc.file_path = file.name
+
+			loc.procedure = "os.read_entire_file"
+			content, err1 := os.read_entire_file(file.fullpath)
+			assert(err1, loc = loc)
+
+			toks : [dynamic]converter.Token
+			loc.procedure = "converter.tokenize"
+			log.debug("tokenizing ... ", location = loc)
+			converter.tokenize(&toks, cast(string) content, file.name)
+
+			input_map[file.name] = toks[:]
+		}
+
+		loc.file_path = file.name
+
+		initial_file_name := str.ends_with(file.name, ".cpp") ? file.name : str.concatenate({ file.name, ".cpp" }, context.temp_allocator)
+
 		clear(&preprocessed)
 		loc.procedure = "converter.preprocess"
 		log.debug(len(ast), "ast nodes, preprocessing ... ", location = loc)
-		converter.preprocess(&preprocessed, input_map, "prim")
+		converter.preprocess(&preprocessed, input_map, initial_file_name)
 
-		clear(&folded)
-		converter.merge_ast(&folded, preprocessed[:]);
+		clear(&ast)
+		loc.procedure = "converter.parse_ast_filescope_sequence"
+		log.debug(len(preprocessed), "tokens, building ast ... ", location = loc)
+		converter.parse_ast_filescope_sequence(&ast, preprocessed[:])
 
+		clear(&result.buf)
 		loc.procedure = "converter.convert_and_format"
-		log.debug(len(folded), "ast nodes, converting ... ", location = loc)
-		converter.convert_and_format(&result, folded[:])
+		log.debug(len(ast), "ast nodes, converting ... ", location = loc)
+		converter.convert_and_format(&result, ast[:])
 
 		os.write_entire_file(fmt.tprintf(BASEDIR+"/out/%v.odin", path.stem(file.name)), result.buf[:])
 

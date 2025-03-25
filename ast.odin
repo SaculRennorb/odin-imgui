@@ -48,8 +48,35 @@ parse_ast_filescope_sequence :: proc(ast : ^[dynamic]AstNode, tokens : []Token) 
 								panic(fmt.tprintf("Missing semicolon after %v at %v.", decltype, ast[last(sequence[:])^]))
 							}
 						}
-	
 				}
+
+			case .PreprocDefine:
+				remaining_tokens = tokenss
+				node, err := parse_ast_preproc_define(ast, &remaining_tokens)
+				if err != nil {
+					panic(fmt.tprintf("Failed to parse preproc define at %v.", err))
+				}
+				append(&sequence, transmute(AstNodeIndex) append_return_index(ast, node))
+
+			case .PreprocIf:
+				remaining_tokens = tokenss
+				expr, err := parse_ast_preproc_to_line_end(&remaining_tokens)
+				if err != nil {
+					panic(fmt.tprintf("Failed to parse preproc if at %v.", err))
+				}
+				append(&sequence, transmute(AstNodeIndex) append_return_index(ast, AstNode{ kind = .PreprocIf, token_sequence = expr }))
+
+			case .PreprocElse:
+				remaining_tokens = tokenss
+				expr, err := parse_ast_preproc_to_line_end(&remaining_tokens)
+				if err != nil {
+					panic(fmt.tprintf("Failed to parse preproc else at %v.", err))
+				}
+				append(&sequence, transmute(AstNodeIndex) append_return_index(ast, AstNode{ kind = .PreprocElse, token_sequence = expr }))
+
+			case .PreprocEndif:
+				remaining_tokens = tokenss
+				append(&sequence, transmute(AstNodeIndex) append_return_index(ast, AstNode{ kind = .PreprocEndif }))
 
 			case:
 				panic(fmt.tprintf("Unknown token %v for sequence.", token))
@@ -58,6 +85,63 @@ parse_ast_filescope_sequence :: proc(ast : ^[dynamic]AstNode, tokens : []Token) 
 
 	ast[root_index].sequence = sequence
 	return ast[root_index]
+}
+
+parse_ast_preproc_to_line_end :: proc(tokens : ^[]Token) -> (result : [dynamic]Token, err : AstError)
+{
+	for len(tokens) > 0 {
+		t, ts := peek_token(tokens, false)
+		if t.kind == .BackwardSlash {
+			tokens^ = ts
+			eat_token_expect(tokens, .NewLine, false) or_return
+			continue
+		}
+		if t.kind == .NewLine {
+			tokens^ = ts // eat the last newline aswell
+			break;
+		}
+
+		append(&result, t)
+		tokens^ = ts
+	}
+
+	return
+}
+
+parse_ast_preproc_define :: proc(ast : ^[dynamic]AstNode, tokens : ^[]Token) -> (node : AstNode, err : AstError)
+{
+	tokens_ := parse_ast_preproc_to_line_end(tokens) or_return
+	tokens__ := tokens_[:]
+	tokens := &tokens__
+
+	name := eat_token_expect(tokens, .Identifier) or_return
+	next, nexts := peek_token(tokens)
+	if next.kind == .BracketRoundOpen {
+		tokens^ = nexts
+		args : [dynamic]Token
+
+		next, nexts = peek_token(tokens)
+		for {
+			if next.kind == .BracketRoundClose {
+				tokens^ = nexts
+				break
+			}
+
+			arg := eat_token_expect(tokens, .Identifier) or_return
+			append(&args, arg)
+
+			next, nexts = peek_token(tokens)
+			if next.kind == .Comma {
+				tokens^ = nexts
+			}
+		}
+
+		node = AstNode { kind = .PreprocMacro, preproc_macro = { name = name, args = args[:], expansion_tokens = tokens^ } }
+	}
+	else {
+		node = AstNode { kind = .PreprocDefine, preproc_define = { name, tokens^ } }
+	}
+	return
 }
 
 parse_ast_struct_no_keyword :: proc(ast : ^[dynamic]AstNode, tokens : ^[]Token) -> (node : AstNode, err : AstError)
@@ -940,6 +1024,12 @@ AstNodeKind :: enum {
 	Continue,
 	Struct,
 	Union,
+
+	PreprocDefine,
+	PreprocMacro,
+	PreprocIf,
+	PreprocElse,
+	PreprocEndif,
 }
 
 AstNodeIndex :: distinct int
@@ -960,6 +1050,7 @@ AstNode :: struct {
 			operator : AstBinaryOp,
 		},
 		sequence : [dynamic]AstNodeIndex,
+		token_sequence : [dynamic]Token,
 		namespace : struct {
 			name     : Token,
 			sequence : [dynamic]AstNodeIndex,
@@ -972,10 +1063,6 @@ AstNode :: struct {
 			condition : AstNodeIndex,
 			message : string,
 			static : bool,
-		},
-		preproc_if : struct {
-			condition : AstNodeIndex,
-			true_branch, false_branch : AstNodeIndex,
 		},
 		type : [dynamic]Token,
 		var_declaration : struct {
@@ -1009,6 +1096,15 @@ AstNode :: struct {
 		member_access : struct {
 			expression, member : AstNodeIndex,
 			through_pointer : bool,
+		},
+		preproc_define : struct {
+			name : Token,
+			expansion_tokens : []Token,
+		},
+		preproc_macro : struct {
+			name : Token,
+			args : []Token,
+			expansion_tokens : []Token,
 		},
 	}
 }
@@ -1092,6 +1188,11 @@ fmt_astnode :: proc(fi: ^fmt.Info, node: ^AstNode, verb: rune) -> bool
 	
 	switch node.kind {
 		case .NewLine            :
+		case .PreprocIf          : fmt.fmt_arg(fi, node.token_sequence, 'v')
+		case .PreprocElse        : fmt.fmt_arg(fi, node.token_sequence, 'v')
+		case .PreprocEndif       :
+		case .PreprocDefine      : fmt.fmt_arg(fi, node.preproc_define, 'v')
+		case .PreprocMacro       : fmt.fmt_arg(fi, node.preproc_macro, 'v')
 		case .LiteralString      : fmt.fmt_arg(fi, node.identifier, 'v')
 		case .LiteralCharacter   : fmt.fmt_arg(fi, node.identifier, 'v')
 		case .LiteralInteger     : fmt.fmt_arg(fi, node.identifier, 'v')

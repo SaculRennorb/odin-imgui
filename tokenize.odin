@@ -22,7 +22,7 @@ tokenize :: proc(tokens : ^[dynamic]Token, text : string, file_path : string)
 				remaining = remaining[1:]
 				continue
 
-			case '#', ',', ';', '*', '^', '?', '~', '(', '[', '{', ')', ']', '}':
+			case '#', ',', ';', '*', '^', '?', '~', '(', '[', '{', ')', ']', '}', '\\':
 				append(tokens, Token{cast(TokenKind) c, transmute(string)remaining[:1], loc})
 				remaining = remaining[1:]
 
@@ -200,7 +200,7 @@ tokenize :: proc(tokens : ^[dynamic]Token, text : string, file_path : string)
 
 				fallthrough
 
-			case '0'..='9':
+				case '0'..='9':
 				start := remaining
 				is_float := false
 				number_loop: for remaining = remaining[1:]; remaining < end; remaining = remaining[1:] {
@@ -250,6 +250,7 @@ TokenKind :: enum {
 	Minus                = '-',
 	Star                 = '*',
 	ForwardSlash         = '/',
+	BackwardSlash        = '\\',
 	Ampersand            = '&',
 	Pipe                 = '|',
 	Circumflex           = '^',
@@ -279,6 +280,11 @@ TokenKind :: enum {
 	LiteralCharacter,
 	LiteralNull,
 	Comment,
+
+	PreprocDefine,
+	PreprocIf,
+	PreprocElse,
+	PreprocEndif,
 	
 	DoubleAmpersand = 255,
 	DoublePipe,

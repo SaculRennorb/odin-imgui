@@ -52,6 +52,61 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 			case .Sequence:
 				write_node_sequence(result, ast, current_node.sequence[:], context_heap, name_context, indent + 1)
 
+			case .PreprocIf:
+				current_indent_str := str.repeat(ONE_INDENT, max(0, indent - 1), context.temp_allocator)
+
+				str.write_string(result, current_indent_str)
+				str.write_string(result, "when ")
+				write_token_range(result, current_node.token_sequence[:], " ")
+				str.write_string(result, " {\n")
+
+			case .PreprocElse:
+				current_indent_str := str.repeat(ONE_INDENT, max(0, indent - 1), context.temp_allocator)
+
+				str.write_string(result, current_indent_str)
+				str.write_string(result, "} else ")
+				write_token_range(result, current_node.token_sequence[:], " ")
+				str.write_string(result, " { // preproc else\n")
+
+			case .PreprocEndif:
+				current_indent_str := str.repeat(ONE_INDENT, max(0, indent - 1), context.temp_allocator)
+
+				str.write_string(result, current_indent_str)
+				str.write_string(result, "} // preproc endif\n")
+
+			case .PreprocDefine:
+				current_indent_str := str.repeat(ONE_INDENT, indent, context.temp_allocator)
+				define := current_node.preproc_define
+
+				str.write_string(result, current_indent_str)
+				str.write_string(result, define.name.source)
+				str.write_string(result, " :: ")
+				write_token_range(result, define.expansion_tokens)
+				str.write_byte(result, '\n')
+
+				insert_new_definition(context_heap, 0, define.name.source, current_node_index, define.name.source)
+
+
+			case .PreprocMacro:
+				current_indent_str := str.repeat(ONE_INDENT, indent, context.temp_allocator)
+				current_member_indent_str := str.concatenate({ current_indent_str, ONE_INDENT }, context.temp_allocator)
+				macro := current_node.preproc_macro
+
+				str.write_string(result, current_indent_str)
+				str.write_string(result, macro.name.source)
+				str.write_string(result, " :: #force_inline proc \"contextless\" (")
+				for arg, i in macro.args {
+					str.write_string(result, arg.source)
+					str.write_string(result, " : ")
+					fmt.sbprintf(result, "$T%v", i)
+				}
+				str.write_string(result, ") //TODO: validate those args are not by-ref\n")
+				str.write_string(result, current_indent_str); str.write_string(result, "{\n")
+				write_token_range(result, macro.expansion_tokens)
+				str.write_string(result, current_indent_str); str.write_byte(result, '}')
+
+				insert_new_definition(context_heap, 0, macro.name.source, current_node_index, macro.name.source)
+
 			case .FunctionDefinition:
 				current_indent_str := str.repeat(ONE_INDENT, indent, context.temp_allocator)
 				current_member_indent_str := str.concatenate({ current_indent_str, ONE_INDENT }, context.temp_allocator)

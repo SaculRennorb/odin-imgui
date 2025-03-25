@@ -126,7 +126,7 @@ test :: proc(t : ^testing.T)
 		clear(&preprocessed)
 		loc.procedure = "converter.preprocess"
 		log.debug(len(ast), "ast nodes, preprocessing ... ", location = loc)
-		converter.preprocess(&preprocessed, input_map, initial_file_name)
+		converter.preprocess(&{ result = &preprocessed, inputs = input_map }, initial_file_name)
 
 		clear(&ast)
 		loc.procedure = "converter.parse_ast_filescope_sequence"

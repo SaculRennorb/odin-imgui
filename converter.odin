@@ -43,6 +43,41 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 			}
 		}
 
+		write_preproc_node :: proc(result : ^str.Builder, current_node : AstNode, indent : int) -> bool
+		{
+			#partial switch current_node.kind {
+				case .PreprocIf:
+					current_indent_str := str.repeat(ONE_INDENT, max(0, indent - 1), context.temp_allocator)
+	
+					str.write_string(result, current_indent_str)
+					str.write_string(result, "when ")
+					write_token_range(result, current_node.token_sequence[:], " ")
+					str.write_string(result, " {\n")
+	
+				case .PreprocElse:
+					current_indent_str := str.repeat(ONE_INDENT, max(0, indent - 1), context.temp_allocator)
+	
+					str.write_string(result, current_indent_str)
+					str.write_string(result, "} else ")
+					if len(current_node.token_sequence) > 0 {
+						write_token_range(result, current_node.token_sequence[:], " ")
+						str.write_byte(result, ' ')
+					}
+					str.write_string(result, "{ // preproc else\n")
+	
+				case .PreprocEndif:
+					current_indent_str := str.repeat(ONE_INDENT, max(0, indent - 1), context.temp_allocator)
+	
+					str.write_string(result, current_indent_str)
+					str.write_string(result, "} // preproc endif\n")
+
+				case:
+					return false
+			}
+
+			return true
+		}
+
 		ONE_INDENT :: "\t"
 		current_node := ast[current_node_index]
 		#partial switch current_node.kind {
@@ -51,28 +86,6 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 
 			case .Sequence:
 				write_node_sequence(result, ast, current_node.sequence[:], context_heap, name_context, indent + 1)
-
-			case .PreprocIf:
-				current_indent_str := str.repeat(ONE_INDENT, max(0, indent - 1), context.temp_allocator)
-
-				str.write_string(result, current_indent_str)
-				str.write_string(result, "when ")
-				write_token_range(result, current_node.token_sequence[:], " ")
-				str.write_string(result, " {\n")
-
-			case .PreprocElse:
-				current_indent_str := str.repeat(ONE_INDENT, max(0, indent - 1), context.temp_allocator)
-
-				str.write_string(result, current_indent_str)
-				str.write_string(result, "} else ")
-				write_token_range(result, current_node.token_sequence[:], " ")
-				str.write_string(result, " { // preproc else\n")
-
-			case .PreprocEndif:
-				current_indent_str := str.repeat(ONE_INDENT, max(0, indent - 1), context.temp_allocator)
-
-				str.write_string(result, current_indent_str)
-				str.write_string(result, "} // preproc endif\n")
 
 			case .PreprocDefine:
 				current_indent_str := str.repeat(ONE_INDENT, indent, context.temp_allocator)
@@ -85,7 +98,6 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 				str.write_byte(result, '\n')
 
 				insert_new_definition(context_heap, 0, define.name.source, current_node_index, define.name.source)
-
 
 			case .PreprocMacro:
 				current_indent_str := str.repeat(ONE_INDENT, indent, context.temp_allocator)
@@ -191,19 +203,24 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 				has_static_var_members := false
 				has_inplicit_initializer := false
 				for ci in structure.members {
-					if ast[ci].kind != .VariableDeclaration { continue }
-					member := ast[ci].var_declaration
-					if .Static in member.flags { has_static_var_members = true; continue }
+					#partial switch ast[ci].kind {
+						case .VariableDeclaration:
+							member := ast[ci].var_declaration
+							if .Static in member.flags { has_static_var_members = true; continue }
 
-					d := insert_new_definition(context_heap, name_context, member.var_name.source, ci, member.var_name.source)
+							d := insert_new_definition(context_heap, name_context, member.var_name.source, ci, member.var_name.source)
 
-					str.write_string(result, current_member_indent_str);
-					str.write_string(result, member.var_name.source);
-					str.write_string(result, " : ")
-					write_type(result, ast, ast[member.type], context_heap, name_context)
-					str.write_string(result, ",\n")
+							str.write_string(result, current_member_indent_str);
+							str.write_string(result, member.var_name.source);
+							str.write_string(result, " : ")
+							write_type(result, ast, ast[member.type], context_heap, name_context)
+							str.write_string(result, ",\n")
 
-					has_inplicit_initializer |= member.initializer_expression != {}
+							has_inplicit_initializer |= member.initializer_expression != {}
+
+						case:
+							write_preproc_node(result, ast[ci], indent)
+					}
 				}
 
 				str.write_string(result, current_indent_str); str.write_byte(result, '}')
@@ -483,6 +500,11 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 				write_node_sequence(result, ast, ns.sequence[:], context_heap, name_context, indent, complete_name)
 
 			case:
+				was_preproc := #force_inline write_preproc_node(result, current_node, indent)
+				if was_preproc {
+					break
+				}
+
 				log.error("Unknown ast node:", current_node)
 				runtime.trap();
 		}

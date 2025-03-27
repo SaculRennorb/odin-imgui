@@ -50,41 +50,55 @@ parse_ast_filescope_sequence :: proc(ast : ^[dynamic]AstNode, tokens : []Token) 
 						}
 				}
 
-			case .PreprocDefine:
-				remaining_tokens = tokenss
-				node, err := parse_ast_preproc_define(ast, &remaining_tokens)
-				if err != nil {
-					panic(fmt.tprintf("Failed to parse preproc define at %v.", err))
-				}
-				append(&sequence, transmute(AstNodeIndex) append_return_index(ast, node))
-
-			case .PreprocIf:
-				remaining_tokens = tokenss
-				expr, err := parse_ast_preproc_to_line_end(&remaining_tokens)
-				if err != nil {
-					panic(fmt.tprintf("Failed to parse preproc if at %v.", err))
-				}
-				append(&sequence, transmute(AstNodeIndex) append_return_index(ast, AstNode{ kind = .PreprocIf, token_sequence = expr }))
-
-			case .PreprocElse:
-				remaining_tokens = tokenss
-				expr, err := parse_ast_preproc_to_line_end(&remaining_tokens)
-				if err != nil {
-					panic(fmt.tprintf("Failed to parse preproc else at %v.", err))
-				}
-				append(&sequence, transmute(AstNodeIndex) append_return_index(ast, AstNode{ kind = .PreprocElse, token_sequence = expr }))
-
-			case .PreprocEndif:
-				remaining_tokens = tokenss
-				append(&sequence, transmute(AstNodeIndex) append_return_index(ast, AstNode{ kind = .PreprocEndif }))
-
 			case:
-				panic(fmt.tprintf("Unknown token %v for sequence.", token))
+				was_preproc := #force_inline try_parse_ast_preproc_statement(ast, &remaining_tokens, &sequence, token, tokenss)
+				if !was_preproc {
+					panic(fmt.tprintf("Unknown token %v for sequence.", token))
+				}
 		}
 	}
 
 	ast[root_index].sequence = sequence
 	return ast[root_index]
+}
+
+try_parse_ast_preproc_statement :: proc(ast : ^[dynamic]AstNode, tokens : ^[]Token, sequence : ^[dynamic]AstNodeIndex, token: Token, tokenss: []Token) -> bool
+{
+	#partial switch token.kind {
+		case .PreprocDefine:
+			tokens^ = tokenss
+			node, err := parse_ast_preproc_define(ast, tokens)
+			if err != nil {
+				panic(fmt.tprintf("Failed to parse preproc define at %v.", err))
+			}
+			append(sequence, transmute(AstNodeIndex) append_return_index(ast, node))
+
+		case .PreprocIf:
+			tokens^ = tokenss
+			expr, err := parse_ast_preproc_to_line_end(tokens)
+			if err != nil {
+				panic(fmt.tprintf("Failed to parse preproc if at %v.", err))
+			}
+			append(sequence, transmute(AstNodeIndex) append_return_index(ast, AstNode{ kind = .PreprocIf, token_sequence = expr }))
+
+		case .PreprocElse:
+			tokens^ = tokenss
+			expr, err := parse_ast_preproc_to_line_end(tokens)
+			if err != nil {
+				panic(fmt.tprintf("Failed to parse preproc else at %v.", err))
+			}
+			append(sequence, transmute(AstNodeIndex) append_return_index(ast, AstNode{ kind = .PreprocElse, token_sequence = expr }))
+
+		case .PreprocEndif:
+			tokens^ = tokenss
+			eat_token_expect(tokens, .NewLine, false)
+			append(sequence, transmute(AstNodeIndex) append_return_index(ast, AstNode{ kind = .PreprocEndif }))
+
+		case:
+			return false
+	}
+
+	return true
 }
 
 parse_ast_preproc_to_line_end :: proc(tokens : ^[]Token) -> (result : [dynamic]Token, err : AstError)
@@ -192,6 +206,11 @@ parse_ast_struct_no_keyword :: proc(ast : ^[dynamic]AstNode, tokens : ^[]Token) 
 		if n.kind == .BracketCurlyClose {
 			tokens^ = ss // eat closing }
 			break
+		}
+
+		was_preproc := try_parse_ast_preproc_statement(ast, tokens, &members, n, ss)
+		if was_preproc {
+			continue
 		}
 
 		member_type := parse_ast_declaration(ast, tokens, &members, &node) or_return

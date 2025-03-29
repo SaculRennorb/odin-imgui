@@ -52,7 +52,7 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 					str.write_string(result, current_indent_str)
 					str.write_string(result, "when ")
 					write_token_range(result, current_node.token_sequence[:], " ")
-					str.write_string(result, " {\n")
+					str.write_string(result, " {")
 	
 				case .PreprocElse:
 					current_indent_str := str.repeat(ONE_INDENT, max(0, indent - 1), context.temp_allocator)
@@ -63,13 +63,13 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 						write_token_range(result, current_node.token_sequence[:], " ")
 						str.write_byte(result, ' ')
 					}
-					str.write_string(result, "{ // preproc else\n")
+					str.write_string(result, "{ // preproc else")
 	
 				case .PreprocEndif:
 					current_indent_str := str.repeat(ONE_INDENT, max(0, indent - 1), context.temp_allocator)
 	
 					str.write_string(result, current_indent_str)
-					str.write_string(result, "} // preproc endif\n")
+					str.write_string(result, "} // preproc endif")
 
 				case:
 					return false
@@ -95,7 +95,6 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 				str.write_string(result, define.name.source)
 				str.write_string(result, " :: ")
 				write_token_range(result, define.expansion_tokens)
-				str.write_byte(result, '\n')
 
 				insert_new_definition(context_heap, 0, define.name.source, current_node_index, define.name.source)
 
@@ -219,7 +218,9 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 							has_inplicit_initializer |= member.initializer_expression != {}
 
 						case:
-							write_preproc_node(result, ast[ci], indent)
+							if write_preproc_node(result, ast[ci], indent) {
+								str.write_byte(result, '\n')
+							}
 					}
 				}
 
@@ -681,11 +682,11 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 			}
 			else if input[0].source == "long" { // long long
 				if len(input) == 1 || input[1].kind != .Identifier { // long long, long long*
-					remaining_input = input[2:]
+					remaining_input = input[1:]
 					append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = prefix+"64" } })
 				}
 				else if input[1].source == "int" { // long long int
-					remaining_input = input[3:]
+					remaining_input = input[2:]
 					append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = prefix+"64" } })
 				}
 			}

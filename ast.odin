@@ -91,7 +91,6 @@ try_parse_ast_preproc_statement :: proc(ast : ^[dynamic]AstNode, tokens : ^[]Tok
 
 		case .PreprocEndif:
 			tokens^ = tokenss
-			eat_token_expect(tokens, .NewLine, false)
 			append(sequence, transmute(AstNodeIndex) append_return_index(ast, AstNode{ kind = .PreprocEndif }))
 
 		case:
@@ -111,7 +110,6 @@ parse_ast_preproc_to_line_end :: proc(tokens : ^[]Token) -> (result : [dynamic]T
 			continue
 		}
 		if t.kind == .NewLine {
-			tokens^ = ts // eat the last newline aswell
 			break;
 		}
 
@@ -460,6 +458,11 @@ parse_ast_function_def_no_return_type_and_name :: proc(ast : ^[dynamic]AstNode, 
 				break
 			}
 
+			was_preproc := try_parse_ast_preproc_statement(ast, tokens, &body_sequence, n, ss)
+			if was_preproc {
+				continue
+			}
+
 			parse_ast_statement(ast, tokens, &body_sequence) or_return
 			eat_token_expect(tokens, .Semicolon) or_return
 		}
@@ -718,6 +721,7 @@ parse_ast_type_inner :: proc(tokens : ^[]Token) -> (type : TokenRange, err : Ast
 	start := find_next_actual_token(tokens)
 
 	has_name := false
+	has_int_modifier := false
 
 	type_loop: for {
 		n, s := peek_token(tokens)
@@ -729,16 +733,27 @@ parse_ast_type_inner :: proc(tokens : ^[]Token) -> (type : TokenRange, err : Ast
 
 			case .Identifier:
 				switch n.source {
-					case "const", "short", "long", "unsigned", "signed":
+					case "short", "long":
+						tokens^ = s
+						has_int_modifier = true
+						continue
+
+					case "const", "unsigned", "signed":
 						tokens^ = s
 						continue
 
+					case "int":
+						tokens^ = s
+						has_name = true
+						continue
+
 					case:
-						if has_name { break type_loop }
+						if has_name || has_int_modifier { break type_loop }
+
+						before := tokens^;
 
 						parse_ast_qualified_name(tokens)
 						has_name = true
-						
 				}
 
 			case .BracketTriangleOpen:

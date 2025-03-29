@@ -94,7 +94,7 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 				str.write_string(result, current_indent_str)
 				str.write_string(result, define.name.source)
 				str.write_string(result, " :: ")
-				write_token_range(result, define.expansion_tokens)
+				write_token_range(result, define.expansion_tokens, "")
 
 				insert_new_definition(context_heap, 0, define.name.source, current_node_index, define.name.source)
 
@@ -107,14 +107,27 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 				str.write_string(result, macro.name.source)
 				str.write_string(result, " :: #force_inline proc \"contextless\" (")
 				for arg, i in macro.args {
+					if i > 0 { str.write_string(result, ", ") }
 					str.write_string(result, arg.source)
 					str.write_string(result, " : ")
 					fmt.sbprintf(result, "$T%v", i)
 				}
 				str.write_string(result, ") //TODO: validate those args are not by-ref\n")
 				str.write_string(result, current_indent_str); str.write_string(result, "{\n")
-				write_token_range(result, macro.expansion_tokens)
-				str.write_string(result, current_indent_str); str.write_byte(result, '}')
+				last_broke_line := true
+				for tok in macro.expansion_tokens {
+					if last_broke_line { str.write_string(result, current_member_indent_str) }
+					#partial switch tok.kind {
+						case .Semicolon:
+							str.write_string(result, ";\n")
+							last_broke_line = true
+
+						case:
+							str.write_string(result, tok.source)
+							last_broke_line = false
+					}
+				}
+				str.write_string(result, current_indent_str); str.write_string(result, "}\n")
 
 				insert_new_definition(context_heap, 0, macro.name.source, current_node_index, macro.name.source)
 

@@ -187,6 +187,18 @@ tokenize :: proc(tokens : ^[dynamic]Token, text : string, file_path : string)
 						append(tokens, Token{.LiteralBool, str, loc})
 					case "NULL", "nullptr":
 						append(tokens, Token{.LiteralNull, str, loc})
+					case "return":
+						append(tokens, Token{.Return, str, loc})
+					case "break":
+						append(tokens, Token{.Break, str, loc})
+					case "continue":
+						append(tokens, Token{.Continue, str, loc})
+					case "for":
+						append(tokens, Token{.For, str, loc})
+					case "do":
+						append(tokens, Token{.Do, str, loc})
+					case "while":
+						append(tokens, Token{.While, str, loc})
 					case:
 						append(tokens, Token{.Identifier, str, loc})
 				}
@@ -280,6 +292,13 @@ TokenKind :: enum {
 	LiteralCharacter,
 	LiteralNull,
 	Comment,
+
+	Return,
+	Break,
+	Continue,
+	For,
+	While,
+	Do,
 
 	PreprocDefine,
 	PreprocIf,

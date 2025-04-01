@@ -415,19 +415,42 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 			case .LiteralNull:
 				str.write_string(result, "nil")
 
-			case .ExprUnary:
-				switch current_node.unary.operator {
+			case .ExprUnaryLeft:
+				switch current_node.unary_left.operator {
 					case .Invert:
 						str.write_byte(result, '!')
-						write_node(result, ast, current_node.unary.right, context_heap, name_context)
+						write_node(result, ast, current_node.unary_left.right, context_heap, name_context)
 
 					case .Dereference:
-						write_node(result, ast, current_node.unary.right, context_heap, name_context)
+						write_node(result, ast, current_node.unary_left.right, context_heap, name_context)
 						str.write_byte(result, '^')
 
 					case .Minus:
 						str.write_byte(result, '-')
-						write_node(result, ast, current_node.unary.right, context_heap, name_context)
+						write_node(result, ast, current_node.unary_left.right, context_heap, name_context)
+
+					case .Increment:
+						str.write_string(result, "pre_incr(&")
+						write_node(result, ast, current_node.unary_left.right, context_heap, name_context)
+						str.write_string(result, ")")
+
+					case .Decrement:
+						str.write_string(result, "pre_decr(&")
+						write_node(result, ast, current_node.unary_left.right, context_heap, name_context)
+						str.write_string(result, ")")
+				}
+
+				requires_termination = true
+
+			case .ExprUnaryRight:
+				#partial switch current_node.unary_right.operator {
+					case .Increment:
+						write_node(result, ast, current_node.unary_right.left, context_heap, name_context)
+						str.write_string(result, " += 1")
+
+					case .Decrement:
+						write_node(result, ast, current_node.unary_right.left, context_heap, name_context)
+						str.write_string(result, " -= 1")
 				}
 
 				requires_termination = true
@@ -512,6 +535,46 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 				name_context := insert_new_definition(context_heap, name_context, ns.name.source, current_node_index, complete_name)
 
 				write_node_sequence(result, ast, ns.sequence[:], context_heap, name_context, indent, complete_name)
+
+
+			case .For, .While, .Do:
+				loop := current_node.loop
+
+				current_indent_str := str.repeat(ONE_INDENT, indent, context.temp_allocator)
+				current_member_indent_str := str.concatenate({ current_indent_str, ONE_INDENT }, context.temp_allocator)
+
+				str.write_string(result, "for")
+				if loop.initializer != {} || loop.loop_statement != {} {
+					str.write_byte(result, ' ')
+					if loop.initializer != {} { write_node(result, ast, loop.initializer, context_heap, name_context) }
+					str.write_string(result, "; ")
+					if loop.condition != {} { write_node(result, ast, loop.condition, context_heap, name_context) }
+					str.write_string(result, "; ")
+					if loop.loop_statement != {} { write_node(result, ast, loop.loop_statement, context_heap, name_context) }
+				}
+				else if loop.condition != {} && current_node.kind != .Do {
+					str.write_byte(result, ' ')
+					write_node(result, ast, loop.condition, context_heap, name_context)
+				}
+				str.write_string(result, " {\n")
+				
+				for ci in loop.body_sequence {
+					str.write_string(result, current_member_indent_str)
+					write_node(result, ast, ci, context_heap, name_context, indent + 1)
+					str.write_byte(result, '\n')
+				}
+
+				if loop.condition != {} && current_node.kind == .Do {
+					str.write_byte(result, '\n')
+					str.write_string(result, current_member_indent_str)
+					str.write_string(result, "if !(")
+					write_node(result, ast, loop.condition, context_heap, name_context)
+					str.write_string(result, ") { break }\n")
+				}
+
+				str.write_string(result, current_indent_str); str.write_string(result, "}")
+
+				requires_new_paragraph = true
 
 			case:
 				was_preproc := #force_inline write_preproc_node(result, current_node, indent)
@@ -608,8 +671,11 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 
 				return resolve_type(ast, var_def.node, context_heap, var_def.parent)
 			
-			case .ExprUnary:
-				return resolve_type(ast, current_node.unary.right, context_heap, name_context)
+			case .ExprUnaryLeft:
+				return resolve_type(ast, current_node.unary_left.right, context_heap, name_context)
+
+			case .ExprUnaryRight:
+				return resolve_type(ast, current_node.unary_right.left, context_heap, name_context)
 
 			case .MemberAccess:
 				member_access := current_node.member_access
@@ -789,17 +855,36 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 					#partial switch node.kind {
 						case .LiteralBool, .LiteralCharacter, .LiteralFloat, .LiteralInteger, .LiteralString:
 							append(output, node.literal)
-						case .ExprUnary:
-							switch node.unary.operator {
+						case .ExprUnaryLeft:
+							switch node.unary_left.operator {
 								case .Minus:
 									append(output, Token{ kind = .Minus, source = "-" })
-									transform_expression(output, ast, node.unary.right)
+									transform_expression(output, ast, node.unary_left.right)
 								case .Dereference:
-									transform_expression(output, ast, node.unary.right)
+									transform_expression(output, ast, node.unary_left.right)
 									append(output, Token{ kind = .Minus, source = "^" })
 								case .Invert:
 									append(output, Token{ kind = .Minus, source = "!" })
-									transform_expression(output, ast, node.unary.right)
+									transform_expression(output, ast, node.unary_left.right)
+								case .Increment:
+									transform_expression(output, ast, node.unary_left.right)
+									append(output, Token{ kind = .PrefixIncrement, source = " += " })
+									append(output, Token{ kind = .LiteralInteger, source = "1 /*TODO: was prefix*/" })
+								case .Decrement:
+									transform_expression(output, ast, node.unary_left.right)
+									append(output, Token{ kind = .PrefixIncrement, source = " -= " })
+									append(output, Token{ kind = .LiteralInteger, source = "1 /*TODO: was prefix*/" })
+							}
+						case .ExprUnaryRight:
+							#partial switch node.unary_right.operator {
+								case .Increment:
+									transform_expression(output, ast, node.unary_right.left)
+									append(output, Token{ kind = .PrefixIncrement, source = " += " })
+									append(output, Token{ kind = .LiteralInteger, source = "1" })
+								case .Decrement:
+									transform_expression(output, ast, node.unary_right.left)
+									append(output, Token{ kind = .PrefixIncrement, source = " -= " })
+									append(output, Token{ kind = .LiteralInteger, source = "1" })
 							}
 						case .ExprBinary:
 							transform_expression(output, ast, node.binary.left)

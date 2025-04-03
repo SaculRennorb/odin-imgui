@@ -31,14 +31,17 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 		context_heap : ^[dynamic]NameContext,
 	}
 
-	write_node :: proc(ctx : ConverterContext, current_node_index : AstNodeIndex, name_context : NameContextIndex, indent_str := "", definition_prefix := "") -> (requires_termination, requires_new_paragraph : bool)
+	write_node :: proc(ctx : ConverterContext, current_node_index : AstNodeIndex, name_context : NameContextIndex, indent_str := "", definition_prefix := "") -> (requires_termination, requires_new_paragraph, swallow_paragraph : bool)
 	{
 		write_node_sequence :: proc(ctx : ConverterContext, sequence : []AstNodeIndex, name_context : NameContextIndex, indent_str : string, definition_prefix := "")
 		{
 			previous_requires_termination := false
 			previous_requires_new_paragraph := false
+			should_swallow_paragraph := false
 			previous_node_kind : AstNodeKind
-			for ci, cii in sequence {
+			
+			for cii := 0; cii < len(sequence); cii += 1 {
+				ci := sequence[cii]
 				node_kind := ctx.ast[ci].kind
 				if previous_requires_termination && node_kind != .NewLine { str.write_string(ctx.result, "; ") }
 				if previous_requires_new_paragraph && len(sequence) > cii + 1 {
@@ -48,8 +51,13 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 				if node_kind != .NewLine && previous_node_kind == .NewLine {
 					str.write_string(ctx.result, indent_str)
 				}
+				if should_swallow_paragraph {
+					should_swallow_paragraph = false
+					if ctx.ast[sequence[cii]].kind == .NewLine { cii += 1 }
+					if ctx.ast[sequence[cii]].kind == .NewLine { continue }
+				}
 
-				previous_requires_termination, previous_requires_new_paragraph = write_node(ctx, ci, name_context, indent_str, definition_prefix)
+				previous_requires_termination, previous_requires_new_paragraph, should_swallow_paragraph = write_node(ctx, ci, name_context, indent_str, definition_prefix)
 				previous_node_kind = node_kind
 			}
 		}
@@ -88,6 +96,11 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 
 			assert(len(fn_node.function_name) == 1)
 			name_context := insert_new_definition(ctx.context_heap, name_context, last(fn_node.function_name[:]).source, function_node_idx, complete_name)
+
+			if .ForwardDeclaration in fn_node.flags {
+				return // Don't insert forward declarations, only insert the name context leaf node.
+			}
+
 			context_heap_reset := len(ctx.context_heap) // keep fn as leaf node, since expressions cen reference the name
 			defer {
 				clear(&ctx.context_heap[name_context].definitions)
@@ -204,6 +217,8 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 
 			case .FunctionDefinition:
 				write_function(ctx, name_context, current_node_index, definition_prefix, false, indent_str)
+
+				swallow_paragraph = .ForwardDeclaration in current_node.function_def.flags 
 
 			case .Struct, .Union:
 				member_indent_str := str.concatenate({ indent_str, ONE_INDENT }, context.temp_allocator)

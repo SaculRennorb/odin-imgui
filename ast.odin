@@ -17,8 +17,12 @@ parse_ast_filescope_sequence :: proc(ast : ^[dynamic]AstNode, tokens : []Token) 
 		token, tokenss := peek_token(&remaining_tokens, false)
 		#partial switch token.kind {
 			case .NewLine:
-				remaining_tokens = tokenss // eat newline
+				remaining_tokens = tokenss
 				append(&sequence, transmute(AstNodeIndex) append_return_index(ast, AstNode{ kind = .NewLine }))
+
+			case .Comment:
+				remaining_tokens = tokenss
+				append(&sequence, transmute(AstNodeIndex) append_return_index(ast, AstNode{ kind = .Comment, literal = token }))
 
 			case .Identifier:
 				switch token.source {

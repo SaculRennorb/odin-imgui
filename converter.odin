@@ -156,6 +156,9 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 			case .NewLine:
 				str.write_byte(ctx.result, '\n')
 
+			case .Comment:
+				str.write_string(ctx.result, current_node.literal.source)
+
 			case .Sequence:
 				write_node_sequence(ctx, current_node.sequence[:], name_context, indent_str)
 
@@ -253,6 +256,11 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 							str.write_string(ctx.result, ",\n")
 
 							has_inplicit_initializer |= member.initializer_expression != {}
+
+						case .Comment:
+							str.write_string(ctx.result, member_indent_str);
+							str.write_string(ctx.result, ctx.ast[ci].literal.source)
+							str.write_byte(ctx.result, '\n')
 
 						case:
 							if write_preproc_node(ctx.result, ctx.ast[ci]) {

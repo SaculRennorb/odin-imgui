@@ -8,7 +8,4 @@ B11 :: struct {
 	using __base_a11 : A11,
 }
 
-B11_C :: proc(this : ^B11) -> i32
-{
-	return this.a
-}
+B11_C :: proc(this : ^B11) -> i32 { return this.a }

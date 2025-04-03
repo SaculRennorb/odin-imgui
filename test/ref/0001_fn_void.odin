@@ -1,5 +1,3 @@
 package test
 
-fn001 :: proc()
-{
-}
+fn001 :: proc() { }

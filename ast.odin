@@ -605,10 +605,21 @@ parse_ast_statement :: proc(ast : ^[dynamic]AstNode, tokens : ^[]Token, sequence
 parse_ast_scoped_sequence_no_open_brace :: proc(ast : ^[dynamic]AstNode, tokens : ^[]Token, fn : $F, sequence : ^[dynamic]AstNodeIndex, parent_node : ^AstNode = nil) -> (err : AstError)
 {
 	for {
-		n, ns := peek_token(tokens)
-		if n.kind == .BracketCurlyClose {
-			tokens^ = ns
-			break
+		n, ns := peek_token(tokens, false)
+		#partial switch n.kind {
+			case .BracketCurlyClose:
+				tokens^ = ns
+				return
+
+			case .NewLine:
+				tokens^ = ns
+				append(sequence, transmute(AstNodeIndex) append_return_index(ast, AstNode{ kind = .NewLine }))
+				continue
+			
+			case .Comment:
+				tokens^ = ns
+				append(sequence, transmute(AstNodeIndex) append_return_index(ast, AstNode{ kind = .Comment, literal = n }))
+				continue
 		}
 
 		was_preproc := try_parse_ast_preproc_statement(ast, tokens, sequence, n, ns)
@@ -1152,6 +1163,7 @@ AstBinaryOp :: enum {
 
 AstNodeKind :: enum {
 	NewLine = 1,
+	Comment,
 	LiteralString,
 	LiteralCharacter,
 	LiteralInteger,
@@ -1351,6 +1363,7 @@ fmt_astnode :: proc(fi: ^fmt.Info, node: ^AstNode, verb: rune) -> bool
 	
 	switch node.kind {
 		case .NewLine            :
+		case .Comment            : fmt.fmt_arg(fi, node.literal, 'v')
 		case .PreprocIf          : fmt.fmt_arg(fi, node.token_sequence, 'v')
 		case .PreprocElse        : fmt.fmt_arg(fi, node.token_sequence, 'v')
 		case .PreprocEndif       :

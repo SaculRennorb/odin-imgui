@@ -3,10 +3,7 @@ package test
 A201 :: struct {
 }
 
-A201_B :: proc(this : ^A201) -> ^i32
-{
-	return nil
-}
+A201_B :: proc(this : ^A201) -> ^i32 { return nil }
 
 fn0202 :: proc()
 {

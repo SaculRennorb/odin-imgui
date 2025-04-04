@@ -53,8 +53,11 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 				}
 				if should_swallow_paragraph {
 					should_swallow_paragraph = false
-					if ctx.ast[sequence[cii]].kind == .NewLine { cii += 1 }
-					if ctx.ast[sequence[cii]].kind == .NewLine { continue }
+					if ctx.ast[ci].kind == .NewLine {
+						cii += 1
+						ci = sequence[cii]
+					}
+					if ctx.ast[ci].kind == .NewLine { continue }
 				}
 
 				previous_requires_termination, previous_requires_new_paragraph, should_swallow_paragraph = write_node(ctx, ci, name_context, indent_str, definition_prefix)
@@ -225,11 +228,21 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 				structure := current_node.struct_or_union
 
 				complete_structure_name := fold_token_range(definition_prefix, structure.name)
-				str.write_string(ctx.result, complete_structure_name);
-				str.write_string(ctx.result, current_node.kind == .Struct ? " :: struct {\n" : " :: struct #raw_union {\n")
 
 				og_name_context := name_context
 				name_context := name_context
+
+				if structure.is_forward_declaration {
+					name_context = transmute(NameContextIndex) append_return_index(ctx.context_heap, NameContext{ node = current_node_index, parent = name_context, complete_name = complete_structure_name })
+					ctx.context_heap[og_name_context].definitions[last(structure.name).source] = name_context
+
+					swallow_paragraph = true
+
+					return
+				}
+
+				str.write_string(ctx.result, complete_structure_name);
+				str.write_string(ctx.result, current_node.kind == .Struct ? " :: struct {\n" : " :: struct #raw_union {\n")
 
 				if structure.base_type != nil {
 					// copy over defs from base type, using their location

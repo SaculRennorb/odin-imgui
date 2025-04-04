@@ -34,6 +34,9 @@ parse_ast_filescope_sequence :: proc(ast : ^[dynamic]AstNode, tokens : []Token) 
 
 						if node, node_err := parse_ast_struct_no_keyword(ast, &remaining_tokens); node_err == nil {
 							node.kind = token.source == "union" ? .Union : .Struct
+
+							ast_attach_comments(ast, &sequence, &node)
+
 							append(&sequence, transmute(AstNodeIndex) append_return_index(ast, node))
 							
 							t, err := eat_token_expect(&remaining_tokens, .Semicolon)
@@ -210,6 +213,42 @@ parse_ast_struct_no_keyword :: proc(ast : ^[dynamic]AstNode, tokens : ^[]Token) 
 	return
 }
 
+ast_attach_comments :: proc(ast : ^[dynamic]AstNode, sequence : ^[dynamic]AstNodeIndex, attach_to : ^AstNode)
+{
+	start_index := 0
+	loop: #reverse for sid, sidi in sequence {
+		#partial switch ast[sid].kind {
+			case .Comment, .NewLine:
+				continue loop
+			case:
+				start_index = sidi + 1
+				break loop
+		}
+	}
+
+	// skip leading newlines
+	for ; start_index < len(sequence); start_index += 1 {
+		if ast[sequence[start_index]].kind != .NewLine {
+			break
+		}
+	}
+
+	attached_comments : ^[dynamic]AstNodeIndex
+	#partial switch attach_to.kind {
+		case .FunctionDefinition:
+			attached_comments = &attach_to.function_def.attached_comments
+		case .Struct, .Union:
+			attached_comments = &attach_to.struct_or_union.attached_comments
+		case:
+			unreachable()
+	}
+
+	for sid in sequence[start_index:] {
+		ast[sid].attached = true
+		append(attached_comments, sid)
+	}
+}
+
 parse_ast_declaration :: proc(ast : ^[dynamic]AstNode, tokens : ^[]Token, sequence : ^[dynamic]AstNodeIndex, parent_type : ^AstNode = nil) -> (parsed_type : AstNodeKind, err : AstError)
 {
 	tokens_reset := tokens^
@@ -239,6 +278,8 @@ parse_ast_declaration :: proc(ast : ^[dynamic]AstNode, tokens : ^[]Token, sequen
 					location = last(parent_type.struct_or_union.name).location
 				}
 
+				ast_attach_comments(ast, sequence, &initializer)
+
 				parent_type.struct_or_union.initializer = transmute(AstNodeIndex) append_return_index(ast, initializer)
 				parsed_type =  .FunctionDefinition
 				return
@@ -259,6 +300,8 @@ parse_ast_declaration :: proc(ast : ^[dynamic]AstNode, tokens : ^[]Token, sequen
 						location = last(parent_type.struct_or_union.name).location
 					}
 
+					ast_attach_comments(ast, sequence, &deinitializer)
+
 					parent_type.struct_or_union.deinitializer = transmute(AstNodeIndex) append_return_index(ast, deinitializer)
 					parsed_type =  .FunctionDefinition
 					return
@@ -277,6 +320,8 @@ parse_ast_declaration :: proc(ast : ^[dynamic]AstNode, tokens : ^[]Token, sequen
 		case "struct", "class", "union":
 			node := parse_ast_struct_no_keyword(ast, tokens) or_return
 			node.kind = first_type_segment.source == "union" ? .Union : .Struct
+
+			ast_attach_comments(ast, sequence, &node)
 
 			append(sequence, transmute(AstNodeIndex) append_return_index(ast, node))
 
@@ -315,7 +360,9 @@ parse_ast_declaration :: proc(ast : ^[dynamic]AstNode, tokens : ^[]Token, sequen
 		fndef_node.function_def.return_type =  transmute(AstNodeIndex) append_return_index(ast, type_node)
 		fndef_node.function_def.function_name = ast_filter_qualified_name(name)
 		fndef_node.function_def.flags |= transmute(AstFunctionDefFlags) storage;
-		
+
+		ast_attach_comments(ast, sequence, &fndef_node)
+
 		append(sequence, transmute(AstNodeIndex) append_return_index(ast, fndef_node))
 		parsed_type =  .FunctionDefinition
 	}
@@ -1209,6 +1256,7 @@ TokenRange :: []Token
 
 AstNode :: struct {
 	kind : AstNodeKind,
+	attached : bool,
 	using _ : struct #raw_union {
 		literal : Token,
 		identifier : [dynamic]Token,
@@ -1251,6 +1299,7 @@ AstNode :: struct {
 			return_type : AstNodeIndex,
 			arguments : [dynamic]AstNodeIndex,
 			body_sequence : [dynamic]AstNodeIndex,
+			attached_comments : [dynamic]AstNodeIndex,
 			flags : AstFunctionDefFlags,
 		},
 		index : struct {
@@ -1267,6 +1316,7 @@ AstNode :: struct {
 			is_forward_declaration : bool,
 			initializer : AstNodeIndex,
 			deinitializer : AstNodeIndex,
+			attached_comments : [dynamic]AstNodeIndex,
 		},
 		member_access : struct {
 			expression, member : AstNodeIndex,

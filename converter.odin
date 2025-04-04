@@ -42,6 +42,8 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 			
 			for cii := 0; cii < len(sequence); cii += 1 {
 				ci := sequence[cii]
+				if ctx.ast[ci].attached { continue }
+
 				node_kind := ctx.ast[ci].kind
 				if previous_requires_termination && node_kind != .NewLine { str.write_string(ctx.result, "; ") }
 				if previous_requires_new_paragraph && len(sequence) > cii + 1 {
@@ -93,11 +95,21 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 
 		write_function :: proc(ctx : ConverterContext, name_context : NameContextIndex, function_node_idx : AstNodeIndex, complete_structure_name : string, is_member_fn : bool, indent_str : string)
 		{
-			fn_node := ctx.ast[function_node_idx].function_def
+			fn_node := &ctx.ast[function_node_idx].function_def
 
 			complete_name := fold_token_range(complete_structure_name, fn_node.function_name[:])
 
-			assert(len(fn_node.function_name) == 1)
+			assert_eq(len(fn_node.function_name), 1)
+			// fold attached comments form forward declaration. This also works when chaining forward declarations
+			_, forward_declared_context := try_find_definition_for_name(ctx.context_heap, name_context, fn_node.function_name[:])
+			if forward_declared_context != nil {
+				forward_declaration := ctx.ast[forward_declared_context.node]
+				assert_eq(forward_declaration.kind, AstNodeKind.FunctionDefinition)
+
+				forward_comments := forward_declaration.function_def.attached_comments
+				inject_at(&fn_node.attached_comments, 0, ..forward_comments[:])
+			}
+
 			name_context := insert_new_definition(ctx.context_heap, name_context, last(fn_node.function_name[:]).source, function_node_idx, complete_name)
 
 			if .ForwardDeclaration in fn_node.flags {
@@ -110,7 +122,10 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 				resize(ctx.context_heap, context_heap_reset)
 			}
 
-			
+			// write directly, they are marked for skipping in write_sequence
+			for aid in fn_node.attached_comments {
+				write_node(ctx, aid, name_context)
+			}
 
 			str.write_string(ctx.result, indent_str);
 			str.write_string(ctx.result, complete_name);
@@ -167,7 +182,7 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 
 
 		ONE_INDENT :: "\t"
-		current_node := ctx.ast[current_node_index]
+		current_node := &ctx.ast[current_node_index]
 		#partial switch current_node.kind {
 			case .NewLine:
 				str.write_byte(ctx.result, '\n')
@@ -225,12 +240,21 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 
 			case .Struct, .Union:
 				member_indent_str := str.concatenate({ indent_str, ONE_INDENT }, context.temp_allocator)
-				structure := current_node.struct_or_union
+				structure := &current_node.struct_or_union
 
 				complete_structure_name := fold_token_range(definition_prefix, structure.name)
 
 				og_name_context := name_context
 				name_context := name_context
+
+				_, forward_declared_context := try_find_definition_for_name(ctx.context_heap, name_context, structure.name)
+				if forward_declared_context != nil {
+					forward_declaration := ctx.ast[forward_declared_context.node]
+					assert(forward_declaration.kind == .Struct || forward_declaration.kind == .Union)
+	
+					forward_comments := forward_declaration.struct_or_union.attached_comments
+					inject_at(&structure.attached_comments, 0, ..forward_comments[:])
+				}
 
 				if structure.is_forward_declaration {
 					name_context = transmute(NameContextIndex) append_return_index(ctx.context_heap, NameContext{ node = current_node_index, parent = name_context, complete_name = complete_structure_name })
@@ -239,6 +263,11 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 					swallow_paragraph = true
 
 					return
+				}
+
+				// write directly, they are marked for skipping in write_sequence
+				for aid in structure.attached_comments {
+					write_node(ctx, aid, name_context)
 				}
 
 				str.write_string(ctx.result, complete_structure_name);
@@ -581,7 +610,7 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 				requires_new_paragraph = true
 
 			case:
-				was_preproc := #force_inline write_preproc_node(ctx.result, current_node)
+				was_preproc := #force_inline write_preproc_node(ctx.result, current_node^)
 				if was_preproc {
 					break
 				}
@@ -943,6 +972,16 @@ insert_new_definition :: proc(context_heap : ^[dynamic]NameContext, current_inde
 
 find_definition_for_name :: proc(context_heap : ^[dynamic]NameContext, current_index : NameContextIndex, compound_identifier : TokenRange) -> (root_context, name_context : ^NameContext)
 {
+	root_context, name_context = try_find_definition_for_name(context_heap, current_index, compound_identifier)
+	if name_context != nil { return }
+
+	loc := runtime.Source_Code_Location{ compound_identifier[0].location.file_path, cast(i32) compound_identifier[0].location.row, cast(i32) compound_identifier[0].location.column, "" }
+	dump_context_stack(context_heap[:], current_index)
+	panic(fmt.tprintf("'%v' was not found in context", compound_identifier), loc)
+}
+
+try_find_definition_for_name :: proc(context_heap : ^[dynamic]NameContext, current_index : NameContextIndex, compound_identifier : TokenRange) -> (root_context, name_context : ^NameContext)
+{
 	im_root_context := &context_heap[current_index]
 
 	ctx_stack: for {
@@ -964,9 +1003,7 @@ find_definition_for_name :: proc(context_heap : ^[dynamic]NameContext, current_i
 		return im_root_context, current_context
 	}
 
-	loc := runtime.Source_Code_Location{ compound_identifier[0].location.file_path, cast(i32) compound_identifier[0].location.row, cast(i32) compound_identifier[0].location.column, "" }
-	dump_context_stack(context_heap[:], current_index)
-	panic(fmt.tprintf("'%v' was not found in context", compound_identifier), loc)
+	return nil, nil
 }
 
 @(thread_local) current_name_context_heap : ^[dynamic]NameContext

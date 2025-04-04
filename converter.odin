@@ -12,6 +12,7 @@ import      "core:math"
 import      "core:slice"
 import      "core:log"
 import      "core:io"
+import sa   "core:container/small_array"
 
 
 convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
@@ -296,15 +297,73 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 				ctx.context_heap[og_name_context].definitions[last(structure.name).source] = name_context
 				// no reset here, struct context might be relevant later on
 
+				BitfieldSectionData :: struct {
+					member_stack : sa.Small_Array(64, AstNodeIndex),
+					subsection_counter : int,
+					member_indent_str : string,
+				}
+				bitfield_section_data : BitfieldSectionData
+
+				write_bitfield_subsection_and_reset :: proc(ctx : ConverterContext, section_data : ^BitfieldSectionData, name_context : NameContextIndex, indent_str : string)
+				{
+					if len(section_data.member_indent_str) == 0 {
+						section_data.member_indent_str = str.concatenate({ indent_str, ONE_INDENT }, context.temp_allocator)
+					}
+
+					str.write_string(ctx.result, indent_str);
+					str.write_string(ctx.result, "using _");
+					fmt.sbprint(ctx.result, section_data.subsection_counter);
+					str.write_string(ctx.result, " : bit_field u8 {\n");
+
+					for ci in sa.slice(&section_data.member_stack) {
+						#partial switch ctx.ast[ci].kind {
+							case .VariableDeclaration:
+								str.write_string(ctx.result, section_data.member_indent_str);
+								write_node(ctx, ci, name_context)
+								str.write_byte(ctx.result, ',')
+
+							case:
+								write_node(ctx, ci, name_context)
+						}
+					}
+
+					str.write_string(ctx.result, indent_str);
+					str.write_string(ctx.result, "},\n");
+
+					sa.clear(&section_data.member_stack)
+				}
+
 				has_static_var_members := false
 				has_inplicit_initializer := false
-				for ci in structure.members {
+				for cii := 0; cii < len(structure.members); cii += 1 {
+					ci := structure.members[cii]
 					#partial switch ctx.ast[ci].kind {
 						case .VariableDeclaration:
 							member := ctx.ast[ci].var_declaration
 							if .Static in member.flags { has_static_var_members = true; continue }
 
 							d := insert_new_definition(ctx.context_heap, name_context, member.var_name.source, ci, member.var_name.source)
+							has_inplicit_initializer |= member.initializer_expression != {}
+
+							if member.width_expression != {} {
+								sa.append(&bitfield_section_data.member_stack, ci)
+								
+								// eat additional newlines an comments
+								bitfield_loop: for ; cii + 1 < len(structure.members); cii += 1 {
+									ci = structure.members[cii + 1]
+									#partial switch ctx.ast[ci].kind {
+										case .NewLine, .Comment:
+											sa.append(&bitfield_section_data.member_stack, ci)
+										case:
+											break bitfield_loop
+									}
+								}
+								continue
+							}
+
+							if sa.len(bitfield_section_data.member_stack) > 0 {
+								write_bitfield_subsection_and_reset(ctx, &bitfield_section_data, name_context, member_indent_str)
+							}
 
 							str.write_string(ctx.result, member_indent_str);
 							str.write_string(ctx.result, member.var_name.source);
@@ -312,7 +371,6 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 							write_type(ctx, ctx.ast[member.type], name_context)
 							str.write_string(ctx.result, ",\n")
 
-							has_inplicit_initializer |= member.initializer_expression != {}
 
 						case .Comment:
 							str.write_string(ctx.result, member_indent_str);
@@ -324,6 +382,10 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 								str.write_byte(ctx.result, '\n')
 							}
 					}
+				}
+
+				if sa.len(bitfield_section_data.member_stack) > 0 {
+					write_bitfield_subsection_and_reset(ctx, &bitfield_section_data, name_context, member_indent_str)
 				}
 
 				str.write_string(ctx.result, indent_str); str.write_byte(ctx.result, '}')
@@ -433,6 +495,11 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 				str.write_string(ctx.result, complete_name);
 				str.write_string(ctx.result, " : ")
 				write_type(ctx, ctx.ast[vardef.type], name_context)
+
+				if vardef.width_expression != {} {
+					str.write_string(ctx.result, " | ")
+					write_node(ctx, vardef.width_expression, name_context)
+				}
 
 				if vardef.initializer_expression != {} {
 					str.write_string(ctx.result, " = ")

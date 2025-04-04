@@ -690,11 +690,8 @@ parse_ast_scoped_sequence_no_open_brace :: proc(ast : ^[dynamic]AstNode, tokens 
 
 		#partial switch member_type {
 			case .VariableDeclaration, .Sequence, .Struct, .Union, .Do, .ExprBinary, .ExprUnaryLeft, .ExprUnaryRight, .MemberAccess, .FunctionCall, .Return, .Break, .Continue:
-				_, sem_err := eat_token_expect(tokens, .Semicolon)
-				if sem_err != nil {
-					err = sem_err // var declaraions must end in a semicolon
-					return
-				}
+				// most declarations and statements must end in a semicolon
+				eat_token_expect(tokens, .Semicolon) or_return
 		}
 	}
 
@@ -713,7 +710,7 @@ parse_ast_var_declaration_no_type :: proc(ast : ^[dynamic]AstNode, tokens : ^[]T
 		tokens^ = tokens_reset
 	}
 
-	current_type : AstNode
+	current_type, width_expression : AstNode
 	err, _ = peek_token(tokens)
 	last_name : Token
 
@@ -753,11 +750,20 @@ parse_ast_var_declaration_no_type :: proc(ast : ^[dynamic]AstNode, tokens : ^[]T
 							type = transmute(AstNodeIndex) append_return_index(ast, current_type.kind == {} ? base_type : current_type),
 							var_name = next,
 							flags = storage_flags,
+							width_expression = width_expression.kind == {} ? {} : transmute(AstNodeIndex) append_return_index(ast, width_expression)
 						}}
 						append(sequence, transmute(AstNodeIndex) append_return_index(ast, decl_node))
 						
 						current_type.kind = {} // @leak
+						width_expression.kind = {} // @leak
 						err = tokens[0]
+
+					case .Colon: // bitfield, e.g.    ... a : 3
+						tokens^ = nns // eat the :
+
+						width_expression = parse_ast_expression(ast, tokens) or_return
+
+						err = nil
 
 					case .Semicolon: // ... a;
 						tokens^ = ns // don't eat the semicolon
@@ -766,8 +772,10 @@ parse_ast_var_declaration_no_type :: proc(ast : ^[dynamic]AstNode, tokens : ^[]T
 							type = transmute(AstNodeIndex) append_return_index(ast, current_type.kind == {} ? base_type : current_type),
 							var_name = next,
 							flags = storage_flags,
+							width_expression = width_expression.kind == {} ? {} : transmute(AstNodeIndex) append_return_index(ast, width_expression)
 						}}
 						append(sequence, transmute(AstNodeIndex) append_return_index(ast, decl_node))
+
 						err = nil
 						return
 
@@ -785,10 +793,12 @@ parse_ast_var_declaration_no_type :: proc(ast : ^[dynamic]AstNode, tokens : ^[]T
 					type = transmute(AstNodeIndex) append_return_index(ast, current_type),
 					var_name = last_name,
 					flags = storage_flags,
+					width_expression = width_expression.kind == {} ? {} : transmute(AstNodeIndex) append_return_index(ast, width_expression)
 				}}
 				append(sequence, transmute(AstNodeIndex) append_return_index(ast, decl_node))
 
 				current_type.kind = {} // @leak
+				width_expression.kind = {} // @leak
 				err = tokens[0]
 
 
@@ -802,16 +812,17 @@ parse_ast_var_declaration_no_type :: proc(ast : ^[dynamic]AstNode, tokens : ^[]T
 				err = tokens[0]
 
 			case .Semicolon:
-				//         v
-				// int b[3];
+				//         v            v
+				// int b[3];   int a : 3;
 
-				// don't eat the semicolon
+				// tokens^ = ns // don't eat the semicolon
 
-				if current_type.kind != {} {
+				if current_type.kind != {} || width_expression.kind != {} {
 					decl_node := AstNode{ kind = .VariableDeclaration, var_declaration = {
-						type = transmute(AstNodeIndex) append_return_index(ast, current_type),
+						type = transmute(AstNodeIndex) append_return_index(ast, current_type.kind != {} ? current_type : base_type),
 						var_name = last_name,
 						flags = storage_flags,
+						width_expression = width_expression.kind == {} ? {} : transmute(AstNodeIndex) append_return_index(ast, width_expression)
 					}}
 					append(sequence, transmute(AstNodeIndex) append_return_index(ast, decl_node))
 
@@ -1292,6 +1303,7 @@ AstNode :: struct {
 			type : AstNodeIndex,
 			var_name : Token,
 			initializer_expression : AstNodeIndex,
+			width_expression : AstNodeIndex,
 			flags : AstVariableDefFlags,
 		},
 		function_def : struct {

@@ -272,7 +272,18 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 				}
 
 				str.write_string(ctx.result, complete_structure_name);
-				str.write_string(ctx.result, current_node.kind == .Struct ? " :: struct {\n" : " :: struct #raw_union {\n")
+				str.write_string(ctx.result, " :: struct")
+
+				if len(structure.template_spec) != 0 {
+					str.write_byte(ctx.result, '(')
+					for ti, i in structure.template_spec {
+						if i > 0 { str.write_string(ctx.result, ", ") }
+						write_node(ctx, ti, name_context)
+					}
+					str.write_byte(ctx.result, ')')
+				}
+
+				str.write_string(ctx.result, current_node.kind == .Struct ? " {\n" : " #raw_union {\n")
 
 				if structure.base_type != nil {
 					// copy over defs from base type, using their location
@@ -936,6 +947,10 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 					case "double":
 						remaining_input = input[1:]
 						append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = "f64" } })
+
+					case "typename", "class":
+						remaining_input = input[1:]
+						append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = "typeid" } })
 
 					case:
 						append(output, _TypeFragment{ identifier = input[0] })

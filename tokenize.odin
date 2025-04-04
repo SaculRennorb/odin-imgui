@@ -199,6 +199,20 @@ tokenize :: proc(tokens : ^[dynamic]Token, text : string, file_path : string)
 						append(tokens, Token{.Do, str, loc})
 					case "while":
 						append(tokens, Token{.While, str, loc})
+					case "typedef":
+						append(tokens, Token{.Typedef, str, loc})
+					case "struct":
+						append(tokens, Token{.Struct, str, loc})
+					case "class":
+						append(tokens, Token{.Class, str, loc})
+					case "union":
+						append(tokens, Token{.Union, str, loc})
+					case "enum":
+						append(tokens, Token{.Enum, str, loc})
+					case "template":
+						append(tokens, Token{.Template, str, loc})
+					case "namespace":
+						append(tokens, Token{.Namespace, str, loc})
 					case:
 						append(tokens, Token{.Identifier, str, loc})
 				}
@@ -292,6 +306,14 @@ TokenKind :: enum {
 	LiteralCharacter,
 	LiteralNull,
 	Comment,
+
+	Typedef,
+	Struct,
+	Class,
+	Union,
+	Enum,
+	Template,
+	Namespace,
 
 	Return,
 	Break,

@@ -132,15 +132,28 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 			str.write_string(ctx.result, complete_name);
 			str.write_string(ctx.result, " :: proc(")
 
+			arg_count := 0
+
+			for ti in fn_node.template_spec {
+				if arg_count > 0 { str.write_string(ctx.result, ", ") }
+
+				str.write_byte(ctx.result, '$')
+				write_node(ctx, ti, name_context)
+			}
+
 			if is_member_fn {
+				if arg_count > 0 { str.write_string(ctx.result, ", ") }
+
 				str.write_string(ctx.result, "this : ^")
 				str.write_string(ctx.result, complete_structure_name);
 
 				insert_new_definition(ctx.context_heap, name_context, "this", -1, "this")
+
+				arg_count += 1
 			}
 
-			for nidx, i in fn_node.arguments {
-				if is_member_fn || i > 0 { str.write_string(ctx.result, ", ") }
+			for nidx in fn_node.arguments {
+				if arg_count > 0 { str.write_string(ctx.result, ", ") }
 				arg := ctx.ast[nidx].var_declaration
 
 				insert_new_definition(ctx.context_heap, name_context, arg.var_name.source, nidx, arg.var_name.source)
@@ -153,6 +166,8 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 					str.write_string(ctx.result, " = ")
 					write_node(ctx, arg.initializer_expression, name_context)
 				}
+
+				arg_count += 1
 			}
 
 			str.write_byte(ctx.result, ')')
@@ -956,6 +971,10 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 						append(output, _TypeFragment{ identifier = input[0] })
 						remaining_input = input[1:]
 				}
+
+			case .Class:
+				remaining_input = input[1:]
+				append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = "typeid" } })
 
 			case .Star:
 				remaining_input = input[1:]

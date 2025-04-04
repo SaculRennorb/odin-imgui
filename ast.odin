@@ -208,7 +208,17 @@ ast_parse_template_spec_no_keyword :: proc(ast : ^[dynamic]AstNode, tokens : ^[]
 			break
 		}
 
-		type := ast_parse_type(ast, tokens) or_return
+		type : AstNode
+		if n, ns := peek_token(tokens); n.kind == .Class {
+			tokens^ = ns
+			
+			type = AstNode { kind = .Type }
+			append(&type.type, n)
+		}
+		else {
+			type = ast_parse_type(ast, tokens) or_return
+		}
+		
 		
 		name := tokens[0]; tokens^ = tokens[1:]
 		

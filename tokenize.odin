@@ -51,6 +51,10 @@ tokenize :: proc(tokens : ^[dynamic]Token, text : string, file_path : string)
 					append(tokens, Token{.LessEq, transmute(string)remaining[:2], loc});
 					remaining = remaining[2:]
 				}
+				else if remaining < end[-1:] && remaining[1] == '<' {
+					append(tokens, Token{.ShiftLeft, transmute(string)remaining[:2], loc});
+					remaining = remaining[2:]
+				}
 				else {
 					append(tokens, Token{.BracketTriangleOpen, transmute(string)remaining[:1], loc});
 					remaining = remaining[1:]
@@ -59,6 +63,10 @@ tokenize :: proc(tokens : ^[dynamic]Token, text : string, file_path : string)
 			case '>': 
 				if remaining < end[-1:] && remaining[1] == '=' {
 					append(tokens, Token{.GreaterEq, transmute(string)remaining[:2], loc});
+					remaining = remaining[2:]
+				}
+				else if remaining < end[-1:] && remaining[1] == '>' {
+					append(tokens, Token{.ShiftRight, transmute(string)remaining[:2], loc});
 					remaining = remaining[2:]
 				}
 				else {
@@ -333,6 +341,8 @@ TokenKind :: enum {
 	NotEquals,
 	LessEq,
 	GreaterEq,
+	ShiftLeft,
+	ShiftRight,
 }
 
 Token :: struct {

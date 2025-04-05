@@ -256,7 +256,7 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 
 			case .Struct, .Union:
 				member_indent_str := str.concatenate({ indent_str, ONE_INDENT }, context.temp_allocator)
-				structure := &current_node.struct_or_union
+				structure := &current_node.structure
 
 				complete_structure_name := fold_token_range(definition_prefix, structure.name)
 
@@ -268,7 +268,7 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 					forward_declaration := ctx.ast[forward_declared_context.node]
 					assert(forward_declaration.kind == .Struct || forward_declaration.kind == .Union)
 	
-					forward_comments := forward_declaration.struct_or_union.attached_comments
+					forward_comments := forward_declaration.structure.attached_comments
 					inject_at(&structure.attached_comments, 0, ..forward_comments[:])
 				}
 
@@ -456,7 +456,7 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 					str.write_string(ctx.result, complete_initializer_name);
 					str.write_string(ctx.result, " :: proc(this : ^")
 					str.write_string(ctx.result, complete_structure_name);
-					if initializer.kind == .FunctionDefinition {
+					if initializer.kind == .FunctionDefinition && .ForwardDeclaration not_in initializer.function_def.flags {
 						for nidx, i in initializer.function_def.arguments {
 							str.write_string(ctx.result, ", ")
 							arg := ctx.ast[nidx].var_declaration
@@ -488,7 +488,7 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 						write_node(ctx, member.initializer_expression, name_context)
 						str.write_byte(ctx.result, '\n')
 					}
-					if initializer.kind == .FunctionDefinition {
+					if initializer.kind == .FunctionDefinition && .ForwardDeclaration not_in initializer.function_def.flags {
 						write_node_sequence(ctx, initializer.function_def.body_sequence[:], name_context, member_indent_str)
 						if ctx.ast[last(initializer.function_def.body_sequence[:])^].kind != .NewLine { str.write_byte(ctx.result, '\n') }
 					}
@@ -505,12 +505,89 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 
 						case .Struct, .Union:
 							str.write_string(ctx.result, "\n\n")
-							ctx.ast[midx].struct_or_union.name = slice.concatenate([][]Token{structure.name, ctx.ast[midx].struct_or_union.name})
+							ctx.ast[midx].structure.name = slice.concatenate([][]Token{structure.name, ctx.ast[midx].structure.name})
 							write_node(ctx, midx, name_context, indent_str)
 
 							requires_new_paragraph = true
 					}
 				}
+
+			case .Enum:
+				structure := &current_node.structure
+
+				complete_structure_name := fold_token_range(definition_prefix, structure.name)
+
+				og_name_context := name_context
+				name_context := name_context
+
+				_, forward_declared_context := try_find_definition_for_name(ctx.context_heap, name_context, structure.name)
+				if forward_declared_context != nil {
+					forward_declaration := ctx.ast[forward_declared_context.node]
+					assert_eq(forward_declaration.kind, AstNodeKind.Enum)
+	
+					forward_comments := forward_declaration.structure.attached_comments
+					inject_at(&structure.attached_comments, 0, ..forward_comments[:])
+				}
+
+				// enums spill out members into parent context, don'T replace the name_context for members
+				structure_name_context := transmute(NameContextIndex) append_return_index(ctx.context_heap, NameContext{ node = current_node_index, parent = name_context, complete_name = complete_structure_name })
+				ctx.context_heap[og_name_context].definitions[last(structure.name).source] = structure_name_context
+
+				if structure.is_forward_declaration {
+					swallow_paragraph = true
+					return
+				}
+
+				// write directly, they are marked for skipping in write_sequence
+				for aid in structure.attached_comments {
+					write_node(ctx, aid, name_context)
+				}
+
+				str.write_string(ctx.result, complete_structure_name);
+				str.write_string(ctx.result, " :: enum ")
+
+				if structure.base_type != nil {
+					write_type_inner(ctx, structure.base_type, name_context)
+				}
+				else {
+					str.write_string(ctx.result, "i32")
+				}
+
+				str.write_string(ctx.result, " {\n")
+
+				member_indent_str := str.concatenate({ indent_str, ONE_INDENT }, context.temp_allocator)
+				for cii := 0; cii < len(structure.members); cii += 1 {
+					ci := structure.members[cii]
+					#partial switch ctx.ast[ci].kind {
+						case .VariableDeclaration:
+							member := ctx.ast[ci].var_declaration
+
+							d := insert_new_definition(ctx.context_heap, name_context, member.var_name.source, ci, member.var_name.source)
+
+							str.write_string(ctx.result, member_indent_str);
+							str.write_string(ctx.result, member.var_name.source);
+
+							if member.initializer_expression != {} {
+								str.write_string(ctx.result, " = ")
+								write_node(ctx, member.initializer_expression, name_context)
+							}
+
+							str.write_string(ctx.result, ",\n")
+
+
+						case .Comment:
+							str.write_string(ctx.result, member_indent_str);
+							str.write_string(ctx.result, ctx.ast[ci].literal.source)
+							str.write_byte(ctx.result, '\n')
+
+						case:
+							if write_preproc_node(ctx.result, ctx.ast[ci]) {
+								str.write_byte(ctx.result, '\n')
+							}
+					}
+				}
+
+				str.write_string(ctx.result, indent_str); str.write_byte(ctx.result, '}')
 
 			case .VariableDeclaration:
 				vardef := current_node.var_declaration
@@ -590,7 +667,18 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 			case .ExprBinary:
 				write_node(ctx, current_node.binary.left, name_context)
 				str.write_byte(ctx.result, ' ')
-				str.write_byte(ctx.result, u8(current_node.binary.operator))
+				#partial switch current_node.binary.operator {
+					case .LogicAnd:   str.write_string(ctx.result, "&&")
+					case .LogicOr:    str.write_string(ctx.result, "||")
+					case .Equals:     str.write_string(ctx.result, "==")
+					case .NotEquals:  str.write_string(ctx.result, "!=")
+					case .LessEq:     str.write_string(ctx.result, "<=")
+					case .GreaterEq:  str.write_string(ctx.result, ">=")
+					case .ShiftLeft:  str.write_string(ctx.result, "<<")
+					case .ShiftRight: str.write_string(ctx.result, ">>")
+					case:
+						str.write_byte(ctx.result, u8(current_node.binary.operator))
+				}
 				str.write_byte(ctx.result, ' ')
 				write_node(ctx, current_node.binary.right, name_context)
 
@@ -598,19 +686,21 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 
 			case .MemberAccess:
 				member := ctx.ast[current_node.member_access.member]
+
+				_, this_context := resolve_type(ctx, current_node.member_access.expression, name_context)
+				this_idx := transmute(NameContextIndex) mem.ptr_sub(this_context, &ctx.context_heap[0])
+
 				if member.kind == .FunctionCall {
 					fncall := member.function_call
 
 					is_ptr := current_node.member_access.through_pointer
-					this_root, this_context := resolve_type(ctx, current_node.member_access.expression, name_context)
 
 					// maybe find basetype for this member
-					this_idx := transmute(NameContextIndex) mem.ptr_sub(this_context, &ctx.context_heap[0])
 					_, actual_member_context := find_definition_for_name(ctx.context_heap, this_idx, fncall.qualified_name[:])
 
 					this_type := ctx.ast[ctx.context_heap[actual_member_context.parent].node]
-					if this_type.kind != .Struct && this_type.kind != .Union {
-						panic(fmt.tprintf("Unexpected this type %v", this_type))
+					if this_type.kind != .Struct {
+						panic(fmt.tprintf("Unexpected this type %v for %", this_type, fncall))
 					}
 
 					str.write_string(ctx.result, actual_member_context.complete_name)
@@ -626,7 +716,16 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 				else {
 					write_node(ctx, current_node.member_access.expression, name_context)
 					str.write_byte(ctx.result, '.')
-					write_node(ctx, current_node.member_access.member, name_context)
+
+					// maybe find basetype for this member
+					_, actual_member_context := find_definition_for_name(ctx.context_heap, this_idx, member.identifier[:])
+
+					this_type := ctx.ast[ctx.context_heap[actual_member_context.parent].node]
+					if this_type.kind != .Struct && this_type.kind != .Union && this_type.kind != .Enum {
+						panic(fmt.tprintf("Unexpected this type %v for %", this_type, member.identifier))
+					}
+
+					str.write_string(ctx.result, actual_member_context.complete_name)
 				}
 
 				requires_termination = true
@@ -739,7 +838,11 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 	write_type :: proc(ctx : ConverterContext, r : AstNode, name_context : NameContextIndex)
 	{
 		type_tokens := r.type[:]
+		write_type_inner(ctx, type_tokens, name_context)
+	}
 
+	write_type_inner :: proc(ctx : ConverterContext, type_tokens : []Token, name_context : NameContextIndex)
+	{
 		converted_type_tokens := make([dynamic]TypeSegment, 0, len(type_tokens), context.temp_allocator)
 		translate_type(&converted_type_tokens, ctx.ast, type_tokens)
 
@@ -1024,22 +1127,24 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 							transform_expression(output, ast, node.binary.left)
 							t := Token{ kind = TokenKind(node.binary.operator) }
 							switch node.binary.operator {
-								case .Assign:   t.source = "="
-								case .Plus:     t.source = "+"
-								case .Minus:    t.source = "-"
-								case .Times:    t.source = "*"
-								case .Divide:   t.source = "/"
-								case .And:      t.source = "&"
-								case .Or:       t.source = "|"
-								case .Xor:      t.source = "~"
-								case .Less:     t.source = "<"
-								case .Greater:  t.source = ">"
-								case .LogicAnd: t.source = "&&"
-								case .LogicOr:  t.source = "||"
-								case .Equals:   t.source = "=="
-								case .NotEquals:t.source = "!="
-								case .LessEq:   t.source = "<="
-								case .GreaterEq:t.source = ">="
+								case .Assign:    t.source = "="
+								case .Plus:      t.source = "+"
+								case .Minus:     t.source = "-"
+								case .Times:     t.source = "*"
+								case .Divide:    t.source = "/"
+								case .And:       t.source = "&"
+								case .Or:        t.source = "|"
+								case .Xor:       t.source = "~"
+								case .Less:      t.source = "<"
+								case .Greater:   t.source = ">"
+								case .LogicAnd:  t.source = "&&"
+								case .LogicOr:   t.source = "||"
+								case .Equals:    t.source = "=="
+								case .NotEquals: t.source = "!="
+								case .LessEq:    t.source = "<="
+								case .GreaterEq: t.source = ">="
+								case .ShiftLeft: t.source = "<<"
+								case .ShiftRight:t.source = ">>"
 							}
 							append(output, t)
 							transform_expression(output, ast, node.binary.right)
@@ -1078,7 +1183,7 @@ find_definition_for_name :: proc(context_heap : ^[dynamic]NameContext, current_i
 
 	loc := runtime.Source_Code_Location{ compound_identifier[0].location.file_path, cast(i32) compound_identifier[0].location.row, cast(i32) compound_identifier[0].location.column, "" }
 	dump_context_stack(context_heap[:], current_index)
-	panic(fmt.tprintf("'%v' was not found in context", compound_identifier), loc)
+	panic(fmt.tprintf("%v : '%v' was not found in context", compound_identifier[0].location, compound_identifier), loc)
 }
 
 try_find_definition_for_name :: proc(context_heap : ^[dynamic]NameContext, current_index : NameContextIndex, compound_identifier : TokenRange) -> (root_context, name_context : ^NameContext)
@@ -1151,7 +1256,7 @@ dump_context_stack :: proc(context_heap : []NameContext, name_context_idx : Name
 {
 	name_context := context_heap[name_context_idx]
 	
-	fmt.eprintf("#%v %v%v -> ", transmute(int)name_context_idx, indent, name);
+	fmt.eprintf("#%3v %v%v -> ", transmute(int)name_context_idx, indent, name);
 
 	if len(name_context.definitions) == 0 {
 		fmt.eprintf("<leaf>\n");

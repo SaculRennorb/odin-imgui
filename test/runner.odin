@@ -91,7 +91,7 @@ test :: proc(t : ^testing.T)
 			assert(err == nil)
 		}
 
-		input_map : map[string][]converter.Token
+		input_map : map[string]converter.Input
 		preprocessed : [dynamic]converter.Token
 		ast  : [dynamic]converter.AstNode
 		result : str.Builder
@@ -102,7 +102,7 @@ test :: proc(t : ^testing.T)
 		ref, err2 := os.read_entire_file(fmt.tprintf(BASEDIR+"/ref/%v.odin", path.stem(file.name)))
 		assert(err2, "Missing ref file?", loc)
 
-		for _, stream in input_map { delete(stream) }
+		for _, stream in input_map { delete(stream.tokens) }
 		clear(&input_map)
 		for file in inputs {
 			loc.file_path = file.name
@@ -116,7 +116,7 @@ test :: proc(t : ^testing.T)
 			log.debug("tokenizing ... ", location = loc)
 			converter.tokenize(&toks, cast(string) content, file.name)
 
-			input_map[file.name] = toks[:]
+			input_map[file.name] = { toks[:], false }
 		}
 
 		loc.file_path = file.name

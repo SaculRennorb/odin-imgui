@@ -3,19 +3,24 @@ package program
 import "core:mem"
 import "core:fmt"
 
+Input :: struct {
+	tokens : []Token,
+	used : bool,
+}
+
 PreProcContext :: struct {
 	result  : ^[dynamic]Token,
-	inputs  : map[string][]Token,
+	inputs  : map[string]Input,
 	defines : map[string]Token,
 }
 
 preprocess :: proc(ctx : ^PreProcContext, entry_file : string)
 {
-	err := do_preprocess(ctx, ctx.inputs[entry_file])
+	err := do_preprocess(ctx, &ctx.inputs[entry_file])
 	if(err != nil) { panic(fmt.tprint("Preprocess failed at", err.?)) }
-	do_preprocess :: proc(ctx : ^PreProcContext, tokens : []Token) -> AstError
+	do_preprocess :: proc(ctx : ^PreProcContext, input : ^Input) -> AstError
 	{
-		tokens := tokens
+		tokens := input.tokens
 		reserve(ctx.result, len(tokens))
 
 		for len(tokens) > 0 {
@@ -38,6 +43,9 @@ preprocess :: proc(ctx : ^PreProcContext, entry_file : string)
 							if tokens[0].kind == .NewLine { break }
 						}
 						args = slice_from_se(raw_data(args_start), raw_data(tokens))
+
+						tokens = tokens[1:]
+						eat_token_expect(&tokens, .NewLine)
 					}
 
 					#partial switch args[0].kind {
@@ -45,19 +53,42 @@ preprocess :: proc(ctx : ^PreProcContext, entry_file : string)
 							str := args[0].source
 							str = str[1:len(str) - 1] // strip of quotation marks
 
-							included_stream, found := ctx.inputs[str]
+							included, found := &ctx.inputs[str]
 							if !found {
 								str := fmt.tprintf("Failed to find include %v in", str)
 								for k, v in ctx.inputs {
-									str = fmt.tprintf("%v\n%v => [%v]Token", str, k, len(v))
+									str = fmt.tprintf("%v\n%v => [%v]Token", str, k, len(v.tokens))
 								}
 								panic(str)
 							}
-							do_preprocess(ctx, included_stream)
+
+							if !included.used {
+								do_preprocess(ctx, included)
+							}
 
 						case:
 							panic(fmt.tprint("Unknown include arg:", args[0]))
 					}
+
+				case "pragma":
+					args : []Token
+					{
+						args_start := tokens
+						for {
+							tokens = tokens[1:]
+							if tokens[0].kind == .NewLine { break }
+						}
+						args = slice_from_se(raw_data(args_start), raw_data(tokens))
+
+						tokens = tokens[1:]
+						eat_token_expect(&tokens, .NewLine)
+					}
+
+					assert_eq(len(args), 1)
+
+					assert_eq(args[0].source, "once")
+					input.used = true
+
 
 				case "define":
 					append(ctx.result, Token{ kind = .PreprocDefine, location = ident.location })

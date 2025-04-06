@@ -27,7 +27,15 @@ ast_parse_filescope_sequence :: proc(ast : ^[dynamic]AstNode, tokens_ : []Token)
 				append(&sequence, transmute(AstNodeIndex) append_return_index(ast, AstNode{ kind = .Comment, literal = token }))
 
 			case .Typedef:
-				panic(fmt.tprintf("Typedef at %v not implemented.", token))
+				tokens^ = tokenss // eat keyword
+
+				node, err := ast_parse_typedef_no_keyword(ast, tokens)
+				if err != nil {
+					panic(fmt.tprintf("Failed to parse typedef at %v.", err))
+				}
+				append(&sequence, transmute(AstNodeIndex) append_return_index(ast, node))
+
+				eat_token_expect(tokens, .Semicolon)
 
 			case .Template:
 				tokens^ = tokenss // eat keyword
@@ -531,6 +539,36 @@ ast_parse_function_def :: proc(ast : ^[dynamic]AstNode, tokens : ^[]Token) -> (n
 	node.function_def.function_name = ast_filter_qualified_name(name)
 	node.function_def.return_type =  transmute(AstNodeIndex) append_return_index(ast, return_type_node)
 	node.function_def.flags = transmute(AstFunctionDefFlags) storage
+
+	return
+}
+
+ast_parse_typedef_no_keyword :: proc(ast : ^[dynamic]AstNode, tokens : ^[]Token) -> (node : AstNode, err : AstError)
+{
+	start := raw_data(tokens^)
+
+	for {
+		next, ns := peek_token(tokens)
+		if next.kind == .Semicolon { break }
+		tokens^ = ns
+	}
+
+	node = AstNode { kind = .Typedef }
+	
+	test := raw_data(tokens^)[-1]
+	if test.kind == .Identifier {
+		type_tokens := slice_from_se(start, raw_data(tokens^)[-1:])
+		type := ast_parse_type(ast, &type_tokens) or_return
+		assert_eq(len(type_tokens), 0)
+		
+		node.typedef.name = test
+		node.typedef.type = transmute(AstNodeIndex) append_return_index(ast, type)
+	}
+	else { // fnptr
+		type_tokens := slice_from_se(start, raw_data(tokens^)[1:])
+		type := ast_parse_fnptr_type(ast, &type_tokens) or_return
+		node.typedef.type = transmute(AstNodeIndex) append_return_index(ast, type)
+	}
 
 	return
 }
@@ -1045,6 +1083,22 @@ ast_parse_function_call :: proc(ast : ^[dynamic]AstNode, tokens : ^[]Token) -> (
 	}
 }
 
+ast_parse_fnptr_type :: proc(ast :  ^[dynamic]AstNode, tokens : ^[]Token) -> (node : AstNode, err : AstError)
+{
+	return_type := ast_parse_type(ast, tokens) or_return
+	eat_token_expect(tokens, .BracketRoundOpen) or_return
+	eat_token_expect(tokens, .Star) or_return
+	name, _ := eat_token_expect(tokens, .Identifier)
+	eat_token_expect(tokens, .BracketRoundClose) or_return
+
+	node = ast_parse_function_def_no_return_type_and_name(ast, tokens) or_return
+	node.function_def.return_type = transmute(AstNodeIndex) append_return_index(ast, return_type)
+	node.function_def.function_name = make([dynamic]Token, 0, 1)
+	append(&node.function_def.function_name, name)
+
+	return
+}
+
 ast_parse_type :: proc(ast :  ^[dynamic]AstNode, tokens : ^[]Token) -> (node : AstNode, err : AstError)
 {
 	range := ast_parse_type_inner(tokens) or_return
@@ -1207,7 +1261,7 @@ ast_parse_expression :: proc(ast : ^[dynamic]AstNode, tokens : ^[]Token, flags :
 
 					continue
 
-				case .Assign, .Plus, .Minus, .Star, .ForwardSlash, .Ampersand, .Pipe, .Circumflex, .BracketTriangleOpen, .BracketTriangleClose, .DoubleAmpersand, .DoublePipe, .Equals, .NotEquals, .LessEq, .GreaterEq, .ShiftLeft, .ShiftRight:
+				case .Assign, .Plus, .Minus, .Star, .ForwardSlash, .Ampersand, .Pipe, .Circumflex, .BracketTriangleOpen, .BracketTriangleClose, .DoubleAmpersand, .DoublePipe, .Equals, .NotEquals, .LessEq, .GreaterEq, .ShiftLeft, .ShiftRight, .Percent:
 					tokens^ = nexts
 
 					right_node := ast_parse_expression(ast, tokens, flags) or_return
@@ -1397,6 +1451,7 @@ AstBinaryOp :: enum {
 	Xor          = '^',
 	Less         = '<',
 	Greater      = '>',
+	Modulo       = '%',
 	
 	LogicAnd = cast(int)TokenKind.DoubleAmpersand,
 	LogicOr,
@@ -1439,6 +1494,7 @@ AstNodeKind :: enum {
 	For,
 	Do,
 	While,
+	Typedef,
 
 	PreprocDefine,
 	PreprocMacro,
@@ -1539,7 +1595,11 @@ AstNode :: struct {
 		loop : struct {
 			initializer, condition, loop_statement : AstNodeIndex,
 			body_sequence : [dynamic]AstNodeIndex,
-		}
+		},
+		typedef : struct {
+			name : Token,
+			type : AstNodeIndex,
+		},
 	}
 }
 
@@ -1628,6 +1688,7 @@ fmt_astnode :: proc(fi: ^fmt.Info, node: ^AstNode, verb: rune) -> bool
 		case .PreprocElse        : fmt.fmt_arg(fi, node.token_sequence, 'v')
 		case .PreprocEndif       :
 		case .PreprocDefine      : fmt.fmt_arg(fi, node.preproc_define, 'v')
+		case .Typedef            : fmt.fmt_arg(fi, node.typedef, 'v')
 		case .PreprocMacro       : fmt.fmt_arg(fi, node.preproc_macro, 'v')
 		case .LiteralString      : fmt.fmt_arg(fi, node.literal, 'v')
 		case .LiteralCharacter   : fmt.fmt_arg(fi, node.literal, 'v')

@@ -2,6 +2,7 @@ package program
 
 import "core:mem"
 import "core:fmt"
+import "core:strings"
 
 Input :: struct {
 	tokens : []Token,
@@ -23,7 +24,7 @@ preprocess :: proc(ctx : ^PreProcContext, entry_file : string)
 		tokens := input.tokens
 		reserve(ctx.result, len(tokens))
 
-		for len(tokens) > 0 {
+		loop: for len(tokens) > 0 {
 			current_token := tokens[0]
 			tokens = tokens[1:]
 			if current_token.kind != .Pound {
@@ -48,26 +49,32 @@ preprocess :: proc(ctx : ^PreProcContext, entry_file : string)
 						eat_token_expect(&tokens, .NewLine)
 					}
 
+					include_path : string
 					#partial switch args[0].kind {
 						case .LiteralString:
-							str := args[0].source
-							str = str[1:len(str) - 1] // strip of quotation marks
+							include_path = args[0].source
+							include_path = include_path[1:len(include_path) - 1] // strip of quotation marks
 
-							included, found := &ctx.inputs[str]
-							if !found {
-								str := fmt.tprintf("Failed to find include %v in", str)
-								for k, v in ctx.inputs {
-									str = fmt.tprintf("%v\n%v => [%v]Token", str, k, len(v.tokens))
-								}
-								panic(str)
-							}
-
-							if !included.used {
-								do_preprocess(ctx, included)
-							}
+						case .BracketTriangleOpen:
+							//include_path := args[1].source
+							continue loop // just skip system includes
 
 						case:
 							panic(fmt.tprint("Unknown include arg:", args[0]))
+					}
+
+
+					included, found := &ctx.inputs[include_path]
+					if !found {
+						str := fmt.tprintf("%v\nFailed to find include %v in", args, include_path)
+						for k, v in ctx.inputs {
+							str = fmt.tprintf("%v\n%v => [%v]Token", str, k, len(v.tokens))
+						}
+						panic(str)
+					}
+
+					if !included.used {
+						do_preprocess(ctx, included)
 					}
 
 				case "pragma":
@@ -84,10 +91,17 @@ preprocess :: proc(ctx : ^PreProcContext, entry_file : string)
 						eat_token_expect(&tokens, .NewLine)
 					}
 
-					assert_eq(len(args), 1)
+					switch args[0].source {
+						case "once":
+							input.used = true
 
-					assert_eq(args[0].source, "once")
-					input.used = true
+						case "warning", "clang", "GCC": // pragma warning push
+							/* just ignore */
+
+						case:
+							panic(fmt.tprintf("Unknown pragma: %v", args))
+					}
+					
 
 
 				case "define":
@@ -121,6 +135,24 @@ preprocess :: proc(ctx : ^PreProcContext, entry_file : string)
 
 				case "endif":
 					append(ctx.result, Token{ kind = .PreprocEndif })
+
+				case "error":
+					args : []Token
+					{
+						args_start := tokens
+						for {
+							tokens = tokens[1:]
+							if tokens[0].kind == .NewLine { break }
+						}
+						args = slice_from_se(raw_data(args_start), raw_data(tokens))
+					}
+
+					str := "// warning"
+					for arg in args {
+						str = strings.concatenate({ str, " ", arg.source })
+					}
+
+					append(ctx.result, Token{ kind = .Comment, source = str, location = args[0].location })
 
 				case:
 					panic(fmt.tprint("Unknown preprocessor directive:", ident))

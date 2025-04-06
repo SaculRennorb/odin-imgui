@@ -9,6 +9,12 @@ main :: proc()
 {
 	input_map : map[string]Input
 	tokenize_file(&input_map, "imgui.h")
+	tokenize_file(&input_map, "imgui.cpp")
+	tokenize_file(&input_map, "imgui_internal.h")
+	tokenize_file(&input_map, "imgui_draw.cpp")
+	tokenize_file(&input_map, "imgui_tables.cpp")
+	tokenize_file(&input_map, "imgui_widgets.cpp")
+	tokenize_file(&input_map, "imconfig.h")
 
 	preprocessed : [dynamic]Token
 	preprocess(&{ result = &preprocessed, inputs = input_map }, "imgui.h")

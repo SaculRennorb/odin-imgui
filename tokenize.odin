@@ -22,7 +22,7 @@ tokenize :: proc(tokens : ^[dynamic]Token, text : string, file_path : string)
 				remaining = remaining[1:]
 				continue
 
-			case '#', ',', ';', '*', '^', '?', '~', '(', '[', '{', ')', ']', '}', '\\':
+			case '#', ',', ';', '*', '^', '?', '~', '(', '[', '{', ')', ']', '}', '\\', '%':
 				append(tokens, Token{cast(TokenKind) c, transmute(string)remaining[:1], loc})
 				remaining = remaining[1:]
 
@@ -298,6 +298,7 @@ TokenKind :: enum {
 	BracketTriangleOpen  = '<',
 	Assign               = '=',
 	BracketTriangleClose = '>',
+	Percent              = '%',
 	Tilde                = '~',
 
 	StaticScopingOperator,

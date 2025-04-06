@@ -94,7 +94,7 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 			return true
 		}
 
-		write_function :: proc(ctx : ConverterContext, name_context : NameContextIndex, function_node_idx : AstNodeIndex, complete_structure_name : string, is_member_fn : bool, indent_str : string)
+		write_function :: proc(ctx : ConverterContext, name_context : NameContextIndex, function_node_idx : AstNodeIndex, complete_structure_name : string, is_member_fn : bool, indent_str : string, write_forward_declared := false)
 		{
 			fn_node := &ctx.ast[function_node_idx].function_def
 
@@ -113,7 +113,7 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 
 			name_context := insert_new_definition(ctx.context_heap, name_context, last(fn_node.function_name[:]).source, function_node_idx, complete_name)
 
-			if .ForwardDeclaration in fn_node.flags {
+			if .ForwardDeclaration in fn_node.flags && !write_forward_declared {
 				return // Don't insert forward declarations, only insert the name context leaf node.
 			}
 
@@ -156,7 +156,9 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 				if arg_count > 0 { str.write_string(ctx.result, ", ") }
 				arg := ctx.ast[nidx].var_declaration
 
-				insert_new_definition(ctx.context_heap, name_context, arg.var_name.source, nidx, arg.var_name.source)
+				if .ForwardDeclaration not_in fn_node.flags {
+					insert_new_definition(ctx.context_heap, name_context, arg.var_name.source, nidx, arg.var_name.source)
+				}
 
 				str.write_string(ctx.result, arg.var_name.source)
 				str.write_string(ctx.result, " : ")
@@ -175,6 +177,10 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 			if fn_node.return_type != {} && ctx.ast[fn_node.return_type].type[0].source != "void" {
 				str.write_string(ctx.result, " -> ")
 				write_type(ctx, ctx.ast[fn_node.return_type], name_context)
+			}
+
+			if .ForwardDeclaration in fn_node.flags {
+				return
 			}
 
 			switch len(fn_node.body_sequence) {
@@ -217,6 +223,20 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 				write_token_range(ctx.result, define.expansion_tokens, "")
 
 				insert_new_definition(ctx.context_heap, 0, define.name.source, current_node_index, define.name.source)
+
+			case .Typedef:
+				define := current_node.typedef
+
+				if type_node := ctx.ast[define.type]; type_node.kind == .Type {
+					str.write_string(ctx.result, define.name.source)
+					str.write_string(ctx.result, " :: ")
+					write_type(ctx, type_node, name_context)
+
+					insert_new_definition(ctx.context_heap, 0, define.name.source, current_node_index, define.name.source)
+				}
+				else {
+					write_function(ctx, name_context, define.type, "", false, "", true)
+				}
 
 			case .PreprocMacro:
 				macro := current_node.preproc_macro
@@ -1230,6 +1250,7 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 								case .And:       t.source = "&"
 								case .Or:        t.source = "|"
 								case .Xor:       t.source = "~"
+								case .Modulo:    t.source = "%"
 								case .Less:      t.source = "<"
 								case .Greater:   t.source = ">"
 								case .LogicAnd:  t.source = "&&"

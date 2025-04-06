@@ -58,11 +58,6 @@ Index of this file:
 
 #pragma once
 
-// Configuration file with compile-time options
-// (edit imconfig.h or '#define IMGUI_USER_CONFIG "myfilename.h" from your build system)
-#ifdef IMGUI_USER_CONFIG
-#include IMGUI_USER_CONFIG
-#endif
 #include "imconfig.h"
 
 #ifndef IMGUI_DISABLE
@@ -294,8 +289,8 @@ typedef void    (*ImGuiMemFreeFunc)(void* ptr, void* user_data);                
 // - This is a frequently used type in the API. Consider using IM_VEC2_CLASS_EXTRA to create implicit cast from/to our preferred type.
 // - Add '#define IMGUI_DEFINE_MATH_OPERATORS' before including this file (or in imconfig.h) to access courtesy maths operators for ImVec2 and ImVec4.
 IM_MSVC_RUNTIME_CHECKS_OFF
-{
 struct ImVec2
+{
     float                                   x, y;
     constexpr ImVec2()                      : x(0.0f), y(0.0f) { }
     constexpr ImVec2(float _x, float _y)    : x(_x), y(_y) { }
@@ -3976,9 +3971,9 @@ namespace ImGui
 // May be convenient for some users to only explicitly include vanilla imgui.h and have extra stuff included.
 #ifdef IMGUI_INCLUDE_IMGUI_USER_H
 #ifdef IMGUI_USER_H_FILENAME
-#include IMGUI_USER_H_FILENAME
+//#include IMGUI_USER_H_FILENAME
 #else
-#include "imgui_user.h"
+//#include "imgui_user.h"
 #endif
 #endif
 

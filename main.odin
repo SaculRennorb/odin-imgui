@@ -19,8 +19,13 @@ main :: proc()
 	preprocessed : [dynamic]Token
 	preprocess(&{ result = &preprocessed, inputs = input_map }, "imgui.h")
 
+	ignore_root_level_identifiers := []string {
+		"IM_MSVC_RUNTIME_CHECKS_OFF",
+		"IM_MSVC_RUNTIME_CHECKS_RESTORE",
+	}
+
 	ast  : [dynamic]AstNode
-	ast_parse_filescope_sequence(&ast, preprocessed[:])
+	ast_parse_filescope_sequence(&ast, preprocessed[:], ignore_root_level_identifiers)
 
 	result : str.Builder
 	convert_and_format(&result, ast[:])

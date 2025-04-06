@@ -6,7 +6,7 @@ import "core:io"
 import str "core:strings"
 
 
-ast_parse_filescope_sequence :: proc(ast : ^[dynamic]AstNode, tokens_ : []Token) -> AstNode
+ast_parse_filescope_sequence :: proc(ast : ^[dynamic]AstNode, tokens_ : []Token, ignore_root_level_identifiers : []string) -> AstNode
 {
 	root_index := transmute(AstNodeIndex) append_return_index(ast, AstNode{ kind = .Sequence }) // unfinished node at index 0
 	sequence : [dynamic]AstNodeIndex
@@ -17,7 +17,7 @@ ast_parse_filescope_sequence :: proc(ast : ^[dynamic]AstNode, tokens_ : []Token)
 
 	for len(tokens) > 0 {
 		token, tokenss := peek_token(tokens, false)
-		#partial switch token.kind {
+		type_switch: #partial switch token.kind {
 			case .NewLine:
 				tokens^ = tokenss
 				append(&sequence, transmute(AstNodeIndex) append_return_index(ast, AstNode{ kind = .NewLine }))
@@ -66,6 +66,13 @@ ast_parse_filescope_sequence :: proc(ast : ^[dynamic]AstNode, tokens_ : []Token)
 				}
 
 			case .Namespace, .Identifier:
+				for name in ignore_root_level_identifiers {
+					if token.source == name {
+						tokens^ = tokenss
+						break type_switch
+					}
+				}
+
 				if node_idx, eat_paragraph, err := ast_parse_declaration(ast, tokens, &sequence); err != nil {
 					panic(fmt.tprintf("Failed to parse declaration at %v.", err))
 				}

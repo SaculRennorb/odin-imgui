@@ -373,7 +373,7 @@ ast_parse_declaration :: proc(ast : ^[dynamic]AstNode, tokens : ^[]Token, sequen
 			if nn.kind == .BracketRoundOpen {
 				tokens^ = ss // eat initializer "name"
 
-				initializer := ast_parse_function_def_no_return_type_and_name(ast, tokens) or_return
+				initializer := ast_parse_function_def_no_return_type_and_name(ast, tokens, true) or_return
 				initializer.function_def.function_name = make([dynamic]Token, 1);
 				initializer.function_def.function_name[0] = Token {
 					kind = .Identifier,
@@ -580,7 +580,7 @@ ast_parse_typedef_no_keyword :: proc(ast : ^[dynamic]AstNode, tokens : ^[]Token)
 	return
 }
 
-ast_parse_function_def_no_return_type_and_name :: proc(ast : ^[dynamic]AstNode, tokens : ^[]Token) -> (node : AstNode, err : AstError)
+ast_parse_function_def_no_return_type_and_name :: proc(ast : ^[dynamic]AstNode, tokens : ^[]Token, parse_initializer := false) -> (node : AstNode, err : AstError)
 {
 	// (int a[3]) {}
 	// (int a[3]) const {}
@@ -643,6 +643,41 @@ ast_parse_function_def_no_return_type_and_name :: proc(ast : ^[dynamic]AstNode, 
 		node.function_def.flags |= { .Const }
 
 		t, sss = peek_token(tokens)
+	}
+
+	if parse_initializer && t.kind == .Colon {
+		tokens^ = sss
+
+		initializer_loop: for {
+			t, sss = peek_token(tokens)
+			#partial switch t.kind {
+				case .Identifier:
+					tokens^ = sss // eat the member name
+
+					identifier := make([dynamic]Token, 1, 1)
+					identifier[0] = t
+					left := AstNode{ kind = .Identifier, identifier = identifier }
+
+					eat_token_expect(tokens, .BracketRoundOpen) or_return
+					expr := ast_parse_expression(ast, tokens) or_return
+					eat_token_expect(tokens, .BracketRoundClose) or_return
+					
+					node := AstNode { kind = .ExprBinary, binary = {
+						left = transmute(AstNodeIndex) append_return_index(ast, left),
+						operator = .Assign,
+						right = transmute(AstNodeIndex) append_return_index(ast, expr),
+					}}
+
+					append(&body_sequence, transmute(AstNodeIndex) append_return_index(ast, AstNode{ kind = .NewLine }))
+					append(&body_sequence, transmute(AstNodeIndex) append_return_index(ast, node))
+
+				case .Comma:
+					tokens^ = sss
+
+				case:
+					break initializer_loop
+			}
+		}
 	}
 
 	if t.kind == .Semicolon {

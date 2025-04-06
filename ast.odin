@@ -58,7 +58,7 @@ ast_parse_filescope_sequence :: proc(ast : ^[dynamic]AstNode, tokens_ : []Token)
 				}
 
 			case .Namespace, .Identifier:
-				if node_idx, err := ast_parse_declaration(ast, tokens, &sequence); err != nil {
+				if node_idx, eat_paragraph, err := ast_parse_declaration(ast, tokens, &sequence); err != nil {
 					panic(fmt.tprintf("Failed to parse declaration at %v.", err))
 				}
 				else {
@@ -76,7 +76,11 @@ ast_parse_filescope_sequence :: proc(ast : ^[dynamic]AstNode, tokens_ : []Token)
 							if _, err := eat_token_expect(tokens, .Semicolon); err != nil {
 									panic(fmt.tprintf("Missing semicolon after %v.", ast[node_idx]))
 							}
-						
+					}
+
+					if eat_paragraph {
+						eat_token_expect(tokens, .NewLine, false)
+						eat_token_expect(tokens, .NewLine, false)
 					}
 				}
 
@@ -333,7 +337,7 @@ ast_attach_comments :: proc(ast : ^[dynamic]AstNode, sequence : ^[dynamic]AstNod
 	}
 }
 
-ast_parse_declaration :: proc(ast : ^[dynamic]AstNode, tokens : ^[]Token, sequence : ^[dynamic]AstNodeIndex, parent_type : ^AstNode = nil) -> (parsed_node : AstNodeIndex, err : AstError)
+ast_parse_declaration :: proc(ast : ^[dynamic]AstNode, tokens : ^[]Token, sequence : ^[dynamic]AstNodeIndex, parent_type : ^AstNode = nil) -> (parsed_node : AstNodeIndex, eat_paragraph : bool, err : AstError)
 {
 	tokens_reset := tokens^
 	ast_reset := len(ast)
@@ -366,6 +370,7 @@ ast_parse_declaration :: proc(ast : ^[dynamic]AstNode, tokens : ^[]Token, sequen
 
 				parent_type.structure.initializer = transmute(AstNodeIndex) append_return_index(ast, initializer)
 
+				eat_paragraph = true
 				parsed_node = parent_type.structure.initializer
 				return
 			}
@@ -389,6 +394,7 @@ ast_parse_declaration :: proc(ast : ^[dynamic]AstNode, tokens : ^[]Token, sequen
 
 					parent_type.structure.deinitializer = transmute(AstNodeIndex) append_return_index(ast, deinitializer)
 
+					eat_paragraph = true
 					parsed_node = parent_type.structure.deinitializer
 					return
 				}
@@ -806,9 +812,10 @@ ast_parse_scoped_sequence_no_open_brace :: proc(ast : ^[dynamic]AstNode, tokens 
 
 		when F == type_of(ast_parse_statement) { // or ast_parse_enum_value_declaration
 			member_node := fn(ast, tokens, sequence) or_return
+			eat_paragraph := false
 		}
 		else when F == type_of(ast_parse_declaration) {
-			member_node := ast_parse_declaration(ast, tokens, sequence, parent_node) or_return
+			member_node, eat_paragraph := ast_parse_declaration(ast, tokens, sequence, parent_node) or_return
 		}
 		else {
 			#panic("wrong fn type")
@@ -834,6 +841,21 @@ ast_parse_scoped_sequence_no_open_brace :: proc(ast : ^[dynamic]AstNode, tokens 
 					// most declarations and statements must end in a semicolon
 					eat_token_expect(tokens, .Semicolon) or_return
 				}
+		}
+
+		if ast[member_node].kind == .FunctionDefinition {
+			// attach comments after the declaration in the same line
+			if n, ns := peek_token(tokens, false); n.kind == .Comment {
+				tokens^ = ns
+
+				append(&ast[member_node].function_def.attached_comments, transmute(AstNodeIndex) append_return_index(ast, AstNode { kind = .Comment, attached = true, literal = n }))
+				append(&ast[member_node].function_def.attached_comments, transmute(AstNodeIndex) append_return_index(ast, AstNode { kind = .NewLine, attached = true }))
+			}
+		}
+
+		if eat_paragraph {
+			eat_token_expect(tokens, .NewLine, false)
+			eat_token_expect(tokens, .NewLine, false)
 		}
 	}
 

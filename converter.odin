@@ -298,7 +298,10 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 					str.write_byte(ctx.result, ')')
 				}
 
-				str.write_string(ctx.result, current_node.kind == .Struct ? " {\n" : " #raw_union {\n")
+				str.write_string(ctx.result, current_node.kind == .Struct ? " {" : " #raw_union {")
+
+				last_was_newline := false
+				had_first_newline := false
 
 				if structure.base_type != nil {
 					// copy over defs from base type, using their location
@@ -311,12 +314,16 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 						definitions = base_context.definitions, // make sure not to modify these! ok because we push another context right after
 					})
 
+					str.write_byte(ctx.result, '\n')
 					str.write_string(ctx.result, member_indent_str)
 					str.write_string(ctx.result, "using ")
 					str.write_string(ctx.result, base_member_name)
 					str.write_string(ctx.result, " : ")
 					str.write_string(ctx.result, base_context.complete_name)
 					str.write_string(ctx.result, ",\n")
+
+					last_was_newline = true
+					had_first_newline = true
 				}
 
 				name_context = transmute(NameContextIndex) append_return_index(ctx.context_heap, NameContext{ node = current_node_index, parent = name_context, complete_name = complete_structure_name })
@@ -341,19 +348,46 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 					fmt.sbprint(ctx.result, section_data.subsection_counter);
 					str.write_string(ctx.result, " : bit_field u8 {\n");
 
-					for ci in sa.slice(&section_data.member_stack) {
+					last_was_newline := true
+					slice := sa.slice(&section_data.member_stack)
+					loop: for cii := 0; cii < len(slice); cii += 1 {
+						ci := slice[cii]
 						#partial switch ctx.ast[ci].kind {
 							case .VariableDeclaration:
-								str.write_string(ctx.result, section_data.member_indent_str);
+								if last_was_newline { str.write_string(ctx.result, section_data.member_indent_str) }
+								else { str.write_byte(ctx.result, ' ') }
 								write_node(ctx, ci, name_context)
 								str.write_byte(ctx.result, ',')
 
-							case:
+								last_was_newline = false
+
+							case .Comment:
+								if last_was_newline { str.write_string(ctx.result, section_data.member_indent_str) }
+								else { str.write_byte(ctx.result, ' ') }
 								write_node(ctx, ci, name_context)
+
+								last_was_newline = false
+
+							case .NewLine:
+								str.write_byte(ctx.result, '\n')
+
+								last_was_newline = true
+
+								for cik := cii + 1; cik < len(slice); cik += 1 {
+									if ctx.ast[slice[cik]].kind != .NewLine {
+										continue loop
+									}
+								}
+								break loop
+
+							case:
+								write_preproc_node(ctx.result, ctx.ast[ci])
+								last_was_newline = false
 						}
 					}
 
-					str.write_string(ctx.result, indent_str);
+					if last_was_newline { str.write_string(ctx.result, indent_str) }
+					else { str.write_byte(ctx.result, ' ') }
 					str.write_string(ctx.result, "},\n");
 
 					sa.clear(&section_data.member_stack)
@@ -361,29 +395,29 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 
 				has_static_var_members := false
 				has_inplicit_initializer := false
-				for cii := 0; cii < len(structure.members); cii += 1 {
+				last_was_transfered := true
+				loop: for cii := 0; cii < len(structure.members); cii += 1 {
 					ci := structure.members[cii]
-					#partial switch ctx.ast[ci].kind {
+					member := ctx.ast[ci]
+					if member.attached { continue }
+
+
+					#partial switch member.kind {
 						case .VariableDeclaration:
-							member := ctx.ast[ci].var_declaration
-							if .Static in member.flags { has_static_var_members = true; continue }
+							member := member.var_declaration
+							if .Static in member.flags {
+								has_static_var_members = true;
+								last_was_transfered = false
+								continue
+							}
+
+							last_was_transfered = true
 
 							d := insert_new_definition(ctx.context_heap, name_context, member.var_name.source, ci, member.var_name.source)
 							has_inplicit_initializer |= member.initializer_expression != {}
 
 							if member.width_expression != {} {
 								sa.append(&bitfield_section_data.member_stack, ci)
-								
-								// eat additional newlines an comments
-								bitfield_loop: for ; cii + 1 < len(structure.members); cii += 1 {
-									ci = structure.members[cii + 1]
-									#partial switch ctx.ast[ci].kind {
-										case .NewLine, .Comment:
-											sa.append(&bitfield_section_data.member_stack, ci)
-										case:
-											break bitfield_loop
-									}
-								}
 								continue
 							}
 
@@ -391,22 +425,76 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 								write_bitfield_subsection_and_reset(ctx, &bitfield_section_data, name_context, member_indent_str)
 							}
 
-							str.write_string(ctx.result, member_indent_str);
+							if last_was_newline { str.write_string(ctx.result, member_indent_str) }
+							else { str.write_byte(ctx.result, ' ') }
 							str.write_string(ctx.result, member.var_name.source);
 							str.write_string(ctx.result, " : ")
 							write_type(ctx, ctx.ast[member.type], name_context)
-							str.write_string(ctx.result, ",\n")
+							str.write_byte(ctx.result, ',')
 
+							last_was_newline = false
+
+						case .Struct, .Union, .Enum, .FunctionDefinition:
+							/* dont write */
+
+							last_was_transfered = false
 
 						case .Comment:
-							str.write_string(ctx.result, member_indent_str);
-							str.write_string(ctx.result, ctx.ast[ci].literal.source)
+							last_was_transfered = true
+
+							if sa.len(bitfield_section_data.member_stack) > 0 {
+								sa.append(&bitfield_section_data.member_stack, ci)
+								continue
+							}
+
+							if last_was_newline { str.write_string(ctx.result, member_indent_str) }
+							else { str.write_byte(ctx.result, ' ') }
+							str.write_string(ctx.result, member.literal.source)
+
+							last_was_newline = false
+
+						case .NewLine:
+							if !last_was_transfered { continue }
+							if cii == 0 && had_first_newline { continue }
+
+							last_was_transfered = true
+							had_first_newline = true
+
+							if sa.len(bitfield_section_data.member_stack) > 0 {
+								sa.append(&bitfield_section_data.member_stack, ci)
+								continue
+							}
+
 							str.write_byte(ctx.result, '\n')
 
-						case:
-							if write_preproc_node(ctx.result, ctx.ast[ci]) {
-								str.write_byte(ctx.result, '\n')
+							last_was_newline = true
+
+							for cik := cii + 1; cik < len(structure.members); cik += 1 {
+								node := ctx.ast[structure.members[cik]]
+								#partial switch node.kind {
+									case .NewLine:
+										/**/
+									case .FunctionDefinition, .Struct, .Union, .Enum:
+										/**/
+									case .VariableDeclaration:
+										continue loop
+									case:
+										if !node.attached { continue loop }
+								}
 							}
+							break loop
+
+						case:
+							if sa.len(bitfield_section_data.member_stack) > 0 {
+								sa.append(&bitfield_section_data.member_stack, ci)
+								last_was_transfered = true
+								continue
+							}
+
+							if write_preproc_node(ctx.result, member) {
+								last_was_transfered = true
+							}
+							last_was_newline = false
 					}
 				}
 
@@ -438,7 +526,7 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 					}
 				}
 
-				if has_inplicit_initializer || structure.initializer != {} {
+				if has_inplicit_initializer || (structure.initializer != {} && .ForwardDeclaration not_in ctx.ast[structure.initializer].function_def.flags) {
 					initializer := ctx.ast[structure.initializer]
 
 					complete_initializer_name := str.concatenate({ complete_structure_name, "_init" })
@@ -553,9 +641,10 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 					str.write_string(ctx.result, "i32")
 				}
 
-				str.write_string(ctx.result, " {\n")
+				str.write_string(ctx.result, " {")
 
 				member_indent_str := str.concatenate({ indent_str, ONE_INDENT }, context.temp_allocator)
+				last_was_newline := false
 				for cii := 0; cii < len(structure.members); cii += 1 {
 					ci := structure.members[cii]
 					#partial switch ctx.ast[ci].kind {
@@ -564,26 +653,32 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 
 							d := insert_new_definition(ctx.context_heap, name_context, member.var_name.source, ci, member.var_name.source)
 
-							str.write_string(ctx.result, member_indent_str);
-							str.write_string(ctx.result, member.var_name.source);
+							if last_was_newline { str.write_string(ctx.result, member_indent_str) }
+							else { str.write_byte(ctx.result, ' ') }
+							str.write_string(ctx.result, member.var_name.source)
 
 							if member.initializer_expression != {} {
 								str.write_string(ctx.result, " = ")
 								write_node(ctx, member.initializer_expression, name_context)
 							}
 
-							str.write_string(ctx.result, ",\n")
+							str.write_byte(ctx.result, ',')
 
+							last_was_newline = false
+
+						case .NewLine:
+							str.write_byte(ctx.result, '\n')
+							last_was_newline = true
 
 						case .Comment:
-							str.write_string(ctx.result, member_indent_str);
+							if last_was_newline { str.write_string(ctx.result, member_indent_str) }
+							else { str.write_byte(ctx.result, ' ') }
 							str.write_string(ctx.result, ctx.ast[ci].literal.source)
-							str.write_byte(ctx.result, '\n')
+
+							last_was_newline = false
 
 						case:
-							if write_preproc_node(ctx.result, ctx.ast[ci]) {
-								str.write_byte(ctx.result, '\n')
-							}
+							write_preproc_node(ctx.result, ctx.ast[ci])
 					}
 				}
 

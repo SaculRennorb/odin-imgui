@@ -799,6 +799,12 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 
 				requires_termination = true
 
+			case .ExprCast:
+				str.write_string(ctx.result, "cast(")
+				write_type(ctx, ctx.ast[current_node.cast_.type], name_context)
+				str.write_string(ctx.result, ") ")
+				write_node(ctx, current_node.cast_.expression, name_context)
+
 			case .MemberAccess:
 				member := ctx.ast[current_node.member_access.member]
 
@@ -962,10 +968,22 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 		translate_type(&converted_type_tokens, ctx.ast, type_tokens)
 
 		last_type_was_ident := false
-		for _t in converted_type_tokens {
+		for _ti := 0; _ti < len(converted_type_tokens); _ti += 1 {
+			_t := converted_type_tokens[_ti]
 			switch t in _t {
 				case _TypePtr:
+					if _ti + 1 < len(converted_type_tokens) {
+						next := converted_type_tokens[_ti + 1]
+						if next, ok := next.(_TypeFragment); ok && next.identifier.source == "void" {
+							str.write_string(ctx.result, "uintptr")
+							_ti += 1
+							break
+						}
+					}
+
+					// else
 					str.write_byte(ctx.result, '^')
+
 
 				case _TypeFragment:
 					if last_type_was_ident { str.write_byte(ctx.result, '_') }

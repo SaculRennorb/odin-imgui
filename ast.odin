@@ -241,7 +241,7 @@ ast_parse_template_spec_no_keyword :: proc(ast : ^[dynamic]AstNode, tokens : ^[]
 		if n, ns := peek_token(tokens); n.kind == .Equals {
 			tokens^ = ns // eat = 
 
-			initializer := ast_parse_expression(ast, tokens, { .StopAtComma }) or_return
+			initializer := ast_parse_expression(ast, tokens, .Comma - ._1) or_return
 			initializer_expression = transmute(AstNodeIndex) append_return_index(ast, initializer)
 		}
 
@@ -364,7 +364,8 @@ ast_parse_declaration :: proc(ast : ^[dynamic]AstNode, tokens : ^[]Token, sequen
 		tokens^ = tokens_reset
 	}
 
-	
+	storage := ast_parse_storage_modifier(tokens)
+
 	if parent_type != nil {
 		n, ss := peek_token(tokens)
 
@@ -375,10 +376,11 @@ ast_parse_declaration :: proc(ast : ^[dynamic]AstNode, tokens : ^[]Token, sequen
 
 				initializer := ast_parse_function_def_no_return_type_and_name(ast, tokens, true) or_return
 				initializer.function_def.function_name = make([dynamic]Token, 1);
+				initializer.function_def.flags |= transmute(AstFunctionDefFlags) storage;
 				initializer.function_def.function_name[0] = Token {
 					kind = .Identifier,
 					source = last(parent_type.structure.name).source,
-					location = last(parent_type.structure.name).location
+					location = last(parent_type.structure.name).location,
 				}
 
 				ast_attach_comments(ast, sequence, &initializer)
@@ -399,10 +401,11 @@ ast_parse_declaration :: proc(ast : ^[dynamic]AstNode, tokens : ^[]Token, sequen
 
 					deinitializer := ast_parse_function_def_no_return_type_and_name(ast, tokens) or_return
 					deinitializer.function_def.function_name = make([dynamic]Token, 1);
+					deinitializer.function_def.flags |= transmute(AstFunctionDefFlags) storage;
 					deinitializer.function_def.function_name[0] = Token {
 						kind = .Identifier,
 						source = last(parent_type.structure.name).source,
-						location = last(parent_type.structure.name).location
+						location = last(parent_type.structure.name).location,
 					}
 
 					ast_attach_comments(ast, sequence, &deinitializer)
@@ -417,9 +420,6 @@ ast_parse_declaration :: proc(ast : ^[dynamic]AstNode, tokens : ^[]Token, sequen
 		}
 	}
 
-	storage := ast_parse_storage_modifier(tokens)
-
-	
 	next, nexts := peek_token(tokens)
 	#partial switch next.kind {
 		case .Struct, .Class, .Union:
@@ -458,6 +458,20 @@ ast_parse_declaration :: proc(ast : ^[dynamic]AstNode, tokens : ^[]Token, sequen
 
 	// var or fn def must have return type
 	type_node := ast_parse_type(ast, tokens) or_return
+
+	if next, ns := peek_token(tokens); next.kind == .Operator {
+		tokens^ = ns
+
+		// TODO
+
+		// assume this is the index operator and just dump it for now
+		eat_token_expect(tokens, .BracketSquareOpen) or_return
+		eat_token_expect(tokens, .BracketSquareClose) or_return
+
+		ast_parse_function_def_no_return_type_and_name(ast, tokens) or_return
+
+		return
+	}
 
 	before_name := tokens^
 	name := ast_parse_qualified_name(tokens) or_return 
@@ -503,7 +517,7 @@ ast_parse_enum_value_declaration :: proc(ast : ^[dynamic]AstNode, tokens : ^[]To
 	if n, ns := peek_token(tokens); n.kind == .Assign {
 		tokens^ = ns
 		
-		value_expr := ast_parse_expression(ast, tokens, { .StopAtComma }) or_return
+		value_expr := ast_parse_expression(ast, tokens, .Comma - ._1) or_return
 		node.var_declaration.initializer_expression = transmute(AstNodeIndex) append_return_index(ast, value_expr)
 	}
 
@@ -523,6 +537,7 @@ ast_parse_storage_modifier :: proc(tokens : ^[]Token) -> (storage : AstStorageMo
 			case "static": storage |= { .Static }
 			case "thread_local": storage |= { .ThreadLocal }
 			case "extern": storage |= { .Extern }
+			case "constexpr": storage |= { .Extern }
 			case: break storage_loop
 		}
 
@@ -625,7 +640,7 @@ ast_parse_function_def_no_return_type_and_name :: proc(ast : ^[dynamic]AstNode, 
 					if nn, nns := peek_token(tokens); nn.kind == .Assign {
 						tokens^ = nns
 
-						initializer := ast_parse_expression(ast, tokens, { .StopAtComma }) or_return
+						initializer := ast_parse_expression(ast, tokens, .Comma - ._1) or_return
 						arg_node.var_declaration.initializer_expression = transmute(AstNodeIndex) append_return_index(ast, initializer)
 					}
 				}
@@ -967,7 +982,7 @@ ast_parse_var_declaration_no_type :: proc(ast : ^[dynamic]AstNode, tokens : ^[]T
 				#partial switch next_next.kind {
 					case .Assign: // ... a =  ...
 						tokens^ = nns
-						value := ast_parse_expression(ast, tokens, { .StopAtComma }) or_return
+						value := ast_parse_expression(ast, tokens, .Assign) or_return
 						decl_node := AstNode{ kind = .VariableDeclaration, var_declaration = {
 							type = transmute(AstNodeIndex) append_return_index(ast, base_type),
 							var_name = next,
@@ -980,7 +995,7 @@ ast_parse_var_declaration_no_type :: proc(ast : ^[dynamic]AstNode, tokens : ^[]T
 					case .BracketSquareOpen: // ... a[ ...
 						tokens^ = nns
 
-						length_expression := ast_parse_expression(ast, tokens, { .StopAtComma }) or_return
+						length_expression := ast_parse_expression(ast, tokens) or_return
 						eat_token_expect(tokens, .BracketSquareClose) or_return
 						
 						if current_type.kind == {} { current_type = clone_node(base_type) }
@@ -1118,7 +1133,7 @@ ast_parse_function_call :: proc(ast : ^[dynamic]AstNode, tokens : ^[]Token) -> (
 				continue
 
 			case:
-				arg := ast_parse_expression(ast, tokens, { .StopAtComma }) or_return
+				arg := ast_parse_expression(ast, tokens, .Comma - ._1) or_return
 				
 				append(&arguments, transmute(AstNodeIndex) append_return_index(ast, arg))
 		}
@@ -1234,7 +1249,10 @@ ast_parse_qualified_name :: proc(tokens : ^[]Token) -> (r : TokenRange, err : As
 		}
 	}
 
-	range := slice_from_se(start, raw_data(tokens^))
+	end := raw_data(tokens^)
+	if start > end { err = start[0]; return }
+
+	range := slice_from_se(start, end)
 	return range, len(range) > 0 ? nil : start[0]
 }
 
@@ -1248,8 +1266,42 @@ ast_filter_qualified_name :: proc(tokens : TokenRange) -> (dest : [dynamic]Token
 	return
 }
 
-ExpressionParserFlags :: bit_set[enum { StopAtComma }]
-ast_parse_expression :: proc(ast : ^[dynamic]AstNode, tokens : ^[]Token, flags : ExpressionParserFlags = {}) -> (node : AstNode, err : AstError)
+OperatorPresedence :: enum {
+	_1               = 1,
+	CppCast          = 2,
+	PostfixIncrement = 2,
+	PostfixDecrement = 2,
+	FucntionCall     = 2,
+	Index            = 2,
+	MemberAccess     = 2,
+	PrefixIncrement  = 3,
+	PrefixDecrement  = 3,
+	UnaryMinus       = 3,
+	Not              = 3,
+	Invert           = 3,
+	CCast            = 3,
+	Dereference      = 3,
+	AddressOf        = 3,
+	Multiply         = 5,
+	Divide           = 5,
+	Modulo           = 5,
+	Add              = 6,
+	Subtract         = 6,
+	Bitshift         = 7,
+	Threeway         = 8,
+	Comparison       = 9,
+	Equality         = 10,
+	BitAnd           = 11,
+	BitXor           = 12,
+	BitOr            = 13,
+	LogicAnd         = 14,
+	LogicOr          = 15,
+	Tenary           = 16,
+	Assign           = 16,
+	AssignModify     = 16,
+	Comma            = 17,
+}
+ast_parse_expression :: proc(ast : ^[dynamic]AstNode, tokens : ^[]Token, max_presedence := max(OperatorPresedence)) -> (node : AstNode, err : AstError)
 {
 	token_reset := tokens^
 	ast_reset_size := len(ast)
@@ -1304,9 +1356,34 @@ ast_parse_expression :: proc(ast : ^[dynamic]AstNode, tokens : ^[]Token, flags :
 					continue
 
 				case .Assign, .Plus, .Minus, .Star, .ForwardSlash, .Ampersand, .Pipe, .Circumflex, .BracketTriangleOpen, .BracketTriangleClose, .DoubleAmpersand, .DoublePipe, .Equals, .NotEquals, .LessEq, .GreaterEq, .ShiftLeft, .ShiftRight, .Percent:
+					presedence : OperatorPresedence
+					#partial switch next.kind {
+						case .Assign              : presedence = .Assign
+						case .Plus                : presedence = .Add
+						case .Minus               : presedence = .Subtract
+						case .Star                : presedence = .Multiply
+						case .ForwardSlash        : presedence = .Divide
+						case .Ampersand           : presedence = .BitAnd
+						case .Pipe                : presedence = .BitOr
+						case .Circumflex          : presedence = .BitXor
+						case .BracketTriangleOpen : presedence = .Comparison
+						case .BracketTriangleClose: presedence = .Comparison
+						case .DoubleAmpersand     : presedence = .LogicAnd
+						case .DoublePipe          : presedence = .LogicOr
+						case .Equals              : presedence = .Assign
+						case .NotEquals           : presedence = .Equality
+						case .LessEq              : presedence = .Comparison
+						case .GreaterEq           : presedence = .Comparison
+						case .ShiftLeft           : presedence = .Bitshift
+						case .ShiftRight          : presedence = .Bitshift
+						case .Percent             : presedence = .Modulo
+					}
+
+					if max_presedence < presedence { break }
+
 					tokens^ = nexts
 
-					right_node := ast_parse_expression(ast, tokens, flags) or_return
+					right_node := ast_parse_expression(ast, tokens, presedence) or_return
 
 					node = AstNode{ kind = .ExprBinary, binary = {
 						left = transmute(AstNodeIndex) append_return_index(ast, node),
@@ -1340,9 +1417,24 @@ ast_parse_expression :: proc(ast : ^[dynamic]AstNode, tokens : ^[]Token, flags :
 		}
 
 		#partial switch next.kind {
-			case .Star, .Minus, .Tilde, .PrefixDecrement, .PrefixIncrement:
+			case .Star, .Ampersand, .Minus, .Exclamationmark, .Tilde, .PrefixDecrement, .PrefixIncrement:
+
+				presedence : OperatorPresedence
+				#partial switch next.kind {
+					case .Star           : presedence = .Dereference
+					case .Ampersand      : presedence = .AddressOf
+					case .Minus          : presedence = .UnaryMinus
+					case .Exclamationmark: presedence = .Not
+					case .Tilde          : presedence = .Invert
+					case .PrefixDecrement: presedence = .PrefixDecrement
+					case .PrefixIncrement: presedence = .PrefixIncrement
+				}
+
+				if max_presedence < presedence { break }
+
 				tokens^ = nexts
-				right_node := ast_parse_expression(ast, tokens, { .StopAtComma }) or_return
+
+				right_node := ast_parse_expression(ast, tokens, presedence) or_return
 				node = AstNode{ kind = .ExprUnaryLeft, unary_left = {
 					operator = transmute(AstUnaryOp)next.kind,
 					right = transmute(AstNodeIndex) append_return_index(ast, right_node),
@@ -1375,15 +1467,49 @@ ast_parse_expression :: proc(ast : ^[dynamic]AstNode, tokens : ^[]Token, flags :
 				tokens^ = nexts; err = nil
 				continue
 
-			case .BracketRoundOpen: // bracketed expression
+			case .BracketRoundOpen: // bracketed expression or cast
+				og_nexts := nexts
+
+				if type, type_err := ast_parse_type(ast, &nexts); type_err == nil && find_next_actual_token(&nexts)[0].kind == .BracketRoundClose { // cast: (type) expression
+					eat_token_expect(&nexts, .BracketRoundClose) or_return
+					expression := ast_parse_expression(ast, &nexts, .CCast) or_return
+
+					tokens^ = nexts
+
+					node = AstNode { kind = .ExprCast, cast_ = {
+						type = transmute(AstNodeIndex) append_return_index(ast, type),
+						expression = transmute(AstNodeIndex) append_return_index(ast, expression),
+					}}
+				}
+				else { // bracketed expression: (expression)
+					tokens^ = og_nexts
+					node = ast_parse_expression(ast, tokens) or_return
+					eat_token_expect(tokens, .BracketRoundClose) or_return
+				}
+
+				err = nil
+				continue
+
+			case .StaticCast: // static_cast<type>(expression)
 				tokens^ = nexts
-				node = ast_parse_expression(ast, tokens) or_return
+
+				eat_token_expect(tokens, .BracketTriangleOpen) or_return
+				type := ast_parse_type(ast, tokens) or_return
+				eat_token_expect(tokens, .BracketTriangleClose) or_return
+				eat_token_expect(tokens, .BracketRoundOpen) or_return
+				expression := ast_parse_expression(ast, tokens) or_return
 				eat_token_expect(tokens, .BracketRoundClose) or_return
+
+				node = AstNode { kind = .ExprCast, cast_ = {
+					type = transmute(AstNodeIndex) append_return_index(ast, type),
+					expression = transmute(AstNodeIndex) append_return_index(ast, expression),
+				}}
+
 				err = nil
 				continue
 
 			case .Comma:
-				if err == nil && .StopAtComma not_in flags {
+				if err == nil && max_presedence >= .Comma {
 					tokens^ = nexts // eat the ,
 					append(&sequence, transmute(AstNodeIndex) append_return_index(ast, node))
 					err = next
@@ -1471,6 +1597,8 @@ find_next_actual_token :: proc(tokens : ^[]Token) -> [^]Token #no_bounds_check
 	return raw_data(tokens^)
 }
 
+
+
 AstError :: Maybe(Token)
 
 
@@ -1521,6 +1649,7 @@ AstNodeKind :: enum {
 	ExprUnaryRight,
 	ExprBinary,
 	ExprIndex,
+	ExprCast,
 	MemberAccess,
 	FunctionCall,
 	FunctionDefinition,
@@ -1566,6 +1695,10 @@ AstNode :: struct {
 		binary : struct {
 			left, right : AstNodeIndex,
 			operator : AstBinaryOp,
+		},
+		cast_ : struct {
+			type : AstNodeIndex,
+			expression : AstNodeIndex,
 		},
 		sequence : [dynamic]AstNodeIndex,
 		token_sequence : [dynamic]Token,
@@ -1645,11 +1778,13 @@ AstNode :: struct {
 	}
 }
 
-AstStorageModifier :: bit_set[enum{
+AstStorageModifierFlag :: enum{
 	Static      = 0,
 	Extern      = 1,
 	ThreadLocal = 2,
-}]
+	Constexpr   = 3,
+}
+AstStorageModifier :: bit_set[AstStorageModifierFlag]
 
 AstVariableDefFlags :: bit_set[enum{
 	Static      = cast(int) AstStorageModifier.Static,
@@ -1660,7 +1795,7 @@ AstVariableDefFlags :: bit_set[enum{
 AstFunctionDefFlags :: bit_set[enum{
 	Static = cast(int) AstStorageModifier.Static,
 	Extern = cast(int) AstStorageModifier.Extern,
-	ForwardDeclaration = int(AstStorageModifier.ThreadLocal) + 1,
+	ForwardDeclaration = cast(int) max(AstStorageModifierFlag) + 1,
 	Const,
 }]
 
@@ -1748,6 +1883,7 @@ fmt_astnode :: proc(fi: ^fmt.Info, node: ^AstNode, verb: rune) -> bool
 		case .ExprUnaryRight     : fmt.fmt_arg(fi, node.unary_right, 'v')
 		case .ExprBinary         : fmt.fmt_arg(fi, node.binary, 'v')
 		case .ExprIndex          : fmt.fmt_arg(fi, node.index, 'v')
+		case .ExprCast           : fmt.fmt_arg(fi, node.cast_, 'v')
 		case .MemberAccess       : fmt.fmt_arg(fi, node.member_access, 'v')
 		case .FunctionCall       : fmt.fmt_arg(fi, node.function_call, 'v')
 		case .FunctionDefinition : fmt.fmt_arg(fi, node.function_def, 'v')

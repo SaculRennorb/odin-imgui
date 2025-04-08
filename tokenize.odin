@@ -221,6 +221,10 @@ tokenize :: proc(tokens : ^[dynamic]Token, text : string, file_path : string)
 						append(tokens, Token{.Template, str, loc})
 					case "namespace":
 						append(tokens, Token{.Namespace, str, loc})
+					case "operator":
+						append(tokens, Token{.Operator, str, loc})
+					case "static_cast":
+						append(tokens, Token{.StaticCast, str, loc})
 					case:
 						append(tokens, Token{.Identifier, str, loc})
 				}
@@ -323,6 +327,8 @@ TokenKind :: enum {
 	Enum,
 	Template,
 	Namespace,
+	Operator,
+	StaticCast,
 
 	Return,
 	Break,

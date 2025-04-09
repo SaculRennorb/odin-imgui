@@ -230,7 +230,12 @@ tokenize :: proc(tokens : ^[dynamic]Token, text : string, file_path : string)
 				}
 
 			case '.':
-				if !(remaining < end[-1:] && '0' <= remaining[1] && remaining[1] <= '9') {
+				if remaining < end[-2:] && remaining[1] == '.' && remaining[2] == '.' {
+					append(tokens, Token{.Ellipsis, transmute(string)remaining[:3], loc})
+					remaining = remaining[3:]
+					continue
+				}
+				else if !(remaining < end[-1:] && '0' <= remaining[1] && remaining[1] <= '9') {
 					append(tokens, Token{.Dot, transmute(string)remaining[:1], loc})
 					remaining = remaining[1:]
 					continue
@@ -238,7 +243,7 @@ tokenize :: proc(tokens : ^[dynamic]Token, text : string, file_path : string)
 
 				fallthrough
 
-				case '0'..='9':
+			case '0'..='9':
 				start := remaining
 				is_float := false
 				number_loop: for remaining = remaining[1:]; remaining < end; remaining = remaining[1:] {
@@ -319,6 +324,7 @@ TokenKind :: enum {
 	LiteralCharacter,
 	LiteralNull,
 	Comment,
+	Ellipsis,
 
 	Typedef,
 	Struct,

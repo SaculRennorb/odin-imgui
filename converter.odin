@@ -154,22 +154,34 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 
 			for nidx in fn_node.arguments {
 				if arg_count > 0 { str.write_string(ctx.result, ", ") }
-				arg := ctx.ast[nidx].var_declaration
 
-				if .ForwardDeclaration not_in fn_node.flags {
-					insert_new_definition(ctx.context_heap, name_context, arg.var_name.source, nidx, arg.var_name.source)
+				#partial switch ctx.ast[nidx].kind {
+					case .Varargs:
+						str.write_string(ctx.result, "args : ..[]any")
+
+						arg_count += 1
+
+					case .VariableDeclaration:
+						arg := ctx.ast[nidx].var_declaration
+
+						if .ForwardDeclaration not_in fn_node.flags {
+							insert_new_definition(ctx.context_heap, name_context, arg.var_name.source, nidx, arg.var_name.source)
+						}
+		
+						str.write_string(ctx.result, arg.var_name.source)
+						str.write_string(ctx.result, " : ")
+						write_type(ctx, ctx.ast[arg.type], name_context)
+		
+						if arg.initializer_expression != {} {
+							str.write_string(ctx.result, " = ")
+							write_node(ctx, arg.initializer_expression, name_context)
+						}
+
+						arg_count += 1
+
+					case:
+						panic(fmt.tprintf("Cannot convert %v to fn arg.", ctx.ast[nidx]))
 				}
-
-				str.write_string(ctx.result, arg.var_name.source)
-				str.write_string(ctx.result, " : ")
-				write_type(ctx, ctx.ast[arg.type], name_context)
-
-				if arg.initializer_expression != {} {
-					str.write_string(ctx.result, " = ")
-					write_node(ctx, arg.initializer_expression, name_context)
-				}
-
-				arg_count += 1
 			}
 
 			str.write_byte(ctx.result, ')')

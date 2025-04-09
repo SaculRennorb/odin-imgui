@@ -623,6 +623,8 @@ ast_parse_function_def_no_return_type_and_name :: proc(ctx: ^AstContext, tokens 
 		tokens^ = token_reset
 	}
 
+	has_vararg := false
+
 	loop: for {
 		next, nexts := peek_token(tokens)
 		#partial switch next.kind {
@@ -636,7 +638,9 @@ ast_parse_function_def_no_return_type_and_name :: proc(ctx: ^AstContext, tokens 
 
 			case .Ellipsis:
 				tokens^ = nexts
+
 				append(&arguments, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .Varargs }))
+				has_vararg = true
 				continue
 
 			case:
@@ -663,12 +667,22 @@ ast_parse_function_def_no_return_type_and_name :: proc(ctx: ^AstContext, tokens 
 	}
 
 	t, sss := peek_token(tokens)
-	if t.kind == .Identifier && t.source == "const" { // void xx(...) const {...}
-		tokens^ = sss
+	for {
+		if t.kind == .Identifier && t.source == "const" { // void xx(...) const {...}
+			tokens^ = sss
 
-		node.function_def.flags |= { .Const }
+			node.function_def.flags |= { .Const }
 
-		t, sss = peek_token(tokens)
+			t, sss = peek_token(tokens)
+		}
+		else if t.kind == .Identifier && (t.source == "IM_FMTARGS" || t.source == "IM_FMTLIST") { // IM_FMTARGS(1)  @hardcoded
+			tokens^ = sss[3:] // skip evetything
+
+			t, sss = peek_token(tokens)
+		}
+		else {
+			break
+		}
 	}
 
 	if parse_initializer && t.kind == .Colon {

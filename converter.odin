@@ -799,6 +799,11 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 
 				requires_termination = true
 
+			case .ExprBacketed:
+				str.write_byte(ctx.result, '(')
+				write_node(ctx, current_node.inner, name_context)
+				str.write_byte(ctx.result, ')')
+
 			case .ExprCast:
 				str.write_string(ctx.result, "cast(")
 				write_type(ctx, ctx.ast[current_node.cast_.type], name_context)

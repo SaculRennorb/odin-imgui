@@ -1483,7 +1483,10 @@ ast_parse_expression :: proc(ast : ^[dynamic]AstNode, tokens : ^[]Token, max_pre
 				}
 				else { // bracketed expression: (expression)
 					tokens^ = og_nexts
-					node = ast_parse_expression(ast, tokens) or_return
+
+					inner := ast_parse_expression(ast, tokens) or_return
+					node = AstNode { kind = .ExprBacketed, inner = transmute(AstNodeIndex) append_return_index(ast, inner)}
+
 					eat_token_expect(tokens, .BracketRoundClose) or_return
 				}
 
@@ -1650,6 +1653,7 @@ AstNodeKind :: enum {
 	ExprBinary,
 	ExprIndex,
 	ExprCast,
+	ExprBacketed,
 	MemberAccess,
 	FunctionCall,
 	FunctionDefinition,
@@ -1683,6 +1687,7 @@ AstNode :: struct {
 	attached : bool,
 	using _ : struct #raw_union {
 		literal : Token,
+		inner : AstNodeIndex,
 		identifier : [dynamic]Token,
 		unary_left : struct {
 			operator : AstUnaryOp,
@@ -1884,6 +1889,7 @@ fmt_astnode :: proc(fi: ^fmt.Info, node: ^AstNode, verb: rune) -> bool
 		case .ExprBinary         : fmt.fmt_arg(fi, node.binary, 'v')
 		case .ExprIndex          : fmt.fmt_arg(fi, node.index, 'v')
 		case .ExprCast           : fmt.fmt_arg(fi, node.cast_, 'v')
+		case .ExprBacketed       : fmt.fmt_arg(fi, node.inner, 'v')
 		case .MemberAccess       : fmt.fmt_arg(fi, node.member_access, 'v')
 		case .FunctionCall       : fmt.fmt_arg(fi, node.function_call, 'v')
 		case .FunctionDefinition : fmt.fmt_arg(fi, node.function_def, 'v')

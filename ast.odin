@@ -468,8 +468,11 @@ ast_parse_declaration :: proc(ast : ^[dynamic]AstNode, tokens : ^[]Token, sequen
 		eat_token_expect(tokens, .BracketSquareOpen) or_return
 		eat_token_expect(tokens, .BracketSquareClose) or_return
 
-		ast_parse_function_def_no_return_type_and_name(ast, tokens) or_return
+		node := ast_parse_function_def_no_return_type_and_name(ast, tokens) or_return
+		// dont append to sequence for now 
 
+		parsed_node = transmute(AstNodeIndex) append_return_index(ast, node)
+		err = nil
 		return
 	}
 

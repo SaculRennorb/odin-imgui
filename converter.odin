@@ -1001,6 +1001,8 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 					// else
 					str.write_byte(ctx.result, '^')
 
+				case _TypeMultiptr:
+					str.write_string(ctx.result, "[^]")
 
 				case _TypeFragment:
 					if last_type_was_ident { str.write_byte(ctx.result, '_') }
@@ -1013,12 +1015,13 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 						str.write_byte(ctx.result, ')')
 					}
 
+					last_type_was_ident = true
+
 				case _TypeArray:
 					str.write_byte(ctx.result, '[')
 					write_token_range(ctx.result, t.length_expression[:], "")
 					str.write_byte(ctx.result, ']')
 			}
-			_, last_type_was_ident = _t.(_TypeFragment)
 		}
 	}
 
@@ -1235,7 +1238,14 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 
 			case .AstNode: // used for array expression for now
 				length_expression : [dynamic]Token
-				transform_expression(&length_expression, ast, transmute(AstNodeIndex) input[0].location.column)
+				if input[0].location.column != {} {
+					transform_expression(&length_expression, ast, transmute(AstNodeIndex) input[0].location.column)
+					inject_at(output, 0, _TypeArray{ length_expression })
+				}
+				else{
+					inject_at(output, 0, _TypeMultiptr{})
+				}
+
 				transform_expression :: proc(output : ^[dynamic]Token, ast : []AstNode, current_node_index : AstNodeIndex)
 				{
 					node := ast[current_node_index]
@@ -1301,7 +1311,6 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 							transform_expression(output, ast, node.binary.right)
 					}
 				}
-				inject_at(output, 0, _TypeArray{ length_expression })
 				remaining_input = input[1:]
 
 			case:
@@ -1429,13 +1438,15 @@ dump_context_stack :: proc(context_heap : []NameContext, name_context_idx : Name
 
 
 _TypePtr :: struct {}
+_TypeMultiptr :: struct {}
 _TypeArray :: struct {
 	length_expression : [dynamic]Token,
 }
+
 _TypeFragment :: struct {
 	identifier : Token,
 	generic_arguments : map[string]Token,
 }
 
-TypeSegment :: union #no_nil { _TypePtr, _TypeArray, _TypeFragment }
+TypeSegment :: union #no_nil { _TypePtr, _TypeMultiptr, _TypeArray, _TypeFragment }
 Type :: []TypeSegment

@@ -625,12 +625,12 @@ ast_parse_function_def_no_return_type_and_name :: proc(ctx: ^AstContext, tokens 
 
 	has_vararg := false
 
-	loop: for {
+	args_loop: for {
 		next, nexts := peek_token(tokens)
 		#partial switch next.kind {
 			case .BracketRoundClose:
 				tokens^ = nexts
-				break loop
+				break args_loop
 
 			case .Comma:
 				tokens^ = nexts
@@ -645,14 +645,30 @@ ast_parse_function_def_no_return_type_and_name :: proc(ctx: ^AstContext, tokens 
 
 			case:
 				type := ast_parse_type(tokens) or_return
-
+				
 				name, names := peek_token(tokens) // name is optionan
 				arg_node := AstNode { kind = .VariableDeclaration }
 				if name.kind == .Identifier {
 					tokens^ = names
 					arg_node.var_declaration.var_name = name
 
-					if nn, nns := peek_token(tokens); nn.kind == .Assign {
+					nn, nns := peek_token(tokens)
+					if nn.kind == .BracketSquareOpen {
+						tokens^ = nns
+
+						array_type_token := Token { kind = .AstNode }
+						if length_expression, length_err := ast_parse_expression(ctx, tokens); length_err == nil {
+							array_type_token.location.column = append_return_index(ctx.ast, AstNode{ kind = .Varargs })
+						}
+
+						eat_token_expect(tokens, .BracketSquareClose) or_return
+
+						append(&type.type, array_type_token)
+
+						nn, nns = peek_token(tokens)
+					}
+
+					if nn.kind == .Assign {
 						tokens^ = nns
 
 						initializer := ast_parse_expression(ctx, tokens, .Comma - ._1) or_return

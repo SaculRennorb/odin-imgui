@@ -481,27 +481,28 @@ ast_parse_declaration :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[
 	}
 
 	before_name := tokens^
-	name := ast_parse_qualified_name(tokens) or_return 
+	if name, name_err := ast_parse_qualified_name(tokens); name_err == nil {
+		next, _ = peek_token(tokens)
 
-	next, _ = peek_token(tokens)
-
-	if next.kind == .BracketRoundOpen {
-		fndef_node := ast_parse_function_def_no_return_type_and_name(ctx, tokens) or_return
-		fndef_node.function_def.return_type =  transmute(AstNodeIndex) append_return_index(ctx.ast, type_node)
-		fndef_node.function_def.function_name = ast_filter_qualified_name(name)
-		fndef_node.function_def.flags |= transmute(AstFunctionDefFlags) storage;
-
-		ast_attach_comments(ctx, sequence, &fndef_node)
-
-		parsed_node = transmute(AstNodeIndex) append_return_index(ctx.ast, fndef_node)
-		append(sequence, parsed_node)
+		if next.kind == .BracketRoundOpen {
+			fndef_node := ast_parse_function_def_no_return_type_and_name(ctx, tokens) or_return
+			fndef_node.function_def.return_type =  transmute(AstNodeIndex) append_return_index(ctx.ast, type_node)
+			fndef_node.function_def.function_name = ast_filter_qualified_name(name)
+			fndef_node.function_def.flags |= transmute(AstFunctionDefFlags) storage;
+	
+			ast_attach_comments(ctx, sequence, &fndef_node)
+	
+			parsed_node = transmute(AstNodeIndex) append_return_index(ctx.ast, fndef_node)
+			append(sequence, parsed_node)
+			return
+		}
 	}
-	else {
-		tokens^ = before_name // reset to before name so the statement parses properly
 
-		ast_parse_var_declaration_no_type(ctx, tokens, type_node, sequence, transmute(AstVariableDefFlags) storage) or_return
-		parsed_node =  sequence[len(sequence) - 1]
-	}
+	
+	tokens^ = before_name // reset to before name so the statement parses properly
+
+	ast_parse_var_declaration_no_type(ctx, tokens, type_node, sequence, transmute(AstVariableDefFlags) storage) or_return
+	parsed_node =  sequence[len(sequence) - 1]
 
 	return
 }
@@ -602,6 +603,40 @@ ast_parse_typedef_no_keyword :: proc(ctx : ^AstContext, tokens : ^[]Token) -> (n
 	return
 }
 
+ast_parse_function_args_with_brackets :: proc(ctx: ^AstContext, tokens : ^[]Token, arguments : ^[dynamic]AstNodeIndex) -> (has_vararg : bool, err : AstError)
+{
+	args_loop: for {
+		next, nexts := peek_token(tokens)
+		#partial switch next.kind {
+			case .BracketRoundClose:
+				tokens^ = nexts
+				break args_loop
+
+			case .Comma:
+				tokens^ = nexts
+				continue
+
+			case .Ellipsis:
+				tokens^ = nexts
+
+				append(arguments, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .Varargs }))
+				has_vararg = true
+				continue
+
+			case:
+				type := ast_parse_type(tokens) or_return
+
+				s : [dynamic]AstNodeIndex
+				ast_parse_var_declaration_no_type(ctx, tokens, type, &s, {}, true) or_return
+
+				append(arguments, s[0])
+				delete(s)
+		}
+	}
+
+	return
+}
+
 ast_parse_function_def_no_return_type_and_name :: proc(ctx: ^AstContext, tokens : ^[]Token, parse_initializer := false) -> (node : AstNode, err : AstError)
 {
 	// (int a[3]) {}
@@ -623,64 +658,7 @@ ast_parse_function_def_no_return_type_and_name :: proc(ctx: ^AstContext, tokens 
 		tokens^ = token_reset
 	}
 
-	has_vararg := false
-
-	args_loop: for {
-		next, nexts := peek_token(tokens)
-		#partial switch next.kind {
-			case .BracketRoundClose:
-				tokens^ = nexts
-				break args_loop
-
-			case .Comma:
-				tokens^ = nexts
-				continue
-
-			case .Ellipsis:
-				tokens^ = nexts
-
-				append(&arguments, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .Varargs }))
-				has_vararg = true
-				continue
-
-			case:
-				type := ast_parse_type(tokens) or_return
-				
-				name, names := peek_token(tokens) // name is optionan
-				arg_node := AstNode { kind = .VariableDeclaration }
-				if name.kind == .Identifier {
-					tokens^ = names
-					arg_node.var_declaration.var_name = name
-
-					nn, nns := peek_token(tokens)
-					if nn.kind == .BracketSquareOpen {
-						tokens^ = nns
-
-						array_type_token := Token { kind = .AstNode }
-						if length_expression, length_err := ast_parse_expression(ctx, tokens); length_err == nil {
-							array_type_token.location.column = append_return_index(ctx.ast, AstNode{ kind = .Varargs })
-						}
-
-						eat_token_expect(tokens, .BracketSquareClose) or_return
-
-						append(&type.type, array_type_token)
-
-						nn, nns = peek_token(tokens)
-					}
-
-					if nn.kind == .Assign {
-						tokens^ = nns
-
-						initializer := ast_parse_expression(ctx, tokens, .Comma - ._1) or_return
-						arg_node.var_declaration.initializer_expression = transmute(AstNodeIndex) append_return_index(ctx.ast, initializer)
-					}
-				}
-				
-				
-				arg_node.var_declaration.type = transmute(AstNodeIndex) append_return_index(ctx.ast, type)
-				append(&arguments, transmute(AstNodeIndex) append_return_index(ctx.ast, arg_node))
-		}
-	}
+	has_vararg := ast_parse_function_args_with_brackets(ctx, tokens, &arguments) or_return
 
 	t, sss := peek_token(tokens)
 	for {
@@ -1006,7 +984,7 @@ ast_parse_scoped_sequence_no_open_brace :: proc(ctx: ^AstContext, tokens : ^[]To
 	return
 }
 
-ast_parse_var_declaration_no_type :: proc(ctx: ^AstContext, tokens : ^[]Token, base_type : AstNode, sequence : ^[dynamic]AstNodeIndex, storage_flags : AstVariableDefFlags) -> (err : AstError)
+ast_parse_var_declaration_no_type :: proc(ctx: ^AstContext, tokens : ^[]Token, preparsed_type : AstNode, sequence : ^[dynamic]AstNodeIndex, storage_flags : AstVariableDefFlags, stop_at_comma := false) -> (err : AstError)
 {
 	tokens_reset := tokens^
 	ast_reset := len(ctx.ast)
@@ -1018,133 +996,115 @@ ast_parse_var_declaration_no_type :: proc(ctx: ^AstContext, tokens : ^[]Token, b
 		tokens^ = tokens_reset
 	}
 
-	current_type, width_expression : AstNode
-	err, _ = peek_token(tokens)
-	last_name : Token
+	// fnptr detection        (*name)(args, ...)
+	if n, ns := peek_token(tokens); n.kind == .BracketRoundOpen {
+		if nn, nns := peek_token(&ns); nn.kind == .Star {
+			tokens^ = nns // skip  (*
+			name := eat_token_expect(tokens, .Identifier) or_return
+			eat_token_expect(tokens, .BracketRoundClose)
+			eat_token_expect(tokens, .BracketRoundOpen)
+			arguments : [dynamic]AstNodeIndex
+			ast_parse_function_args_with_brackets(ctx, tokens, &arguments)
+			eat_token_expect(tokens, .BracketRoundClose)
 
-	loop: for {
-		next, ns := peek_token(tokens)
-		#partial switch next.kind {
-			case .Identifier:
-				last_name = next
-				next_next, nns := peek_token(&ns)
-				#partial switch next_next.kind {
-					case .Assign: // ... a =  ...
-						tokens^ = nns
-						value := ast_parse_expression(ctx, tokens, .Assign) or_return
-						decl_node := AstNode{ kind = .VariableDeclaration, var_declaration = {
-							type = transmute(AstNodeIndex) append_return_index(ctx.ast, base_type),
-							var_name = next,
-							initializer_expression = transmute(AstNodeIndex) append_return_index(ctx.ast, value),
-							flags = storage_flags,
-						}}
-						append(sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, decl_node))
-						err = nil
+			fn_type := AstNode{ kind = .FunctionDefinition, function_def = {
+				return_type = transmute(AstNodeIndex) append_return_index(ctx.ast, preparsed_type),
+				arguments = arguments,
+			}}
+			append(&fn_type.function_def.function_name, name)
 
-					case .BracketSquareOpen: // ... a[ ...
-						tokens^ = nns
+			var_def := AstNode { kind = .VariableDeclaration, var_declaration = {
+				var_name = name,
+				type = transmute(AstNodeIndex) append_return_index(ctx.ast, fn_type),
+			}}
 
-						length_expression := ast_parse_expression(ctx, tokens) or_return
-						eat_token_expect(tokens, .BracketSquareClose) or_return
-						
-						if current_type.kind == {} { current_type = clone_node(base_type) }
-						append(&current_type.type, Token{ kind = .AstNode, location = { column = transmute(int) transmute(AstNodeIndex) append_return_index(ctx.ast, length_expression) } })
-						err = nil
+			append(sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, var_def))
 
-					case .Comma: // ... a, ...
-						tokens^ = nns
-
-						decl_node := AstNode{ kind = .VariableDeclaration, var_declaration = {
-							type = transmute(AstNodeIndex) append_return_index(ctx.ast, current_type.kind == {} ? base_type : current_type),
-							var_name = next,
-							flags = storage_flags,
-							width_expression = width_expression.kind == {} ? {} : transmute(AstNodeIndex) append_return_index(ctx.ast, width_expression)
-						}}
-						append(sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, decl_node))
-						
-						current_type.kind = {} // @leak
-						width_expression.kind = {} // @leak
-						err = tokens[0]
-
-					case .Colon: // bitfield, e.g.    ... a : 3
-						tokens^ = nns // eat the :
-
-						width_expression = ast_parse_expression(ctx, tokens) or_return
-
-						err = nil
-
-					case .Semicolon: // ... a;
-						tokens^ = ns // don't eat the semicolon
-
-						decl_node := AstNode{ kind = .VariableDeclaration, var_declaration = {
-							type = transmute(AstNodeIndex) append_return_index(ctx.ast, current_type.kind == {} ? base_type : current_type),
-							var_name = next,
-							flags = storage_flags,
-							width_expression = width_expression.kind == {} ? {} : transmute(AstNodeIndex) append_return_index(ctx.ast, width_expression)
-						}}
-						append(sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, decl_node))
-
-						err = nil
-						return
-
-					case:
-						err = tokens[0]
-						return
-				}
-			
-			case .Comma:
-				//         v
-				// int a[1], b
-				tokens^ = ns
-
-				decl_node := AstNode{ kind = .VariableDeclaration, var_declaration = {
-					type = transmute(AstNodeIndex) append_return_index(ctx.ast, current_type),
-					var_name = last_name,
-					flags = storage_flags,
-					width_expression = width_expression.kind == {} ? {} : transmute(AstNodeIndex) append_return_index(ctx.ast, width_expression)
-				}}
-				append(sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, decl_node))
-
-				current_type.kind = {} // @leak
-				width_expression.kind = {} // @leak
-				err = tokens[0]
-
-
-			case .Star:
-				//        v
-				// int a, *b
-				tokens^ = ns
-
-				if current_type.kind == {} { current_type = clone_node(base_type) }
-				append(&current_type.type, next)
-				err = tokens[0]
-
-			case .Semicolon:
-				//         v            v
-				// int b[3];   int a : 3;
-
-				// tokens^ = ns // don't eat the semicolon
-
-				if current_type.kind != {} || width_expression.kind != {} {
-					decl_node := AstNode{ kind = .VariableDeclaration, var_declaration = {
-						type = transmute(AstNodeIndex) append_return_index(ctx.ast, current_type.kind != {} ? current_type : base_type),
-						var_name = last_name,
-						flags = storage_flags,
-						width_expression = width_expression.kind == {} ? {} : transmute(AstNodeIndex) append_return_index(ctx.ast, width_expression)
-					}}
-					append(sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, decl_node))
-
-					err = nil
-				}
-				return
-
-			
-			case:
-				break loop
+			return
 		}
 	}
 
-	return
+	loop: for {
+		name : Token
+		current_type, width_expression, initializer_expression : AstNode
+	
+		next : Token; ns : []Token
+		type_prefix_loop: for {
+			next, ns = peek_token(tokens)
+			#partial switch next.kind {
+				case .Ampersand, .Star:
+					//     v
+					// int ***&a
+					tokens^ = ns
+
+					if current_type.kind == {} { current_type = clone_node(preparsed_type) }
+					append(&current_type.type, next)
+
+				case .Identifier:
+					//         v
+					// int ***&a
+					tokens^ = ns
+
+					name = next
+
+					next, ns = peek_token(tokens)
+					break type_prefix_loop
+
+				case:
+					err = next
+					return
+			}
+		}
+
+		// found and eaten identifier
+
+		if next.kind == .BracketSquareOpen { // void fn(int a[]);   or  int a[3];
+			tokens^ = ns
+
+			type_extension := Token { kind = .AstNode }
+
+			if length_expression, length_err := ast_parse_expression(ctx, tokens); length_err == nil {
+				//       v
+				// int a[expr];
+				type_extension.location.column = append_return_index(ctx.ast, length_expression)
+			}
+			eat_token_expect(tokens, .BracketSquareClose) or_return
+
+			if current_type.kind == {} { current_type = clone_node(preparsed_type) }
+			append(&current_type.type, type_extension)
+
+			next, ns = peek_token(tokens)
+		}
+
+		if next.kind == .Colon {
+			tokens^ = ns
+
+			width_expression = ast_parse_expression(ctx, tokens, .Comma - ._1) or_return
+
+			next, ns = peek_token(tokens)
+		}
+
+		if next.kind == .Assign {
+			tokens^ = ns
+
+			initializer_expression = ast_parse_expression(ctx, tokens, .Comma - ._1) or_return
+
+			next, ns = peek_token(tokens)
+		}
+
+		node := AstNode { kind = .VariableDeclaration, var_declaration = {
+			flags = storage_flags,
+			type = transmute(AstNodeIndex) append_return_index(ctx.ast, current_type.kind == {} ? preparsed_type : current_type),
+			var_name = name,
+			width_expression = width_expression.kind != {} ? transmute(AstNodeIndex) append_return_index(ctx.ast, width_expression) : {},
+			initializer_expression = initializer_expression.kind != {} ? transmute(AstNodeIndex) append_return_index(ctx.ast, initializer_expression) : {},
+		}}
+		append(sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, node))
+
+		if next.kind != .Comma || stop_at_comma { return }
+		
+		tokens^ = ns // eat ,
+	}
 }
 
 ast_parse_function_call :: proc(ctx: ^AstContext, tokens : ^[]Token) -> (node : AstNode, err : AstError)

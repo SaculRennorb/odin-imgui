@@ -1,0 +1,1 @@
+const char* (*getter)(void* user_data, int idx);

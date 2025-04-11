@@ -648,19 +648,21 @@ ast_parse_function_args_with_brackets :: proc(ctx: ^AstContext, tokens : ^[]Toke
 			case:
 				type := ast_parse_type(ctx, tokens) or_return
 
-				if nn, nns := peek_token(tokens); nn.kind == .Identifier {
-					s : [dynamic]AstNodeIndex
-					ast_parse_var_declaration_no_type(ctx, tokens, type, &s, {}, true) or_return
+				nn, nns := peek_token(tokens)
+				#partial switch nn.kind {
+					case .Comma, .BracketRoundClose:
+						var_def := AstNode{ kind = .VariableDeclaration, var_declaration = {
+							type = transmute(AstNodeIndex) append_return_index(ctx.ast, type),
+							// no name
+						}}
+						append(arguments, transmute(AstNodeIndex) append_return_index(ctx.ast, var_def))
 
-					append(arguments, s[0])
-					delete(s)
-				}
-				else {
-					var_def := AstNode{ kind = .VariableDeclaration, var_declaration = {
-						type = transmute(AstNodeIndex) append_return_index(ctx.ast, type),
-						// no name
-					}}
-					append(arguments, transmute(AstNodeIndex) append_return_index(ctx.ast, var_def))
+					case: // odent or fnptr brackets
+						s : [dynamic]AstNodeIndex
+						ast_parse_var_declaration_no_type(ctx, tokens, type, &s, {}, true) or_return
+
+						append(arguments, s[0])
+						delete(s)
 				}
 		}
 	}
@@ -1176,7 +1178,7 @@ ast_parse_function_call :: proc(ctx: ^AstContext, tokens : ^[]Token) -> (node : 
 	}
 }
 
-ast_parse_fnptr_type :: proc(ctx : ^AstContext, tokens : ^[]Token) -> (node : AstNode, err : AstError)
+ast_parse_fnptr_type :: proc(ctx : ^AstContext, tokens : ^[]Token) -> (node : AstNode, err : AstError) // @cleanup: deduplicate 
 {
 	return_type := ast_parse_type(ctx, tokens) or_return
 	eat_token_expect(tokens, .BracketRoundOpen) or_return
@@ -1275,7 +1277,7 @@ ast_parse_type_inner :: proc(ctx : ^AstContext, tokens : ^[]Token, type : ^[dyna
 				append(type, eat_token_expect(tokens, .BracketTriangleClose) or_return) // closing >
 
 			case:
-				if !has_name { err = n }
+				if !has_name && !has_int_modifier { err = n }
 				return
 		}
 	}

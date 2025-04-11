@@ -1477,6 +1477,11 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 				tokens^ = nexts; err = nil
 				continue
 
+			case .LiteralBool:
+				node = AstNode{ kind = .LiteralBool, literal = next }
+				tokens^ = nexts; err = nil
+				continue
+
 			case .BracketRoundOpen: // bracketed expression or cast
 				og_nexts := nexts
 

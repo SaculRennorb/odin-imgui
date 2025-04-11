@@ -472,14 +472,25 @@ ast_parse_declaration :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[
 	if next, ns := peek_token(tokens); next.kind == .Operator {
 		tokens^ = ns
 
-		// TODO
+		nn := eat_token(tokens);
+		#partial switch nn.kind {
+			case .BracketSquareOpen: // operator [](args) { ... }
+				eat_token_expect(tokens, .BracketSquareClose) or_return
 
-		// assume this is the index operator and just dump it for now
-		eat_token_expect(tokens, .BracketSquareOpen) or_return
-		eat_token_expect(tokens, .BracketSquareClose) or_return
+			case .Identifier:
+				if nn.source == "new" || nn.source == "delete" {
+					break
+				}
+				fallthrough
 
+			case:
+				err = nn
+				return
+		}
+			
+		// Dump operators for now. @hardcoded
 		node := ast_parse_function_def_no_return_type_and_name(ctx, tokens) or_return
-		// dont append to sequence for now 
+		// Don't append to sequence for now.
 
 		parsed_node = transmute(AstNodeIndex) append_return_index(ctx.ast, node)
 		err = nil

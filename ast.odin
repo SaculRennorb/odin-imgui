@@ -1426,12 +1426,13 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 		}
 
 		#partial switch next.kind {
-			case .Star, .Ampersand, .Minus, .Exclamationmark, .Tilde, .PrefixDecrement, .PrefixIncrement:
+			case .Star, .Ampersand, .Plus, .Minus, .Exclamationmark, .Tilde, .PrefixDecrement, .PrefixIncrement:
 
 				presedence : OperatorPresedence
 				#partial switch next.kind {
 					case .Star           : presedence = .Dereference
 					case .Ampersand      : presedence = .AddressOf
+					case .Plus           : presedence = .UnaryMinus
 					case .Minus          : presedence = .UnaryMinus
 					case .Exclamationmark: presedence = .Not
 					case .Tilde          : presedence = .Invert
@@ -1616,6 +1617,7 @@ AstError :: Maybe(Token)
 
 AstUnaryOp :: enum {
 	Dereference  = '*',
+	Plus         = '+',
 	Minus        = '-',
 	Invert       = '~',
 	Increment    = cast(int) TokenKind.PrefixIncrement,

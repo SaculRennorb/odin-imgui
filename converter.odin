@@ -581,6 +581,10 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 						write_node(ctx, current_node.unary_left.right, name_context)
 						str.write_byte(ctx.result, '^')
 
+					case .Plus:
+						str.write_byte(ctx.result, '+')
+						write_node(ctx, current_node.unary_left.right, name_context)
+
 					case .Minus:
 						str.write_byte(ctx.result, '-')
 						write_node(ctx, current_node.unary_left.right, name_context)
@@ -1269,6 +1273,9 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 							switch node.unary_left.operator {
 								case .Minus:
 									append(output, Token{ kind = .Minus, source = "-" })
+									transform_expression(output, ast, node.unary_left.right)
+								case .Plus:
+									append(output, Token{ kind = .Minus, source = "+" })
 									transform_expression(output, ast, node.unary_left.right)
 								case .Dereference:
 									transform_expression(output, ast, node.unary_left.right)

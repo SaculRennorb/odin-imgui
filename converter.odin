@@ -880,11 +880,16 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 				case .VariableDeclaration:
 					arg := ctx.ast[nidx].var_declaration
 
-					if .ForwardDeclaration not_in fn_node.flags {
-						insert_new_definition(ctx.context_heap, name_context, arg.var_name.source, nidx, arg.var_name.source)
+					if arg.var_name.source != "" {
+						if .ForwardDeclaration not_in fn_node.flags {
+							insert_new_definition(ctx.context_heap, name_context, arg.var_name.source, nidx, arg.var_name.source)
+						}
+		
+						str.write_string(ctx.result, arg.var_name.source)
 					}
-	
-					str.write_string(ctx.result, arg.var_name.source)
+					else {
+						str.write_byte(ctx.result, '_') // fn args might not have a name
+					}
 					str.write_string(ctx.result, " : ")
 					write_type(ctx, ctx.ast[arg.type], name_context)
 	

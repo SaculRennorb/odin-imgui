@@ -241,7 +241,7 @@ ast_parse_template_spec_no_keyword :: proc(ctx : ^AstContext, tokens : ^[]Token)
 			append(&type.type, n)
 		}
 		else {
-			type = ast_parse_type(tokens) or_return
+			type = ast_parse_type(ctx, tokens) or_return
 		}
 		
 		
@@ -296,7 +296,9 @@ ast_parse_structure :: proc(ctx: ^AstContext, tokens : ^[]Token) -> (node : AstN
 		if next.kind == .Colon {
 			tokens^ = nexts // eat the : 
 
-			node.structure.base_type =  ast_parse_type_inner(tokens) or_return
+			bt : [dynamic]Token
+			ast_parse_type_inner(ctx, tokens, &bt) or_return
+			node.structure.base_type = bt[:]
 
 			next, nexts = peek_token(tokens)
 		}
@@ -467,7 +469,7 @@ ast_parse_declaration :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[
 	}
 
 	// var or fn def must have return type
-	type_node := ast_parse_type(tokens) or_return
+	type_node := ast_parse_type(ctx, tokens) or_return
 
 	if next, ns := peek_token(tokens); next.kind == .Operator {
 		tokens^ = ns
@@ -579,7 +581,7 @@ ast_parse_function_def :: proc(ctx: ^AstContext, tokens : ^[]Token) -> (node : A
 
 	storage := ast_parse_storage_modifier(tokens)
 
-	return_type_node := ast_parse_type(tokens) or_return // int
+	return_type_node := ast_parse_type(ctx, tokens) or_return // int
 	name := ast_parse_qualified_name(tokens) or_return // main
 
 	node = ast_parse_function_def_no_return_type_and_name(ctx, tokens) or_return // (int a[3]) {}
@@ -606,7 +608,7 @@ ast_parse_typedef_no_keyword :: proc(ctx : ^AstContext, tokens : ^[]Token) -> (n
 	test := raw_data(tokens^)[-1]
 	if test.kind == .Identifier {
 		type_tokens := slice_from_se(start, raw_data(tokens^)[-1:])
-		type := ast_parse_type(&type_tokens) or_return
+		type := ast_parse_type(ctx, &type_tokens) or_return
 		assert_eq(len(type_tokens), 0)
 		
 		node.typedef.name = test
@@ -623,6 +625,8 @@ ast_parse_typedef_no_keyword :: proc(ctx : ^AstContext, tokens : ^[]Token) -> (n
 
 ast_parse_function_args_with_brackets :: proc(ctx: ^AstContext, tokens : ^[]Token, arguments : ^[dynamic]AstNodeIndex) -> (has_vararg : bool, err : AstError)
 {
+	eat_token_expect(tokens, .BracketRoundOpen) or_return
+
 	args_loop: for {
 		next, nexts := peek_token(tokens)
 		#partial switch next.kind {
@@ -642,13 +646,22 @@ ast_parse_function_args_with_brackets :: proc(ctx: ^AstContext, tokens : ^[]Toke
 				continue
 
 			case:
-				type := ast_parse_type(tokens) or_return
+				type := ast_parse_type(ctx, tokens) or_return
 
-				s : [dynamic]AstNodeIndex
-				ast_parse_var_declaration_no_type(ctx, tokens, type, &s, {}, true) or_return
+				if nn, nns := peek_token(tokens); nn.kind == .Identifier {
+					s : [dynamic]AstNodeIndex
+					ast_parse_var_declaration_no_type(ctx, tokens, type, &s, {}, true) or_return
 
-				append(arguments, s[0])
-				delete(s)
+					append(arguments, s[0])
+					delete(s)
+				}
+				else {
+					var_def := AstNode{ kind = .VariableDeclaration, var_declaration = {
+						type = transmute(AstNodeIndex) append_return_index(ctx.ast, type),
+						// no name
+					}}
+					append(arguments, transmute(AstNodeIndex) append_return_index(ctx.ast, var_def))
+				}
 		}
 	}
 
@@ -661,8 +674,6 @@ ast_parse_function_def_no_return_type_and_name :: proc(ctx: ^AstContext, tokens 
 	// (int a[3]) const {}
 
 	node.kind = .FunctionDefinition
-
-	eat_token_expect(tokens, .BracketRoundOpen) or_return // (
 
 	token_reset := tokens^
 	ast_reset_size := len(ctx.ast)
@@ -898,7 +909,7 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 	}
 	err = next
 
-	if type_node, type_err := ast_parse_type(tokens); type_err == nil {
+	if type_node, type_err := ast_parse_type(ctx, tokens); type_err == nil {
 		err = ast_parse_var_declaration_no_type(ctx, tokens, type_node, sequence, transmute(AstVariableDefFlags) storage)
 		if err == nil {
 			parsed_node = last(sequence[:])^
@@ -1014,16 +1025,14 @@ ast_parse_var_declaration_no_type :: proc(ctx: ^AstContext, tokens : ^[]Token, p
 		tokens^ = tokens_reset
 	}
 
-	// fnptr detection        (*name)(args, ...)
+	// fnptr detection        (*name)(args)
 	if n, ns := peek_token(tokens); n.kind == .BracketRoundOpen {
 		if nn, nns := peek_token(&ns); nn.kind == .Star {
 			tokens^ = nns // skip  (*
 			name := eat_token_expect(tokens, .Identifier) or_return
 			eat_token_expect(tokens, .BracketRoundClose)
-			eat_token_expect(tokens, .BracketRoundOpen)
 			arguments : [dynamic]AstNodeIndex
 			ast_parse_function_args_with_brackets(ctx, tokens, &arguments)
-			eat_token_expect(tokens, .BracketRoundClose)
 
 			fn_type := AstNode{ kind = .FunctionDefinition, function_def = {
 				return_type = transmute(AstNodeIndex) append_return_index(ctx.ast, preparsed_type),
@@ -1169,7 +1178,7 @@ ast_parse_function_call :: proc(ctx: ^AstContext, tokens : ^[]Token) -> (node : 
 
 ast_parse_fnptr_type :: proc(ctx : ^AstContext, tokens : ^[]Token) -> (node : AstNode, err : AstError)
 {
-	return_type := ast_parse_type(tokens) or_return
+	return_type := ast_parse_type(ctx, tokens) or_return
 	eat_token_expect(tokens, .BracketRoundOpen) or_return
 	eat_token_expect(tokens, .Star) or_return
 	name, _ := eat_token_expect(tokens, .Identifier)
@@ -1183,18 +1192,15 @@ ast_parse_fnptr_type :: proc(ctx : ^AstContext, tokens : ^[]Token) -> (node : As
 	return
 }
 
-ast_parse_type :: proc(tokens : ^[]Token) -> (node : AstNode, err : AstError)
+ast_parse_type :: proc(ctx : ^AstContext, tokens : ^[]Token) -> (node : AstNode, err : AstError)
 {
-	range := ast_parse_type_inner(tokens) or_return
-
 	node = AstNode { kind = .Type }
-	resize(&node.type, len(range))
-	copy(node.type[:], range)
+	ast_parse_type_inner(ctx, tokens, &node.type) or_return
 
 	return
 }
 
-ast_parse_type_inner :: proc(tokens : ^[]Token) -> (type : TokenRange, err : AstError)
+ast_parse_type_inner :: proc(ctx : ^AstContext, tokens : ^[]Token, type : ^[dynamic]Token) -> (err : AstError)
 {
 	// int
 	// const int
@@ -1202,32 +1208,50 @@ ast_parse_type_inner :: proc(tokens : ^[]Token) -> (type : TokenRange, err : Ast
 	// const char***
 	// const ::char const** const&
 
-	start := find_next_actual_token(tokens)
+	type_reset := len(type)
+	defer if err != nil {
+		resize(type, type_reset)
+	}
 
 	has_name := false
 	has_int_modifier := false
 
 	type_loop: for {
-		n, s := peek_token(tokens)
-		
+		n, ns := peek_token(tokens)
 		#partial switch n.kind {
 			case .Ampersand, .Star:
-				tokens^ = s
+				append(type, n); tokens^ = ns
 				continue
+
+			case .BracketSquareOpen:
+				if nn, nns := peek_token(&ns); nn.kind == .BracketSquareClose {
+					tokens^ = nns
+
+					append(type, Token{ kind = .AstNode })
+
+					break type_loop // []can only be the last part
+				}
+				else {
+					tokens^ = ns
+					length_expression := ast_parse_expression(ctx, tokens) or_return
+					eat_token_expect(tokens, .BracketSquareClose) or_return
+
+					append(type, Token{ kind = .AstNode, location = { column = append_return_index(ctx.ast, length_expression) } })
+				}
 
 			case .Identifier:
 				switch n.source {
 					case "short", "long":
-						tokens^ = s
+						append(type, n); tokens^ = ns
 						has_int_modifier = true
 						continue
 
 					case "const", "unsigned", "signed":
-						tokens^ = s
+						append(type, n); tokens^ = ns
 						continue
 
 					case "int":
-						tokens^ = s
+						append(type, n); tokens^ = ns
 						has_name = true
 						continue
 
@@ -1236,22 +1260,27 @@ ast_parse_type_inner :: proc(tokens : ^[]Token) -> (type : TokenRange, err : Ast
 
 						before := tokens^;
 
-						ast_parse_qualified_name(tokens)
+						qname := ast_parse_qualified_name(tokens) or_return
+						oldl := len(type)
+						non_zero_resize(type, oldl + len(qname))
+						copy(type[oldl:], qname)
+
 						has_name = true
 				}
 
 			case .BracketTriangleOpen:
-				tokens^ = s
-				ast_parse_type_inner(tokens)
-				eat_token_expect(tokens, .BracketTriangleClose) // closing >
+				append(type, n); tokens^ = ns
+
+				ast_parse_type_inner(ctx, tokens, type)
+				append(type, eat_token_expect(tokens, .BracketTriangleClose) or_return) // closing >
 
 			case:
-				break type_loop
+				if !has_name { err = n }
+				return
 		}
 	}
 
-	range := slice_from_se(start, raw_data(tokens^))
-	return range, len(range) > 0 ? nil : start[0]
+	return
 }
 
 ast_parse_qualified_name :: proc(tokens : ^[]Token) -> (r : TokenRange, err : AstError)
@@ -1503,7 +1532,7 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 			case .BracketRoundOpen: // bracketed expression or cast
 				og_nexts := nexts
 
-				if type, type_err := ast_parse_type(&nexts); type_err == nil && find_next_actual_token(&nexts)[0].kind == .BracketRoundClose { // cast: (type) expression
+				if type, type_err := ast_parse_type(ctx, &nexts); type_err == nil && find_next_actual_token(&nexts)[0].kind == .BracketRoundClose { // cast: (type) expression
 					eat_token_expect(&nexts, .BracketRoundClose) or_return
 					expression := ast_parse_expression(ctx, &nexts, .CCast) or_return
 
@@ -1530,7 +1559,7 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 				tokens^ = nexts
 
 				eat_token_expect(tokens, .BracketTriangleOpen) or_return
-				type := ast_parse_type(tokens) or_return
+				type := ast_parse_type(ctx, tokens) or_return
 				eat_token_expect(tokens, .BracketTriangleClose) or_return
 				eat_token_expect(tokens, .BracketRoundOpen) or_return
 				expression := ast_parse_expression(ctx, tokens) or_return

@@ -548,6 +548,7 @@ ast_parse_storage_modifier :: proc(tokens : ^[]Token) -> (storage : AstStorageMo
 		if n.kind != .Identifier { break }
 
 		switch n.source {
+			case "inline": storage |= { .Inline }
 			case "static": storage |= { .Static }
 			case "thread_local": storage |= { .ThreadLocal }
 			case "extern": storage |= { .Extern }
@@ -1807,22 +1808,25 @@ AstNode :: struct {
 }
 
 AstStorageModifierFlag :: enum{
-	Static      = 0,
-	Extern      = 1,
-	ThreadLocal = 2,
-	Constexpr   = 3,
+	Static,
+	Extern,
+	ThreadLocal,
+	Inline,
+	Constexpr,
 }
 AstStorageModifier :: bit_set[AstStorageModifierFlag]
 
 AstVariableDefFlags :: bit_set[enum{
 	Static      = cast(int) AstStorageModifier.Static,
 	Extern      = cast(int) AstStorageModifier.Extern,
+	Inline      = cast(int) AstStorageModifier.Inline,
 	ThreadLocal = cast(int) AstStorageModifier.ThreadLocal,
 }]
 
 AstFunctionDefFlags :: bit_set[enum{
 	Static = cast(int) AstStorageModifier.Static,
 	Extern = cast(int) AstStorageModifier.Extern,
+	Inline = cast(int) AstStorageModifier.Inline,
 	ForwardDeclaration = cast(int) max(AstStorageModifierFlag) + 1,
 	Const,
 }]

@@ -843,6 +843,11 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 	write_function_type :: proc(ctx : ConverterContext, name_context : NameContextIndex, fn_node : AstNode, complete_structure_name : string, is_member_fn : bool) -> (arg_count : int)
 	{
 		fn_node := fn_node.function_def
+
+		if .Inline in fn_node.flags {
+			str.write_string(ctx.result, "#force_inline ")
+		}
+
 		str.write_string(ctx.result, "proc(")
 
 		for ti in fn_node.template_spec {
@@ -897,9 +902,12 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 
 		str.write_byte(ctx.result, ')')
 
-		if fn_node.return_type != {} && ctx.ast[fn_node.return_type].type[0].source != "void" {
-			str.write_string(ctx.result, " -> ")
-			write_type(ctx, ctx.ast[fn_node.return_type], name_context)
+		if fn_node.return_type != {} {
+			return_type := ctx.ast[fn_node.return_type].type
+			if len(return_type) > 1 || return_type[0].source != "void" {
+				str.write_string(ctx.result, " -> ")
+				write_type(ctx, ctx.ast[fn_node.return_type], name_context)
+			}
 		}
 
 		return

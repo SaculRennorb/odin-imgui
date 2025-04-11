@@ -185,19 +185,25 @@ ast_parse_preproc_define :: proc(ctx: ^AstContext, tokens : ^[]Token) -> (node :
 		tokens^ = nexts
 		args : [dynamic]Token
 
-		next, nexts = peek_token(tokens)
-		for {
-			if next.kind == .BracketRoundClose {
-				tokens^ = nexts
-				break
-			}
-
-			arg := eat_token_expect(tokens, .Identifier) or_return
-			append(&args, arg)
-
+		arg_loop: for {
 			next, nexts = peek_token(tokens)
-			if next.kind == .Comma {
-				tokens^ = nexts
+			#partial switch next.kind {
+				case .BracketRoundClose:
+					tokens^ = nexts
+					break arg_loop
+					
+				case .Identifier:
+					tokens^ = nexts
+					append(&args, next)
+
+					next, nexts = peek_token(tokens)
+					if next.kind == .Comma {
+						tokens^ = nexts
+					}
+
+				case .Ellipsis:
+					tokens^ = nexts
+					append(&args, next)
 			}
 		}
 

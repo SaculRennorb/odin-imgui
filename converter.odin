@@ -77,9 +77,14 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 				str.write_string(ctx.result, " :: #force_inline proc \"contextless\" (")
 				for arg, i in macro.args {
 					if i > 0 { str.write_string(ctx.result, ", ") }
-					str.write_string(ctx.result, arg.source)
-					str.write_string(ctx.result, " : ")
-					fmt.sbprintf(ctx.result, "$T%v", i)
+					if arg.kind != .Ellipsis {
+						str.write_string(ctx.result, arg.source)
+						str.write_string(ctx.result, " : ")
+						fmt.sbprintf(ctx.result, "$T%v", i)
+					}
+					else {
+						str.write_string(ctx.result, "args : ..[]any")
+					}
 				}
 				str.write_string(ctx.result, ") //TODO: validate those args are not by-ref\n")
 				str.write_string(ctx.result, indent_str); str.write_string(ctx.result, "{\n")

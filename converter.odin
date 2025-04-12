@@ -674,9 +674,9 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 					str.write_byte(ctx.result, '(')
 					if !is_ptr { str.write_byte(ctx.result, '&') }
 					write_node(ctx, current_node.member_access.expression, name_context)
-					for pidx, i in fncall.parameters {
+					for aidx, i in fncall.arguments {
 						str.write_string(ctx.result, ", ")
-						write_node(ctx, pidx, name_context)
+						write_node(ctx, aidx, name_context)
 					}
 					str.write_byte(ctx.result, ')')
 				}
@@ -718,9 +718,9 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 
 				str.write_string(ctx.result, last(fncall.qualified_name[:]).source)
 				str.write_byte(ctx.result, '(')
-				for pidx, i in fncall.parameters {
+				for aidx, i in fncall.arguments {
 					if i != 0 { str.write_string(ctx.result, ", ") }
-					write_node(ctx, pidx, name_context)
+					write_node(ctx, aidx, name_context)
 				}
 				str.write_byte(ctx.result, ')')
 

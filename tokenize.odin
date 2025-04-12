@@ -343,6 +343,10 @@ TokenKind :: enum {
 	NotEquals,
 	LessEq,
 	GreaterEq,
+	AssignPlus,
+	AssignMinus,
+	AssignStar,
+	AssignForwardSlash,
 	ShiftLeft,
 	ShiftRight,
 }

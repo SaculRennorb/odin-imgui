@@ -88,6 +88,9 @@ ast_parse_filescope_sequence :: proc(ctx : ^AstContext, tokens_ : []Token) -> As
 
 							eat_token_expect(tokens, .Semicolon)
 
+						case .OperatorDefinition:
+							eat_token_expect(tokens, .Semicolon)
+
 						case .Namespace:
 							/**/
 
@@ -482,13 +485,34 @@ ast_parse_declaration :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[
 	// var or fn def must have return type
 	type_node := ast_parse_type(ctx, tokens) or_return
 
-	if next, ns := peek_token(tokens); next.kind == .Operator {
+	if next, ns := peek_token(tokens); next.kind == .Operator { // operator [](args) { ... }  might be member or static call
 		tokens^ = ns
+
+		node := AstNode{ kind = .OperatorDefinition }
 
 		nn := eat_token(tokens);
 		#partial switch nn.kind {
-			case .BracketSquareOpen: // operator [](args) { ... }
+			// asume binary expressions, correct after fn arguments are known
+			case .Tilde:              node.operator_def.kind = .Invert
+			case .PrefixIncrement:    node.operator_def.kind = .Increment
+			case .PostfixDecrement:   node.operator_def.kind = .Decrement
+			case .Equals:             node.operator_def.kind = .Equals
+			case .NotEquals:          node.operator_def.kind = .NotEquals
+			case .Plus:               node.operator_def.kind = .Add
+			case .Minus:              node.operator_def.kind = .Subtract
+			case .Star:               node.operator_def.kind = .Multiply
+			case .ForwardSlash:       node.operator_def.kind = .Divide
+			case .Ampersand:          node.operator_def.kind = .BitAnd
+			case .Pipe:               node.operator_def.kind = .BitOr
+			case .Circumflex:         node.operator_def.kind = .BitXor
+			case .Assign:             node.operator_def.kind = .Assign
+			case .AssignPlus:         node.operator_def.kind = .AssignAdd
+			case .AssignMinus:        node.operator_def.kind = .AssignSubtract
+			case .AssignStar:         node.operator_def.kind = .AssignMultiply
+			case .AssignForwardSlash: node.operator_def.kind = .AssignDivide
+			case .BracketSquareOpen: 
 				eat_token_expect(tokens, .BracketSquareClose) or_return
+				node.operator_def.kind = .Index
 
 			case .Identifier:
 				if nn.source == "new" || nn.source == "delete" {
@@ -501,11 +525,28 @@ ast_parse_declaration :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[
 				return
 		}
 			
-		// Dump operators for now. @hardcoded
-		node := ast_parse_function_def_no_return_type_and_name(ctx, tokens) or_return
-		// Don't append to sequence for now.
+		fn_node := ast_parse_function_def_no_return_type_and_name(ctx, tokens) or_return
+		node.operator_def.underlying_function = transmute(AstNodeIndex) append_return_index(ctx.ast, fn_node)
+
+		arg_count := parent_type != nil ? 1 : 0
+		arg_count += len(fn_node.function_def.arguments)
+		if arg_count == 1 {
+			// fix op type to unary
+			#partial switch nn.kind {
+				case .Plus:      node.operator_def.kind = .UnaryPlus
+				case .Minus:     node.operator_def.kind = .UanryMinus
+				case .Star:      node.operator_def.kind = .Dereference
+				case .Ampersand: node.operator_def.kind = .AddressOf
+				case:
+					err = nn
+					return
+			}
+		}
 
 		parsed_node = transmute(AstNodeIndex) append_return_index(ctx.ast, node)
+		append(sequence, parsed_node)
+
+		eat_paragraph = true // @hardcoded
 		err = nil
 		return
 	}
@@ -1022,12 +1063,13 @@ ast_parse_scoped_sequence_no_open_brace :: proc(ctx: ^AstContext, tokens : ^[]To
 			#panic("wrong fn type")
 		}
 
-		#partial switch ctx.ast[member_node].kind {
-			case .FunctionDefinition:
+		member_kind := ctx.ast[member_node].kind
+		#partial switch member_kind {
+			case .FunctionDefinition: //TODO(Rennorb) @explain
 				if .ForwardDeclaration not_in ctx.ast[member_node].function_def.flags { break }
 				fallthrough
 				
-			case .VariableDeclaration, .Typedef, .Sequence, .Struct, .Union, .Do, .ExprBinary, .ExprUnaryLeft, .ExprUnaryRight, .MemberAccess, .FunctionCall, .Return, .Break, .Continue:
+			case .VariableDeclaration, .Typedef, .Sequence, .Struct, .Union, .Do, .ExprBinary, .ExprUnaryLeft, .ExprUnaryRight, .MemberAccess, .FunctionCall, .OperatorCall, .Return, .Break, .Continue:
 				when F == type_of(ast_parse_enum_value_declaration) {
 					if fn == ast_parse_enum_value_declaration { // static check only tests for teh shape of the fn
 						// enum value declarations (may) end in a comma
@@ -1044,14 +1086,26 @@ ast_parse_scoped_sequence_no_open_brace :: proc(ctx: ^AstContext, tokens : ^[]To
 				}
 		}
 
-		if ctx.ast[member_node].kind == .FunctionDefinition {
-			// attach comments after the declaration in the same line
-			if n, ns := peek_token(tokens, false); n.kind == .Comment {
-				tokens^ = ns
+		#partial switch member_kind {
+			case .FunctionDefinition:
+				// attach comments after the declaration in the same line
+				if n, ns := peek_token(tokens, false); n.kind == .Comment {
+					tokens^ = ns
 
-				append(&ctx.ast[member_node].function_def.attached_comments, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode { kind = .Comment, attached = true, literal = n }))
-				append(&ctx.ast[member_node].function_def.attached_comments, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode { kind = .NewLine, attached = true }))
-			}
+					append(&ctx.ast[member_node].function_def.attached_comments, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode { kind = .Comment, attached = true, literal = n }))
+					append(&ctx.ast[member_node].function_def.attached_comments, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode { kind = .NewLine, attached = true }))
+				}
+
+			case .OperatorDefinition:
+				// attach comments after the declaration in the same line
+				if n, ns := peek_token(tokens, false); n.kind == .Comment {
+					tokens^ = ns
+
+					op_def := ctx.ast[member_node]
+					fn_def := &ctx.ast[op_def.operator_def.underlying_function]
+					append(&fn_def.function_def.attached_comments, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode { kind = .Comment, attached = true, literal = n }))
+					append(&fn_def.function_def.attached_comments, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode { kind = .NewLine, attached = true }))
+				}
 		}
 
 		if eat_paragraph {
@@ -1198,21 +1252,25 @@ ast_parse_function_call :: proc(ctx: ^AstContext, tokens : ^[]Token) -> (node : 
 
 
 	qualified_name := ast_parse_qualified_name(tokens) or_return
+	ast_parse_function_call_arguments(ctx, tokens, &arguments) or_return
+
+	node = AstNode{ kind = .FunctionCall, function_call = {
+		qualified_name = ast_filter_qualified_name(qualified_name),
+		arguments = arguments,
+	}}
+	return
+}
+
+ast_parse_function_call_arguments :: proc(ctx: ^AstContext, tokens : ^[]Token, arguments : ^[dynamic]AstNodeIndex) -> (err : AstError)
+{
 	eat_token_expect(tokens, .BracketRoundOpen) or_return
-	for {
+	loop: for {
 		n, ns := peek_token(tokens)
 
 		#partial switch n.kind {
 			case .BracketRoundClose:
 				tokens^ = ns
-
-				node = AstNode{ kind = .FunctionCall, function_call = { 
-					qualified_name = ast_filter_qualified_name(qualified_name),
-					parameters =  arguments,
-				}}
-				
-				err = nil
-				return
+				break loop
 			
 			case .Comma:
 				tokens^ = ns
@@ -1220,10 +1278,11 @@ ast_parse_function_call :: proc(ctx: ^AstContext, tokens : ^[]Token) -> (node : 
 
 			case:
 				arg := ast_parse_expression(ctx, tokens, .Comma - ._1) or_return
-				
-				append(&arguments, transmute(AstNodeIndex) append_return_index(ctx.ast, arg))
+				append(arguments, transmute(AstNodeIndex) append_return_index(ctx.ast, arg))
 		}
 	}
+
+	return
 }
 
 ast_parse_fnptr_type :: proc(ctx : ^AstContext, tokens : ^[]Token) -> (node : AstNode, err : AstError) // @cleanup: deduplicate 
@@ -1434,7 +1493,7 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 
 		next, nexts := peek_token(tokens)
 
-		if err == nil {
+		if err == nil { // we already have a "left" and ar looking for a binary operator
 			#partial switch next.kind {
 				case .Dot, .DereferenceMember:
 					tokens^ = nexts // eat -> or .
@@ -1623,6 +1682,57 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 				err = nil
 				continue
 
+			case .Operator: // explicit operator call e.g.   operator=(a)
+				tokens^ = nexts
+
+				node = AstNode { kind = .OperatorCall }
+
+				n := eat_token(tokens)
+				#partial switch n.kind {
+					// assume binary for now, adjust after counting arguments
+					//case .Plus:      node.operator_call.kind = .UnaryPlus
+					//case .Minus:     node.operator_call.kind = .UanryMinus
+					case .Tilde             : node.operator_call.kind = .Invert
+					case .PrefixIncrement   : node.operator_call.kind = .Increment
+					case .PostfixDecrement  : node.operator_call.kind = .Decrement
+					case .Equals            : node.operator_call.kind = .Equals
+					case .NotEquals         : node.operator_call.kind = .NotEquals
+					case .Plus              : node.operator_call.kind = .Add
+					case .Minus             : node.operator_call.kind = .Subtract
+					case .Star              : node.operator_call.kind = .Multiply
+					case .ForwardSlash      : node.operator_call.kind = .Divide
+					case .Assign            : node.operator_call.kind = .Assign
+					case .AssignPlus        : node.operator_call.kind = .AssignAdd
+					case .AssignMinus       : node.operator_call.kind = .AssignSubtract
+					case .AssignStar        : node.operator_call.kind = .AssignMultiply
+					case .AssignForwardSlash: node.operator_call.kind = .AssignDivide
+					case .BracketSquareOpen:
+						eat_token_expect(tokens, .BracketSquareClose) or_return
+						node.operator_call.kind = .Index
+					case:
+						err = n
+						return
+				}
+
+				ast_parse_function_call_arguments(ctx, tokens, &node.operator_call.parameters) or_return
+
+				//NOTE TODO canot do this here, since it might be in a member function and tehrefore missing the first arg
+
+				// if len(node.operator_call.parameters) == 1 {
+				// 	#partial switch node.operator_call.kind {
+				// 		case .Add: node.operator_call.kind = .UnaryPlus
+				// 		case .Subtract: node.operator_call.kind = .UanryMinus
+				// 		case .Multiply: node.operator_call.kind = .Dereference
+				// 		case .BitAnd: node.operator_call.kind = .AddressOf
+				// 		case:
+				// 			err = n
+				// 			return
+				// 	}
+				// }
+
+				err = nil
+				return
+
 			case .Comma:
 				if err == nil && max_presedence >= .Comma {
 					tokens^ = nexts // eat the ,
@@ -1716,16 +1826,50 @@ find_next_actual_token :: proc(tokens : ^[]Token) -> [^]Token #no_bounds_check
 
 AstError :: Maybe(Token)
 
+// not castable to AstUnaryOp or AstBinaryOp
+AstOverloadedOp :: enum {
+	UnaryPlus,
+	UanryMinus,
+	Invert,
+	Increment,
+	Decrement,
+	Dereference,
+	AddressOf,
 
+	Equals,
+	NotEquals,
+	
+	Add,
+	Subtract,
+	Multiply,
+	Divide,
+	BitAnd,
+	BitOr,
+	BitXor,
+
+	Assign,
+	AssignAdd,
+	AssignSubtract,
+	AssignMultiply,
+	AssignDivide,
+	AssignBitAnd,
+	AssignBitOr,
+	AssignBitXor,
+
+	Index,
+}
+
+// not castable to AstOp
 AstUnaryOp :: enum {
 	Dereference  = '*',
 	Plus         = '+',
 	Minus        = '-',
 	Invert       = '~',
-	Increment    = cast(int) TokenKind.PrefixIncrement,
-	Decrement    = cast(int) TokenKind.PrefixDecrement,
+	Increment    = cast(int) TokenKind.PrefixIncrement, // cleanup explicit pre/post
+	Decrement    = cast(int) TokenKind.PrefixDecrement, // cleanup explicit pre/post
 }
 
+// not castable to AstOp
 AstBinaryOp :: enum {
 	Assign       = '=',
 	Plus         = '+',
@@ -1739,14 +1883,14 @@ AstBinaryOp :: enum {
 	Greater      = '>',
 	Modulo       = '%',
 	
-	LogicAnd = cast(int)TokenKind.DoubleAmpersand,
-	LogicOr,
-	Equals,
-	NotEquals,
-	LessEq,
-	GreaterEq,
-	ShiftLeft,
-	ShiftRight,
+	LogicAnd   = cast(int) TokenKind.DoubleAmpersand,
+	LogicOr    = cast(int) TokenKind.DoublePipe,
+	Equals     = cast(int) TokenKind.Equals,
+	NotEquals  = cast(int) TokenKind.NotEquals,
+	LessEq     = cast(int) TokenKind.LessEq,
+	GreaterEq  = cast(int) TokenKind.GreaterEq,
+	ShiftLeft  = cast(int) TokenKind.ShiftLeft,
+	ShiftRight = cast(int) TokenKind.ShiftRight,
 }
 
 AstNodeKind :: enum {
@@ -1770,7 +1914,9 @@ AstNodeKind :: enum {
 	ExprTenary,
 	MemberAccess,
 	FunctionCall,
+	OperatorCall,
 	FunctionDefinition,
+	OperatorDefinition,
 	Type,
 	VariableDeclaration,
 	Assert,
@@ -1829,6 +1975,10 @@ AstNode :: struct {
 		},
 		function_call : struct {
 			qualified_name : [dynamic]Token,
+			arguments : [dynamic]AstNodeIndex,
+		},
+		operator_call : struct {
+			kind : AstOverloadedOp,
 			parameters : [dynamic]AstNodeIndex,
 		},
 		assert : struct {
@@ -1852,6 +2002,10 @@ AstNode :: struct {
 			attached_comments : [dynamic]AstNodeIndex,
 			template_spec : [dynamic]AstNodeIndex,
 			flags : AstFunctionDefFlags,
+		},
+		operator_def : struct {
+			kind : AstOverloadedOp,
+			underlying_function : AstNodeIndex,
 		},
 		index : struct {
 			array_expression : AstNodeIndex,
@@ -1939,7 +2093,8 @@ clone_node :: proc(node : AstNode) -> (clone : AstNode) {
 		case .Type:
 			clone.type = slice.clone_to_dynamic(node.type[:])
 		case .FunctionCall:
-			clone.function_call.parameters  = slice.clone_to_dynamic(node.function_call.parameters[:])
+			clone.function_call.arguments  = slice.clone_to_dynamic(node.function_call.arguments[:])
+		// TODO inclomplete
 	}
 	return
 }
@@ -2021,7 +2176,9 @@ fmt_astnode :: proc(fi: ^fmt.Info, node: ^AstNode, verb: rune) -> bool
 		case .ExprTenary         : fmt.fmt_arg(fi, node.tenary, 'v')
 		case .MemberAccess       : fmt.fmt_arg(fi, node.member_access, 'v')
 		case .FunctionCall       : fmt.fmt_arg(fi, node.function_call, 'v')
+		case .OperatorCall       : fmt.fmt_arg(fi, node.operator_call, 'v')
 		case .FunctionDefinition : fmt.fmt_arg(fi, node.function_def, 'v')
+		case .OperatorDefinition : fmt.fmt_arg(fi, node.operator_def, 'v')
 		case .Type               : fmt.fmt_arg(fi, node.type, 'v')
 		case .VariableDeclaration: fmt.fmt_arg(fi, node.var_declaration, 'v')
 		case .Assert             : fmt.fmt_arg(fi, node.assert, 'v')

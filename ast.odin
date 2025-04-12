@@ -908,6 +908,43 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 
 			err = nil
 			return
+
+		case .If:
+			tokens^ = nexts
+
+			node := AstNode { kind = .Branch }
+
+			eat_token_expect(tokens, .BracketRoundOpen) or_return
+			condition := ast_parse_expression(ctx, tokens) or_return
+			eat_token_expect(tokens, .BracketRoundClose) or_return
+			
+			node.branch.condition = transmute(AstNodeIndex) append_return_index(ctx.ast, condition)
+
+			if n, ns := peek_token(tokens); n.kind == .BracketCurlyOpen {
+				tokens^ = ns // {
+				ast_parse_scoped_sequence_no_open_brace(ctx, tokens, ast_parse_statement, &node.branch.true_branch_sequence) or_return
+			}
+			else {
+				ast_parse_statement(ctx, tokens, &node.branch.true_branch_sequence) or_return
+				eat_token_expect(tokens, .Semicolon) or_return
+			}
+
+			if n, ns := peek_token(tokens); n.kind == .Else {
+				if nn, nns := peek_token(&ns); nn.kind == .BracketCurlyOpen {
+					tokens^ = nns // {
+					ast_parse_scoped_sequence_no_open_brace(ctx, tokens, ast_parse_statement, &node.branch.false_branch_sequence) or_return
+				}
+				else {
+					tokens^ = ns // else
+					ast_parse_statement(ctx, tokens, &node.branch.false_branch_sequence) or_return
+					eat_token_expect(tokens, .Semicolon) // might have a semicolon from single statement or nothing in case of ifelse chain
+				}
+			}
+
+			parsed_node = transmute(AstNodeIndex) append(sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, node))
+
+			err = nil
+			return
 	}
 	err = next
 
@@ -1719,6 +1756,7 @@ AstNodeKind :: enum {
 	ExprIndex,
 	ExprCast,
 	ExprBacketed,
+	ExprTenary,
 	MemberAccess,
 	FunctionCall,
 	FunctionDefinition,
@@ -1734,6 +1772,7 @@ AstNodeKind :: enum {
 	For,
 	Do,
 	While,
+	Branch,
 	Typedef,
 	Varargs,
 
@@ -1841,6 +1880,13 @@ AstNode :: struct {
 		loop : struct {
 			initializer, condition, loop_statement : AstNodeIndex,
 			body_sequence : [dynamic]AstNodeIndex,
+		},
+		branch : struct {
+			condition : AstNodeIndex,
+			true_branch_sequence, false_branch_sequence : [dynamic]AstNodeIndex,
+		},
+		tenary : struct {
+			condition, true_expression, false_expression : AstNodeIndex,
 		},
 		typedef : struct {
 			name : Token,
@@ -1950,6 +1996,7 @@ fmt_astnode :: proc(fi: ^fmt.Info, node: ^AstNode, verb: rune) -> bool
 		case .For                : fmt.fmt_arg(fi, node.loop, 'v')
 		case .Do                 : fmt.fmt_arg(fi, node.loop, 'v')
 		case .While              : fmt.fmt_arg(fi, node.loop, 'v')
+		case .Branch             : fmt.fmt_arg(fi, node.branch, 'v')
 		case .Identifier         : fmt.fmt_arg(fi, node.identifier, 'v')
 		case .Sequence           : fmt.fmt_arg(fi, node.sequence, 'v')
 		case .Namespace          : fmt.fmt_arg(fi, node.namespace, 'v')
@@ -1959,6 +2006,7 @@ fmt_astnode :: proc(fi: ^fmt.Info, node: ^AstNode, verb: rune) -> bool
 		case .ExprIndex          : fmt.fmt_arg(fi, node.index, 'v')
 		case .ExprCast           : fmt.fmt_arg(fi, node.cast_, 'v')
 		case .ExprBacketed       : fmt.fmt_arg(fi, node.inner, 'v')
+		case .ExprTenary         : fmt.fmt_arg(fi, node.tenary, 'v')
 		case .MemberAccess       : fmt.fmt_arg(fi, node.member_access, 'v')
 		case .FunctionCall       : fmt.fmt_arg(fi, node.function_call, 'v')
 		case .FunctionDefinition : fmt.fmt_arg(fi, node.function_def, 'v')

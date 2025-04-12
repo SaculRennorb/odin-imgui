@@ -32,7 +32,7 @@ preprocess :: proc(ctx : ^PreProcContext, entry_file : string)
 				continue
 			}
 
-			ident := eat_token_expect(&tokens, .Identifier) or_return
+			ident := eat_token(&tokens) // cleanup
 
 			switch ident.source {
 				case "include":

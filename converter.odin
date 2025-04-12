@@ -768,6 +768,80 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 
 				requires_new_paragraph = true
 
+			case .Branch:
+				branch := current_node.branch
+
+				str.write_string(ctx.result, "if ")
+				write_node(ctx, branch.condition, name_context)
+
+				body_indent_str : string
+
+				switch len(branch.true_branch_sequence) {
+					case 0:
+						str.write_string(ctx.result, " { }")
+
+					case 1:
+						context_heap_reset := len(ctx.context_heap)
+
+						str.write_string(ctx.result, " { ")
+						write_node(ctx, branch.true_branch_sequence[0], name_context)
+						str.write_string(ctx.result, " }")
+
+						resize(ctx.context_heap, context_heap_reset)
+
+					case:
+						context_heap_reset := len(ctx.context_heap)
+						name_context := insert_new_definition(ctx.context_heap, name_context, "", branch.condition, "")
+						
+						str.write_string(ctx.result, " {")
+						body_indent_str = str.concatenate({ indent_str, ONE_INDENT }, context.temp_allocator)
+						write_node_sequence(ctx, branch.true_branch_sequence[:], name_context, body_indent_str)
+						str.write_byte(ctx.result, '}')
+
+						resize(ctx.context_heap, context_heap_reset)
+
+						str.write_string(ctx.result, indent_str);
+				}
+
+				switch len(branch.false_branch_sequence) {
+					case 0:
+						 /**/
+
+					case 1:
+						context_heap_reset := len(ctx.context_heap)
+
+						if ctx.ast[branch.false_branch_sequence[0]].kind == .Branch { // else if chaining
+							str.write_byte(ctx.result, '\n')
+							str.write_string(ctx.result, indent_str)
+							str.write_string(ctx.result, "else ")
+							write_node(ctx, branch.false_branch_sequence[0], name_context, indent_str)
+						}
+						else {
+							str.write_byte(ctx.result, '\n')
+							str.write_string(ctx.result, indent_str)
+							str.write_string(ctx.result, "else { ")
+							write_node(ctx, branch.false_branch_sequence[0], name_context)
+							str.write_string(ctx.result, " }")
+						}
+
+						resize(ctx.context_heap, context_heap_reset)
+
+					case:
+						context_heap_reset := len(ctx.context_heap)
+						name_context := insert_new_definition(ctx.context_heap, name_context, "", branch.condition, "")
+
+						str.write_byte(ctx.result, '\n')
+						str.write_string(ctx.result, indent_str)
+						str.write_string(ctx.result, "else {")
+						if body_indent_str == "" { body_indent_str = str.concatenate({ indent_str, ONE_INDENT }, context.temp_allocator) }
+						write_node_sequence(ctx, branch.false_branch_sequence[:], name_context, body_indent_str)
+						str.write_string(ctx.result, indent_str)
+						str.write_byte(ctx.result, '}')
+
+						resize(ctx.context_heap, context_heap_reset)
+				}
+
+
 			case:
 				was_preproc := #force_inline write_preproc_node(ctx.result, current_node^)
 				if was_preproc {

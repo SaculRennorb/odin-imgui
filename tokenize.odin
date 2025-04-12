@@ -195,36 +195,23 @@ tokenize :: proc(tokens : ^[dynamic]Token, text : string, file_path : string)
 						append(tokens, Token{.LiteralBool, str, loc})
 					case "NULL", "nullptr":
 						append(tokens, Token{.LiteralNull, str, loc})
-					case "return":
-						append(tokens, Token{.Return, str, loc})
-					case "break":
-						append(tokens, Token{.Break, str, loc})
-					case "continue":
-						append(tokens, Token{.Continue, str, loc})
-					case "for":
-						append(tokens, Token{.For, str, loc})
-					case "do":
-						append(tokens, Token{.Do, str, loc})
-					case "while":
-						append(tokens, Token{.While, str, loc})
-					case "typedef":
-						append(tokens, Token{.Typedef, str, loc})
-					case "struct":
-						append(tokens, Token{.Struct, str, loc})
-					case "class":
-						append(tokens, Token{.Class, str, loc})
-					case "union":
-						append(tokens, Token{.Union, str, loc})
-					case "enum":
-						append(tokens, Token{.Enum, str, loc})
-					case "template":
-						append(tokens, Token{.Template, str, loc})
-					case "namespace":
-						append(tokens, Token{.Namespace, str, loc})
-					case "operator":
-						append(tokens, Token{.Operator, str, loc})
-					case "static_cast":
-						append(tokens, Token{.StaticCast, str, loc})
+					case "return":      append(tokens, Token{.Return, str, loc})
+					case "break":       append(tokens, Token{.Break, str, loc})
+					case "continue":    append(tokens, Token{.Continue, str, loc})
+					case "for":         append(tokens, Token{.For, str, loc})
+					case "do":          append(tokens, Token{.Do, str, loc})
+					case "while":       append(tokens, Token{.While, str, loc})
+					case "if":          append(tokens, Token{.If, str, loc})
+					case "else":        append(tokens, Token{.Else, str, loc})
+					case "typedef":     append(tokens, Token{.Typedef, str, loc})
+					case "struct":      append(tokens, Token{.Struct, str, loc})
+					case "class":       append(tokens, Token{.Class, str, loc})
+					case "union":       append(tokens, Token{.Union, str, loc})
+					case "enum":        append(tokens, Token{.Enum, str, loc})
+					case "template":    append(tokens, Token{.Template, str, loc})
+					case "namespace":   append(tokens, Token{.Namespace, str, loc})
+					case "operator":    append(tokens, Token{.Operator, str, loc})
+					case "static_cast": append(tokens, Token{.StaticCast, str, loc})
 					case:
 						append(tokens, Token{.Identifier, str, loc})
 				}
@@ -342,6 +329,8 @@ TokenKind :: enum {
 	For,
 	While,
 	Do,
+	If,
+	Else,
 
 	PreprocDefine,
 	PreprocIf,

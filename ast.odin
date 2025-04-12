@@ -434,6 +434,17 @@ ast_parse_declaration :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[
 
 	next, nexts := peek_token(tokens)
 	#partial switch next.kind {
+		case .Typedef:
+			tokens^ = nexts
+
+			node := ast_parse_typedef_no_keyword(ctx, tokens) or_return
+
+			parsed_node = transmute(AstNodeIndex) append_return_index(ctx.ast, node)
+			append(sequence, parsed_node)
+
+			err = nil
+			return
+
 		case .Struct, .Class, .Union:
 			node := ast_parse_structure(ctx, tokens) or_return
 
@@ -1016,7 +1027,7 @@ ast_parse_scoped_sequence_no_open_brace :: proc(ctx: ^AstContext, tokens : ^[]To
 				if .ForwardDeclaration not_in ctx.ast[member_node].function_def.flags { break }
 				fallthrough
 				
-			case .VariableDeclaration, .Sequence, .Struct, .Union, .Do, .ExprBinary, .ExprUnaryLeft, .ExprUnaryRight, .MemberAccess, .FunctionCall, .Return, .Break, .Continue:
+			case .VariableDeclaration, .Typedef, .Sequence, .Struct, .Union, .Do, .ExprBinary, .ExprUnaryLeft, .ExprUnaryRight, .MemberAccess, .FunctionCall, .Return, .Break, .Continue:
 				when F == type_of(ast_parse_enum_value_declaration) {
 					if fn == ast_parse_enum_value_declaration { // static check only tests for teh shape of the fn
 						// enum value declarations (may) end in a comma
@@ -1885,6 +1896,7 @@ AstNode :: struct {
 			condition : AstNodeIndex,
 			true_branch_sequence, false_branch_sequence : [dynamic]AstNodeIndex,
 		},
+		//TODO parsing not implemented
 		tenary : struct {
 			condition, true_expression, false_expression : AstNodeIndex,
 		},

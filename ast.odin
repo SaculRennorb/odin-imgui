@@ -1578,6 +1578,20 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 						left = transmute(AstNodeIndex) append_return_index(ctx.ast, node),
 					}}
 					continue
+
+				case .Questionmark:
+					tokens^ = nexts
+
+					true_expression := ast_parse_expression(ctx, tokens) or_return
+					eat_token_expect(tokens, .Colon) or_return
+					false_expression := ast_parse_expression(ctx, tokens, .Comma - ._1) or_return
+
+					node = AstNode{ kind = .ExprTenary, tenary = {
+						condition        = transmute(AstNodeIndex) append_return_index(ctx.ast, node),
+						true_expression  = transmute(AstNodeIndex) append_return_index(ctx.ast, true_expression),
+						false_expression = transmute(AstNodeIndex) append_return_index(ctx.ast, false_expression),
+					}}
+					continue
 			}
 		}
 
@@ -2050,7 +2064,6 @@ AstNode :: struct {
 			condition : AstNodeIndex,
 			true_branch_sequence, false_branch_sequence : [dynamic]AstNodeIndex,
 		},
-		//TODO parsing not implemented
 		tenary : struct {
 			condition, true_expression, false_expression : AstNodeIndex,
 		},

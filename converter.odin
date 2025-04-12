@@ -703,6 +703,13 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 				write_node(ctx, current_node.index.index_expression, name_context)
 				str.write_byte(ctx.result, ']')
 
+			case .ExprTenary:
+				write_node(ctx, current_node.tenary.condition, name_context)
+				str.write_string(ctx.result, " ? ")
+				write_node(ctx, current_node.tenary.true_expression, name_context)
+				str.write_string(ctx.result, " : ")
+				write_node(ctx, current_node.tenary.false_expression, name_context)
+
 			case .Identifier:
 				_, def := find_definition_for_name(ctx.context_heap, name_context, current_node.identifier[:])
 				parent := ctx.ast[ctx.context_heap[def.parent].node]

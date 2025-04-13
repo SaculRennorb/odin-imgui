@@ -632,6 +632,16 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 					case .GreaterEq:  str.write_string(ctx.result, ">=")
 					case .ShiftLeft:  str.write_string(ctx.result, "<<")
 					case .ShiftRight: str.write_string(ctx.result, ">>")
+					case .AssignAdd:  str.write_string(ctx.result, "+=")
+					case .AssignSubtract: str.write_string(ctx.result, "-=")
+					case .AssignMultiply:   str.write_string(ctx.result, "*=")
+					case .AssignDivide:     str.write_string(ctx.result, "/=")
+					case .AssignModulo:     str.write_string(ctx.result, "%=")
+					case .AssignShiftLeft:  str.write_string(ctx.result, "<<=")
+					case .AssignShiftRight: str.write_string(ctx.result, ">>=")
+					case .AssignBitAnd:     str.write_string(ctx.result, "&=")
+					case .AssignBitOr:      str.write_string(ctx.result, "|=")
+					case .AssignBitXor:     str.write_string(ctx.result, "~=")
 					case:
 						str.write_byte(ctx.result, u8(current_node.binary.operator))
 				}
@@ -758,20 +768,65 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 					str.write_byte(ctx.result, ' ')
 					write_node(ctx, loop.condition, name_context)
 				}
-				str.write_string(ctx.result, " {")
-				
-				body_indent_str := str.concatenate({ indent_str, ONE_INDENT }, context.temp_allocator)
-				write_node_sequence(ctx, loop.body_sequence[:], name_context, body_indent_str)
 
+				body_indent_str := str.concatenate({ indent_str, ONE_INDENT }, context.temp_allocator)
 				if loop.condition != {} && current_node.kind == .Do {
-					str.write_byte(ctx.result, '\n')
-					str.write_string(ctx.result, body_indent_str)
-					str.write_string(ctx.result, "if !(")
-					write_node(ctx, loop.condition, name_context)
-					str.write_string(ctx.result, ") { break }\n")
+					switch len(loop.body_sequence) {
+						case 0:
+							str.write_string(ctx.result, " { if !(")
+							write_node(ctx, loop.condition, name_context)
+							str.write_string(ctx.result, ") { break } }")
+	
+						case 1:
+							str.write_string(ctx.result, " {\n")
+
+							str.write_string(ctx.result, body_indent_str)
+							write_node(ctx, loop.body_sequence[0], name_context)
+
+							str.write_byte(ctx.result, '\n')
+							str.write_string(ctx.result, body_indent_str)
+							str.write_string(ctx.result, "if !(")
+							write_node(ctx, loop.condition, name_context)
+							str.write_string(ctx.result, ") { break }\n")
+
+							str.write_string(ctx.result, indent_str)
+							str.write_byte(ctx.result, '}')
+	
+						case:
+							str.write_string(ctx.result, " {")
+
+							write_node_sequence(ctx, loop.body_sequence[:], name_context, body_indent_str)
+
+							str.write_byte(ctx.result, '\n')
+							str.write_string(ctx.result, body_indent_str)
+							str.write_string(ctx.result, "if !(")
+							write_node(ctx, loop.condition, name_context)
+							str.write_string(ctx.result, ") { break }\n")
+
+							str.write_string(ctx.result, indent_str)
+							str.write_byte(ctx.result, '}')
+					}
+				}
+				else {
+					switch len(loop.body_sequence) {
+						case 0:
+							str.write_string(ctx.result, " { }")
+
+						case 1:
+							str.write_string(ctx.result, " { ")
+							write_node(ctx, loop.body_sequence[0], name_context)
+							str.write_string(ctx.result, " }")
+
+						case:
+							str.write_string(ctx.result, " {")
+
+							write_node_sequence(ctx, loop.body_sequence[:], name_context, body_indent_str)
+
+							str.write_string(ctx.result, indent_str)
+							str.write_string(ctx.result, "}")
+					}
 				}
 
-				str.write_string(ctx.result, indent_str); str.write_string(ctx.result, "}")
 
 				requires_new_paragraph = true
 
@@ -1406,25 +1461,35 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 							transform_expression(output, ast, node.binary.left)
 							t := Token{ kind = TokenKind(node.binary.operator) }
 							switch node.binary.operator {
-								case .Assign:    t.source = "="
-								case .Plus:      t.source = "+"
-								case .Minus:     t.source = "-"
-								case .Times:     t.source = "*"
-								case .Divide:    t.source = "/"
-								case .And:       t.source = "&"
-								case .Or:        t.source = "|"
-								case .Xor:       t.source = "~"
-								case .Modulo:    t.source = "%"
-								case .Less:      t.source = "<"
-								case .Greater:   t.source = ">"
-								case .LogicAnd:  t.source = "&&"
-								case .LogicOr:   t.source = "||"
-								case .Equals:    t.source = "=="
-								case .NotEquals: t.source = "!="
-								case .LessEq:    t.source = "<="
-								case .GreaterEq: t.source = ">="
-								case .ShiftLeft: t.source = "<<"
-								case .ShiftRight:t.source = ">>"
+								case .Assign:           t.source = "="
+								case .Plus:             t.source = "+"
+								case .Minus:            t.source = "-"
+								case .Times:            t.source = "*"
+								case .Divide:           t.source = "/"
+								case .BitAnd:           t.source = "&"
+								case .BitOr:            t.source = "|"
+								case .BitXor:           t.source = "~"
+								case .Modulo:           t.source = "%"
+								case .Less:             t.source = "<"
+								case .Greater:          t.source = ">"
+								case .LogicAnd:         t.source = "&&"
+								case .LogicOr:          t.source = "||"
+								case .Equals:           t.source = "=="
+								case .NotEquals:        t.source = "!="
+								case .LessEq:           t.source = "<="
+								case .GreaterEq:        t.source = ">="
+								case .ShiftLeft:        t.source = "<<"
+								case .ShiftRight:       t.source = ">>"
+								case .AssignAdd:        t.source = "+="
+								case .AssignSubtract:   t.source = "-="
+								case .AssignMultiply:   t.source = "*="
+								case .AssignDivide:     t.source = "/="
+								case .AssignModulo:     t.source = "%="
+								case .AssignShiftLeft:  t.source = "<<="
+								case .AssignShiftRight: t.source = ">>="
+								case .AssignBitAnd:     t.source = "&="
+								case .AssignBitOr:      t.source = "|="
+								case .AssignBitXor:     t.source = "~="
 							}
 							append(output, t)
 							transform_expression(output, ast, node.binary.right)

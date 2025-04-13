@@ -888,7 +888,7 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 			}
 			else {
 				ast_parse_statement(ctx, tokens, &body_sequence) or_return
-				eat_token_expect(tokens, .Semicolon) or_return
+				eat_token_expect(tokens, .Semicolon)
 			}
 
 			parsed_node = transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode { kind = .For, loop = {
@@ -919,7 +919,7 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 			}
 			else {
 				ast_parse_statement(ctx, tokens, &body_sequence) or_return
-				eat_token_expect(tokens, .Semicolon) or_return
+				eat_token_expect(tokens, .Semicolon)
 			}
 
 			parsed_node = transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode { kind = .While, loop = {
@@ -978,7 +978,7 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 			}
 			else {
 				ast_parse_statement(ctx, tokens, &node.branch.true_branch_sequence) or_return
-				eat_token_expect(tokens, .Semicolon) or_return
+				eat_token_expect(tokens, .Semicolon)
 			}
 
 			if n, ns := peek_token(tokens); n.kind == .Else {
@@ -1520,7 +1520,7 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 
 					continue
 
-				case .Assign, .Plus, .Minus, .Star, .ForwardSlash, .Ampersand, .Pipe, .Circumflex, .BracketTriangleOpen, .BracketTriangleClose, .DoubleAmpersand, .DoublePipe, .Equals, .NotEquals, .LessEq, .GreaterEq, .ShiftLeft, .ShiftRight, .Percent:
+				case .Assign, .Plus, .Minus, .Star, .ForwardSlash, .Ampersand, .Pipe, .Circumflex, .BracketTriangleOpen, .BracketTriangleClose, .DoubleAmpersand, .DoublePipe, .Equals, .NotEquals, .LessEq, .GreaterEq, .ShiftLeft, .ShiftRight, .Percent, .AssignAmpersand, .AssignCircumflex, .AssignForwardSlash, .AssignMinus, .AssignPercent, .AssignPipe, .AssignPlus, .AssignShiftLeft, .AssignShiftRight, .AssignStar:
 					presedence : OperatorPresedence
 					#partial switch next.kind {
 						case .Assign              : presedence = .Assign
@@ -1542,6 +1542,8 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 						case .ShiftLeft           : presedence = .Bitshift
 						case .ShiftRight          : presedence = .Bitshift
 						case .Percent             : presedence = .Modulo
+						case .AssignPlus, .AssignMinus, .AssignStar, .AssignForwardSlash, .AssignAmpersand, .AssignPipe, .AssignCircumflex, .AssignPercent, .AssignShiftLeft, .AssignShiftRight:
+							presedence = .AssignModify
 					}
 
 					if max_presedence < presedence { break }
@@ -1875,36 +1877,45 @@ AstOverloadedOp :: enum {
 
 // not castable to AstOp
 AstUnaryOp :: enum {
-	Dereference  = '*',
-	Plus         = '+',
-	Minus        = '-',
-	Invert       = '~',
+	Dereference  = cast(int) TokenKind.Star,
+	Plus         = cast(int) TokenKind.Plus,
+	Minus        = cast(int) TokenKind.Minus,
+	Invert       = cast(int) TokenKind.Tilde,
 	Increment    = cast(int) TokenKind.PrefixIncrement, // cleanup explicit pre/post
 	Decrement    = cast(int) TokenKind.PrefixDecrement, // cleanup explicit pre/post
 }
 
 // not castable to AstOp
 AstBinaryOp :: enum {
-	Assign       = '=',
-	Plus         = '+',
-	Minus        = '-',
-	Times        = '*',
-	Divide       = '/',
-	And          = '&',
-	Or           = '|',
-	Xor          = '^',
-	Less         = '<',
-	Greater      = '>',
-	Modulo       = '%',
-	
-	LogicAnd   = cast(int) TokenKind.DoubleAmpersand,
-	LogicOr    = cast(int) TokenKind.DoublePipe,
-	Equals     = cast(int) TokenKind.Equals,
-	NotEquals  = cast(int) TokenKind.NotEquals,
-	LessEq     = cast(int) TokenKind.LessEq,
-	GreaterEq  = cast(int) TokenKind.GreaterEq,
-	ShiftLeft  = cast(int) TokenKind.ShiftLeft,
-	ShiftRight = cast(int) TokenKind.ShiftRight,
+	Assign           = cast(int) TokenKind.Assign,
+	Plus             = cast(int) TokenKind.Plus,
+	Minus            = cast(int) TokenKind.Minus,
+	Times            = cast(int) TokenKind.Star,
+	Divide           = cast(int) TokenKind.ForwardSlash,
+	BitAnd           = cast(int) TokenKind.Ampersand,
+	BitOr            = cast(int) TokenKind.Pipe,
+	BitXor           = cast(int) TokenKind.Circumflex,
+	Less             = cast(int) TokenKind.BracketTriangleOpen,
+	Greater          = cast(int) TokenKind.BracketTriangleClose,
+	Modulo           = cast(int) TokenKind.Percent,	
+	LogicAnd         = cast(int) TokenKind.DoubleAmpersand,
+	LogicOr          = cast(int) TokenKind.DoublePipe,
+	Equals           = cast(int) TokenKind.Equals,
+	NotEquals        = cast(int) TokenKind.NotEquals,
+	LessEq           = cast(int) TokenKind.LessEq,
+	GreaterEq        = cast(int) TokenKind.GreaterEq,
+	ShiftLeft        = cast(int) TokenKind.ShiftLeft,
+	ShiftRight       = cast(int) TokenKind.ShiftRight,
+	AssignAdd        = cast(int) TokenKind.AssignPlus,
+	AssignSubtract   = cast(int) TokenKind.AssignMinus,
+	AssignMultiply   = cast(int) TokenKind.AssignStar,
+	AssignDivide     = cast(int) TokenKind.AssignForwardSlash,
+	AssignModulo     = cast(int) TokenKind.AssignPercent,
+	AssignShiftLeft  = cast(int) TokenKind.AssignShiftLeft,
+	AssignShiftRight = cast(int) TokenKind.AssignShiftRight,
+	AssignBitAnd     = cast(int) TokenKind.AssignAmpersand,
+	AssignBitOr      = cast(int) TokenKind.AssignPipe,
+	AssignBitXor     = cast(int) TokenKind.AssignCircumflex,
 }
 
 AstNodeKind :: enum {

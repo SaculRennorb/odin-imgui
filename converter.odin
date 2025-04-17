@@ -113,349 +113,9 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 
 			case .Struct, .Union:
 				member_indent_str := str.concatenate({ indent_str, ONE_INDENT }, context.temp_allocator)
-				structure := &current_node.structure
-
-				complete_structure_name := fold_token_range(definition_prefix, structure.name)
-
-				og_name_context := name_context
-				name_context := name_context
-
-				_, forward_declared_context := try_find_definition_for_name(ctx.context_heap, name_context, structure.name)
-				if forward_declared_context != nil {
-					forward_declaration := ctx.ast[forward_declared_context.node]
-					assert(forward_declaration.kind == .Struct || forward_declaration.kind == .Union)
-	
-					forward_comments := forward_declaration.structure.attached_comments
-					inject_at(&structure.attached_comments, 0, ..forward_comments[:])
-				}
-
-				if structure.is_forward_declaration {
-					name_context = transmute(NameContextIndex) append_return_index(ctx.context_heap, NameContext{ node = current_node_index, parent = name_context, complete_name = complete_structure_name })
-					ctx.context_heap[og_name_context].definitions[last(structure.name).source] = name_context
-
-					swallow_paragraph = true
-
-					return
-				}
-
-				// write directly, they are marked for skipping in write_sequence
-				for aid in structure.attached_comments {
-					write_node(ctx, aid, name_context)
-				}
-
-				str.write_string(ctx.result, complete_structure_name);
-				str.write_string(ctx.result, " :: struct")
-
-				if len(structure.template_spec) != 0 {
-					str.write_byte(ctx.result, '(')
-					for ti, i in structure.template_spec {
-						if i > 0 { str.write_string(ctx.result, ", ") }
-						write_node(ctx, ti, name_context)
-					}
-					str.write_byte(ctx.result, ')')
-				}
-
-				str.write_string(ctx.result, current_node.kind == .Struct ? " {" : " #raw_union {")
-
-				last_was_newline := false
-				had_first_newline := false
-
-				if structure.base_type != nil {
-					// copy over defs from base type, using their location
-					_, base_context := find_definition_for_name(ctx.context_heap, name_context, structure.base_type)
-
-					base_member_name := str.concatenate({ "__base_", str.to_lower(structure.base_type[len(structure.base_type) - 1].source, context.temp_allocator) })
-					name_context = transmute(NameContextIndex) append_return_index(ctx.context_heap, NameContext{
-						parent      = name_context,
-						node        = base_context.node,
-						definitions = base_context.definitions, // make sure not to modify these! ok because we push another context right after
-					})
-
-					str.write_byte(ctx.result, '\n')
-					str.write_string(ctx.result, member_indent_str)
-					str.write_string(ctx.result, "using ")
-					str.write_string(ctx.result, base_member_name)
-					str.write_string(ctx.result, " : ")
-					str.write_string(ctx.result, base_context.complete_name)
-					str.write_string(ctx.result, ",\n")
-
-					last_was_newline = true
-					had_first_newline = true
-				}
-
-				name_context = transmute(NameContextIndex) append_return_index(ctx.context_heap, NameContext{ node = current_node_index, parent = name_context, complete_name = complete_structure_name })
-				ctx.context_heap[og_name_context].definitions[last(structure.name).source] = name_context
-				// no reset here, struct context might be relevant later on
-
-				BitfieldSectionData :: struct {
-					member_stack : sa.Small_Array(64, AstNodeIndex),
-					subsection_counter : int,
-					member_indent_str : string,
-				}
-				bitfield_section_data : BitfieldSectionData
-
-				write_bitfield_subsection_and_reset :: proc(ctx : ConverterContext, section_data : ^BitfieldSectionData, name_context : NameContextIndex, indent_str : string)
-				{
-					if len(section_data.member_indent_str) == 0 {
-						section_data.member_indent_str = str.concatenate({ indent_str, ONE_INDENT }, context.temp_allocator)
-					}
-
-					str.write_string(ctx.result, indent_str);
-					str.write_string(ctx.result, "using _");
-					fmt.sbprint(ctx.result, section_data.subsection_counter);
-					str.write_string(ctx.result, " : bit_field u8 {\n");
-
-					last_was_newline := true
-					slice := sa.slice(&section_data.member_stack)
-					loop: for cii := 0; cii < len(slice); cii += 1 {
-						ci := slice[cii]
-						#partial switch ctx.ast[ci].kind {
-							case .VariableDeclaration:
-								if last_was_newline { str.write_string(ctx.result, section_data.member_indent_str) }
-								else { str.write_byte(ctx.result, ' ') }
-								write_node(ctx, ci, name_context)
-								str.write_byte(ctx.result, ',')
-
-								last_was_newline = false
-
-							case .Comment:
-								if last_was_newline { str.write_string(ctx.result, section_data.member_indent_str) }
-								else { str.write_byte(ctx.result, ' ') }
-								write_node(ctx, ci, name_context)
-
-								last_was_newline = false
-
-							case .NewLine:
-								str.write_byte(ctx.result, '\n')
-
-								last_was_newline = true
-
-								for cik := cii + 1; cik < len(slice); cik += 1 {
-									if ctx.ast[slice[cik]].kind != .NewLine {
-										continue loop
-									}
-								}
-								break loop
-
-							case:
-								write_preproc_node(ctx.result, ctx.ast[ci])
-								last_was_newline = false
-						}
-					}
-
-					if last_was_newline { str.write_string(ctx.result, indent_str) }
-					else { str.write_byte(ctx.result, ' ') }
-					str.write_string(ctx.result, "},\n");
-
-					sa.clear(&section_data.member_stack)
-				}
-
-				has_static_var_members := false
-				has_inplicit_initializer := false
-				last_was_transfered := true
-				loop: for cii := 0; cii < len(structure.members); cii += 1 {
-					ci := structure.members[cii]
-					member := ctx.ast[ci]
-					if member.attached { continue }
-
-
-					#partial switch member.kind {
-						case .VariableDeclaration:
-							member := member.var_declaration
-							if .Static in member.flags {
-								has_static_var_members = true;
-								last_was_transfered = false
-								continue
-							}
-
-							last_was_transfered = true
-
-							d := insert_new_definition(ctx.context_heap, name_context, member.var_name.source, ci, member.var_name.source)
-							has_inplicit_initializer |= member.initializer_expression != {}
-
-							if member.width_expression != {} {
-								sa.append(&bitfield_section_data.member_stack, ci)
-								continue
-							}
-
-							if sa.len(bitfield_section_data.member_stack) > 0 {
-								write_bitfield_subsection_and_reset(ctx, &bitfield_section_data, name_context, member_indent_str)
-							}
-
-							if last_was_newline { str.write_string(ctx.result, member_indent_str) }
-							else { str.write_byte(ctx.result, ' ') }
-							str.write_string(ctx.result, member.var_name.source);
-							str.write_string(ctx.result, " : ")
-							write_type(ctx, ctx.ast[member.type], name_context)
-							str.write_byte(ctx.result, ',')
-
-							last_was_newline = false
-
-						case .Struct, .Union, .Enum, .FunctionDefinition:
-							/* dont write */
-
-							last_was_transfered = false
-
-						case .Comment:
-							last_was_transfered = true
-
-							if sa.len(bitfield_section_data.member_stack) > 0 {
-								sa.append(&bitfield_section_data.member_stack, ci)
-								continue
-							}
-
-							if last_was_newline { str.write_string(ctx.result, member_indent_str) }
-							else { str.write_byte(ctx.result, ' ') }
-							str.write_string(ctx.result, member.literal.source)
-
-							last_was_newline = false
-
-						case .NewLine:
-							if !last_was_transfered { continue }
-							if cii == 0 && had_first_newline { continue }
-
-							last_was_transfered = true
-							had_first_newline = true
-
-							if sa.len(bitfield_section_data.member_stack) > 0 {
-								sa.append(&bitfield_section_data.member_stack, ci)
-								continue
-							}
-
-							str.write_byte(ctx.result, '\n')
-
-							last_was_newline = true
-
-							for cik := cii + 1; cik < len(structure.members); cik += 1 {
-								node := ctx.ast[structure.members[cik]]
-								#partial switch node.kind {
-									case .NewLine:
-										/**/
-									case .FunctionDefinition, .Struct, .Union, .Enum:
-										/**/
-									case .VariableDeclaration:
-										continue loop
-									case:
-										if !node.attached { continue loop }
-								}
-							}
-							break loop
-
-						case:
-							if sa.len(bitfield_section_data.member_stack) > 0 {
-								sa.append(&bitfield_section_data.member_stack, ci)
-								last_was_transfered = true
-								continue
-							}
-
-							if write_preproc_node(ctx.result, member) {
-								last_was_transfered = true
-							}
-							last_was_newline = false
-					}
-				}
-
-				if sa.len(bitfield_section_data.member_stack) > 0 {
-					write_bitfield_subsection_and_reset(ctx, &bitfield_section_data, name_context, member_indent_str)
-				}
-
-				str.write_string(ctx.result, indent_str); str.write_byte(ctx.result, '}')
-
-				if has_static_var_members {
-					str.write_byte(ctx.result, '\n')
-					for midx in structure.members {
-						if ctx.ast[midx].kind != .VariableDeclaration || .Static not_in ctx.ast[midx].var_declaration.flags { continue }
-						member := ctx.ast[midx].var_declaration
-
-						complete_member_name := fold_token_range(complete_structure_name, { member.var_name })
-						insert_new_definition(ctx.context_heap, name_context, member.var_name.source, midx, complete_member_name)
-
-						str.write_byte(ctx.result, '\n')
-						str.write_string(ctx.result, indent_str);
-						str.write_string(ctx.result, complete_member_name);
-						str.write_string(ctx.result, " : ")
-						write_type(ctx, ctx.ast[member.type], name_context)
-
-						if member.initializer_expression != {} {
-							str.write_string(ctx.result, " = ");
-							write_node(ctx, member.initializer_expression, name_context)
-						}
-					}
-				}
-
-				if has_inplicit_initializer || (structure.initializer != {} && .ForwardDeclaration not_in ctx.ast[structure.initializer].function_def.flags) {
-					initializer := ctx.ast[structure.initializer]
-
-					complete_initializer_name := str.concatenate({ complete_structure_name, "_init" })
-					name_context := insert_new_definition(ctx.context_heap, name_context, last(initializer.function_def.function_name[:]).source, structure.initializer, complete_initializer_name)
-					context_heap_reset := len(ctx.context_heap) // keep fn as leaf node
-					defer {
-						clear(&ctx.context_heap[name_context].definitions)
-						resize(ctx.context_heap, context_heap_reset)
-					}
-
-					insert_new_definition(ctx.context_heap, name_context, "this", -1, "this")
-
-					str.write_string(ctx.result, "\n\n")
-					str.write_string(ctx.result, indent_str);
-					str.write_string(ctx.result, complete_initializer_name);
-					str.write_string(ctx.result, " :: proc(this : ^")
-					str.write_string(ctx.result, complete_structure_name);
-					if initializer.kind == .FunctionDefinition && .ForwardDeclaration not_in initializer.function_def.flags {
-						for nidx, i in initializer.function_def.arguments {
-							str.write_string(ctx.result, ", ")
-							arg := ctx.ast[nidx].var_declaration
-
-							insert_new_definition(ctx.context_heap, name_context, arg.var_name.source, nidx, arg.var_name.source)
-
-							str.write_string(ctx.result, arg.var_name.source)
-							str.write_string(ctx.result, " : ")
-							write_type(ctx, ctx.ast[arg.type], name_context)
-
-							if arg.initializer_expression != {} {
-								str.write_string(ctx.result, " = ")
-								write_node(ctx, arg.initializer_expression, name_context)
-							}
-						}
-					}
-					str.write_string(ctx.result, ")\n")
-
-					str.write_string(ctx.result, indent_str); str.write_string(ctx.result, "{\n")
-					for ci in structure.members {
-						if ctx.ast[ci].kind != .VariableDeclaration { continue }
-						member := ctx.ast[ci].var_declaration
-						if member.initializer_expression == {} { continue }
-
-						str.write_string(ctx.result, member_indent_str);
-						str.write_string(ctx.result, "this.")
-						str.write_string(ctx.result, member.var_name.source)
-						str.write_string(ctx.result, " = ")
-						write_node(ctx, member.initializer_expression, name_context)
-						str.write_byte(ctx.result, '\n')
-					}
-					if initializer.kind == .FunctionDefinition && .ForwardDeclaration not_in initializer.function_def.flags {
-						write_node_sequence(ctx, initializer.function_def.body_sequence[:], name_context, member_indent_str)
-						if ctx.ast[last(initializer.function_def.body_sequence[:])^].kind != .NewLine { str.write_byte(ctx.result, '\n') }
-					}
-					str.write_string(ctx.result, indent_str); str.write_byte(ctx.result, '}')
-				}
-
-				for midx in structure.members {
-					#partial switch ctx.ast[midx].kind {
-						case .FunctionDefinition:
-							str.write_string(ctx.result, "\n\n")
-							write_function(ctx, name_context, midx, complete_structure_name, true, indent_str)
-
-							requires_new_paragraph = true
-
-						case .Struct, .Union:
-							str.write_string(ctx.result, "\n\n")
-							ctx.ast[midx].structure.name = slice.concatenate([][]Token{structure.name, ctx.ast[midx].structure.name})
-							write_node(ctx, midx, name_context, indent_str)
-
-							requires_new_paragraph = true
-					}
-				}
+				swallow, new_para := write_struct_union(ctx, current_node, current_node_index, name_context, indent_str, member_indent_str, definition_prefix)
+				swallow_paragraph |= swallow
+				requires_new_paragraph |= new_para
 
 			case .Enum:
 				structure := &current_node.structure
@@ -950,6 +610,392 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 			previous_requires_termination, previous_requires_new_paragraph, should_swallow_paragraph = write_node(ctx, ci, name_context, indent_str, definition_prefix)
 			previous_node_kind = node_kind
 		}
+	}
+
+	write_struct_union :: proc(ctx : ConverterContext, structure_node : ^AstNode, structure_node_index : AstNodeIndex, name_context : NameContextIndex, indent_str, member_indent_str : string, definition_prefix := "") -> (swallow_paragraph, requires_new_paragraph : bool)
+	{
+		structure := &structure_node.structure
+
+		complete_structure_name := fold_token_range(definition_prefix, structure.name)
+
+		og_name_context := name_context
+		name_context := name_context
+
+		_, forward_declared_context := try_find_definition_for_name(ctx.context_heap, name_context, structure.name)
+		if forward_declared_context != nil {
+			forward_declaration := ctx.ast[forward_declared_context.node]
+			assert(forward_declaration.kind == .Struct || forward_declaration.kind == .Union)
+
+			forward_comments := forward_declaration.structure.attached_comments
+			inject_at(&structure.attached_comments, 0, ..forward_comments[:])
+		}
+
+		if structure.is_forward_declaration {
+			name_context = transmute(NameContextIndex) append_return_index(ctx.context_heap, NameContext{ node = structure_node_index, parent = name_context, complete_name = complete_structure_name })
+			ctx.context_heap[og_name_context].definitions[last(structure.name).source] = name_context
+
+			swallow_paragraph = true
+
+			return
+		}
+
+		// write directly, they are marked for skipping in write_sequence
+		for aid in structure.attached_comments {
+			write_node(ctx, aid, name_context)
+		}
+
+		str.write_string(ctx.result, complete_structure_name);
+		str.write_string(ctx.result, " :: ")
+
+		has_static_var_members, has_inplicit_initializer, nc := write_struct_union_type(ctx, structure_node, structure_node_index, name_context, og_name_context, indent_str, member_indent_str, complete_structure_name)
+		name_context = nc
+
+		if has_static_var_members {
+			str.write_byte(ctx.result, '\n')
+			for midx in structure.members {
+				if ctx.ast[midx].kind != .VariableDeclaration || .Static not_in ctx.ast[midx].var_declaration.flags { continue }
+				member := ctx.ast[midx].var_declaration
+
+				complete_member_name := fold_token_range(complete_structure_name, { member.var_name })
+				insert_new_definition(ctx.context_heap, name_context, member.var_name.source, midx, complete_member_name)
+
+				str.write_byte(ctx.result, '\n')
+				str.write_string(ctx.result, indent_str);
+				str.write_string(ctx.result, complete_member_name);
+				str.write_string(ctx.result, " : ")
+				write_type(ctx, ctx.ast[member.type], name_context)
+
+				if member.initializer_expression != {} {
+					str.write_string(ctx.result, " = ");
+					write_node(ctx, member.initializer_expression, name_context)
+				}
+			}
+		}
+
+		if has_inplicit_initializer || (structure.initializer != {} && .ForwardDeclaration not_in ctx.ast[structure.initializer].function_def.flags) {
+			initializer := ctx.ast[structure.initializer]
+
+			complete_initializer_name := str.concatenate({ complete_structure_name, "_init" })
+			name_context := insert_new_definition(ctx.context_heap, name_context, last(initializer.function_def.function_name[:]).source, structure.initializer, complete_initializer_name)
+			context_heap_reset := len(ctx.context_heap) // keep fn as leaf node
+			defer {
+				clear(&ctx.context_heap[name_context].definitions)
+				resize(ctx.context_heap, context_heap_reset)
+			}
+
+			insert_new_definition(ctx.context_heap, name_context, "this", -1, "this")
+
+			str.write_string(ctx.result, "\n\n")
+			str.write_string(ctx.result, indent_str);
+			str.write_string(ctx.result, complete_initializer_name);
+			str.write_string(ctx.result, " :: proc(this : ^")
+			str.write_string(ctx.result, complete_structure_name);
+			if initializer.kind == .FunctionDefinition && .ForwardDeclaration not_in initializer.function_def.flags {
+				for nidx, i in initializer.function_def.arguments {
+					str.write_string(ctx.result, ", ")
+					arg := ctx.ast[nidx].var_declaration
+
+					insert_new_definition(ctx.context_heap, name_context, arg.var_name.source, nidx, arg.var_name.source)
+
+					str.write_string(ctx.result, arg.var_name.source)
+					str.write_string(ctx.result, " : ")
+					write_type(ctx, ctx.ast[arg.type], name_context)
+
+					if arg.initializer_expression != {} {
+						str.write_string(ctx.result, " = ")
+						write_node(ctx, arg.initializer_expression, name_context)
+					}
+				}
+			}
+			str.write_string(ctx.result, ")\n")
+
+			str.write_string(ctx.result, indent_str); str.write_string(ctx.result, "{\n")
+			for ci in structure.members {
+				if ctx.ast[ci].kind != .VariableDeclaration { continue }
+				member := ctx.ast[ci].var_declaration
+				if member.initializer_expression == {} { continue }
+
+				str.write_string(ctx.result, member_indent_str);
+				str.write_string(ctx.result, "this.")
+				str.write_string(ctx.result, member.var_name.source)
+				str.write_string(ctx.result, " = ")
+				write_node(ctx, member.initializer_expression, name_context)
+				str.write_byte(ctx.result, '\n')
+			}
+			if initializer.kind == .FunctionDefinition && .ForwardDeclaration not_in initializer.function_def.flags {
+				write_node_sequence(ctx, initializer.function_def.body_sequence[:], name_context, member_indent_str)
+				if ctx.ast[last(initializer.function_def.body_sequence[:])^].kind != .NewLine { str.write_byte(ctx.result, '\n') }
+			}
+			str.write_string(ctx.result, indent_str); str.write_byte(ctx.result, '}')
+		}
+
+		for midx in structure.members {
+			#partial switch ctx.ast[midx].kind {
+				case .FunctionDefinition:
+					str.write_string(ctx.result, "\n\n")
+					write_function(ctx, name_context, midx, complete_structure_name, true, indent_str)
+
+					requires_new_paragraph = true
+
+				case .Struct, .Union:
+					if len(ctx.ast[midx].structure.name) == 0 { break }
+
+					str.write_string(ctx.result, "\n\n")
+					ctx.ast[midx].structure.name = slice.concatenate([][]Token{structure.name, ctx.ast[midx].structure.name})
+					write_node(ctx, midx, name_context, indent_str)
+
+					requires_new_paragraph = true
+			}
+		}
+
+		return
+	}
+
+	write_struct_union_type :: proc(ctx : ConverterContext, structure_node : ^AstNode, structure_node_index : AstNodeIndex, name_context_ : NameContextIndex, og_name_context : NameContextIndex, indent_str, member_indent_str : string, complete_structure_name : string) -> (has_static_var_members, has_inplicit_initializer : bool, name_context : NameContextIndex)
+	{
+		structure := &structure_node.structure
+		str.write_string(ctx.result, "struct")
+
+		if len(structure.template_spec) != 0 {
+			str.write_byte(ctx.result, '(')
+			for ti, i in structure.template_spec {
+				if i > 0 { str.write_string(ctx.result, ", ") }
+				write_node(ctx, ti, name_context)
+			}
+			str.write_byte(ctx.result, ')')
+		}
+
+		str.write_string(ctx.result, structure_node.kind == .Struct ? " {" : " #raw_union {")
+
+		last_was_newline := false
+		had_first_newline := false
+
+		name_context = name_context_
+		if structure.base_type != nil {
+			// copy over defs from base type, using their location
+			_, base_context := find_definition_for_name(ctx.context_heap, name_context, structure.base_type)
+
+			base_member_name := str.concatenate({ "__base_", str.to_lower(structure.base_type[len(structure.base_type) - 1].source, context.temp_allocator) })
+			name_context = transmute(NameContextIndex) append_return_index(ctx.context_heap, NameContext{
+				parent      = name_context,
+				node        = base_context.node,
+				definitions = base_context.definitions, // make sure not to modify these! ok because we push another context right after
+			})
+
+			str.write_byte(ctx.result, '\n')
+			str.write_string(ctx.result, member_indent_str)
+			str.write_string(ctx.result, "using ")
+			str.write_string(ctx.result, base_member_name)
+			str.write_string(ctx.result, " : ")
+			str.write_string(ctx.result, base_context.complete_name)
+			str.write_string(ctx.result, ",\n")
+
+			last_was_newline = true
+			had_first_newline = true
+		}
+
+		if len(structure.name) != 0 { // anonymous types don't have a name
+			name_context = transmute(NameContextIndex) append_return_index(ctx.context_heap, NameContext{ node = structure_node_index, parent = name_context, complete_name = complete_structure_name })
+			ctx.context_heap[og_name_context].definitions[last(structure.name).source] = name_context
+			// no reset here, struct context might be relevant later on
+		}
+
+		SubsectionSectionData :: struct {
+			member_stack : sa.Small_Array(64, AstNodeIndex),
+			subsection_counter : int,
+			member_indent_str : string,
+		}
+		subsection_data : SubsectionSectionData
+
+		write_bitfield_subsection_and_reset :: proc(ctx : ConverterContext, subsection_data : ^SubsectionSectionData, name_context : NameContextIndex, indent_str : string)
+		{
+			if len(subsection_data.member_indent_str) == 0 {
+				subsection_data.member_indent_str = str.concatenate({ indent_str, ONE_INDENT }, context.temp_allocator)
+			}
+
+			str.write_string(ctx.result, indent_str);
+			str.write_string(ctx.result, "using _");
+			fmt.sbprint(ctx.result, subsection_data.subsection_counter); subsection_data.subsection_counter += 1
+			str.write_string(ctx.result, " : bit_field u8 {\n");
+
+			last_was_newline := true
+			slice := sa.slice(&subsection_data.member_stack)
+			loop: for cii := 0; cii < len(slice); cii += 1 {
+				ci := slice[cii]
+				#partial switch ctx.ast[ci].kind {
+					case .VariableDeclaration:
+						if last_was_newline { str.write_string(ctx.result, subsection_data.member_indent_str) }
+						else { str.write_byte(ctx.result, ' ') }
+						write_node(ctx, ci, name_context)
+						str.write_byte(ctx.result, ',')
+
+						last_was_newline = false
+
+					case .Comment:
+						if last_was_newline { str.write_string(ctx.result, subsection_data.member_indent_str) }
+						else { str.write_byte(ctx.result, ' ') }
+						write_node(ctx, ci, name_context)
+
+						last_was_newline = false
+
+					case .NewLine:
+						str.write_byte(ctx.result, '\n')
+
+						last_was_newline = true
+
+						for cik := cii + 1; cik < len(slice); cik += 1 {
+							if ctx.ast[slice[cik]].kind != .NewLine {
+								continue loop
+							}
+						}
+						break loop
+
+					case:
+						write_preproc_node(ctx.result, ctx.ast[ci])
+						last_was_newline = false
+				}
+			}
+
+			if last_was_newline { str.write_string(ctx.result, indent_str) }
+			else { str.write_byte(ctx.result, ' ') }
+			str.write_string(ctx.result, "},\n");
+
+			sa.clear(&subsection_data.member_stack)
+		}
+
+		last_was_transfered := true
+		loop: for cii := 0; cii < len(structure.members); cii += 1 {
+			ci := structure.members[cii]
+			member := &ctx.ast[ci]
+			if member.attached { continue }
+
+
+			#partial switch member.kind {
+				case .VariableDeclaration:
+					member := member.var_declaration
+					if .Static in member.flags {
+						has_static_var_members = true;
+						last_was_transfered = false
+						continue
+					}
+
+					last_was_transfered = true
+
+					d := insert_new_definition(ctx.context_heap, name_context, member.var_name.source, ci, member.var_name.source)
+					has_inplicit_initializer |= member.initializer_expression != {}
+
+					if member.width_expression != {} {
+						sa.append(&subsection_data.member_stack, ci)
+						continue
+					}
+
+					if sa.len(subsection_data.member_stack) > 0 {
+						write_bitfield_subsection_and_reset(ctx, &subsection_data, name_context, member_indent_str)
+					}
+
+					if last_was_newline { str.write_string(ctx.result, member_indent_str) }
+					else { str.write_byte(ctx.result, ' ') }
+					str.write_string(ctx.result, member.var_name.source);
+					str.write_string(ctx.result, " : ")
+					write_type(ctx, ctx.ast[member.type], name_context)
+					str.write_byte(ctx.result, ',')
+
+					last_was_newline = false
+
+				case .Enum, .FunctionDefinition, .OperatorDefinition:
+					// dont write
+
+					last_was_transfered = false
+
+				case .Struct, .Union:
+					if len(member.structure.name) != 0 { last_was_transfered = false; break }
+
+					// write anonymous structs as using statements
+					if last_was_newline { str.write_string(ctx.result, member_indent_str) }
+					else { str.write_byte(ctx.result, ' ') }
+
+					str.write_string(ctx.result, "using _")
+					fmt.sbprint(ctx.result, subsection_data.subsection_counter); subsection_data.subsection_counter += 1
+					str.write_string(ctx.result, " : ")
+					inner_member_indent_str :=  str.concatenate({ member_indent_str, ONE_INDENT }, context.temp_allocator)
+					write_struct_union_type(ctx, member, ci, name_context, og_name_context, member_indent_str, inner_member_indent_str, "")
+					str.write_byte(ctx.result, ',')
+					
+					last_was_newline = false
+					last_was_transfered = true
+
+				case .Comment:
+					last_was_transfered = true
+
+					if sa.len(subsection_data.member_stack) > 0 {
+						sa.append(&subsection_data.member_stack, ci)
+						continue
+					}
+
+					if last_was_newline { str.write_string(ctx.result, member_indent_str) }
+					else { str.write_byte(ctx.result, ' ') }
+					str.write_string(ctx.result, member.literal.source)
+
+					last_was_newline = false
+
+				case .NewLine:
+					if !last_was_transfered { continue }
+					if cii == 0 && had_first_newline { continue }
+
+					last_was_transfered = true
+					had_first_newline = true
+
+					if sa.len(subsection_data.member_stack) > 0 {
+						sa.append(&subsection_data.member_stack, ci)
+						continue
+					}
+
+					str.write_byte(ctx.result, '\n')
+
+					last_was_newline = true
+
+					for cik := cii + 1; cik < len(structure.members); cik += 1 {
+						node := ctx.ast[structure.members[cik]]
+						#partial switch node.kind {
+							case .NewLine:
+								/**/
+							case .FunctionDefinition:
+								/**/
+							case .Struct, .Union:
+								if len(node.structure.name) == 0 { continue loop }
+							case .Enum:
+								if len(node.enum_.name) == 0 { continue loop }
+							case .VariableDeclaration:
+								continue loop
+							case:
+								if !node.attached { continue loop }
+						}
+					}
+					break loop
+
+				case:
+					if sa.len(subsection_data.member_stack) > 0 {
+						sa.append(&subsection_data.member_stack, ci)
+						last_was_transfered = true
+						continue
+					}
+
+					if write_preproc_node(ctx.result, member^) {
+						last_was_transfered = true
+					}
+					last_was_newline = false
+			}
+		}
+
+		if sa.len(subsection_data.member_stack) > 0 {
+			write_bitfield_subsection_and_reset(ctx, &subsection_data, name_context, member_indent_str)
+		}
+
+		if last_was_newline { str.write_string(ctx.result, indent_str) }
+		else { str.write_byte(ctx.result, ' ') }
+		str.write_byte(ctx.result, '}')
+
+		return
 	}
 
 	write_preproc_node :: proc(result : ^str.Builder, current_node : AstNode) -> bool

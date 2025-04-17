@@ -383,7 +383,7 @@ ast_parse_declaration :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[
 
 	storage := ast_parse_storage_modifier(tokens)
 
-	if parent_type != nil {
+	if parent_type != nil && len(parent_type.structure.name) != 0 /* anonymous types don't have a name */ {
 		n, ss := peek_token(tokens)
 
 		if n.kind == .Identifier && n.source == last(parent_type.structure.name).source {

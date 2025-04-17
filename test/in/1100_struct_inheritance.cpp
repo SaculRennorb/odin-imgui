@@ -1,3 +1,3 @@
-struct A10 { };
+struct A1100 { };
 
-struct B10 : A10 { };
+struct B1100 : A1100 { };

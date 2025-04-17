@@ -5,7 +5,7 @@ A1201 :: struct {
 		a : i32 | 3,
 	},
 	b : i32,
-	using _0 : bit_field u8 {
+	using _1 : bit_field u8 {
 		c : i32 | 5,
 	},
 }

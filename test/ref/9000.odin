@@ -56,7 +56,7 @@ ImVector :: struct(T : typeid) {
 	Size : i32,
 }
 
-ImVec2 :: struct { x : f32, y : f32,}
+ImVec2 :: struct { x : f32, y : f32, }
 
 // sizeof() 156~192
 ImGuiDockNode :: struct {

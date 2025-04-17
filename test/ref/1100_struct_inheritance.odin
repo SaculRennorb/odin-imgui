@@ -1,7 +1,7 @@
 package test
 
-A10 :: struct {}
+A1100 :: struct { }
 
-B10 :: struct {
-	using __base_a10 : A10,
+B1100 :: struct {
+	using __base_a1100 : A1100,
 }

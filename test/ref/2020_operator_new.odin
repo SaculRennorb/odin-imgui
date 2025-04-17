@@ -1,3 +1,3 @@
 package test
 
-A2020 :: struct {}
+A2020 :: struct { }

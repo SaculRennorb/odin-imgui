@@ -107,7 +107,7 @@ ast_parse_filescope_sequence :: proc(ctx : ^AstContext, tokens_ : []Token) -> As
 				}
 
 			case:
-				was_preproc := #force_inline try_ast_parse_preproc_statement(ctx, tokens, &sequence, token, tokenss)
+				was_preproc := #force_inline ast_try_parse_preproc_statement(ctx, tokens, &sequence, token, tokenss)
 				if !was_preproc {
 					panic(fmt.tprintf("Unknown token %v for sequence.", token))
 				}
@@ -118,7 +118,7 @@ ast_parse_filescope_sequence :: proc(ctx : ^AstContext, tokens_ : []Token) -> As
 	return ctx.ast[root_index]
 }
 
-try_ast_parse_preproc_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dynamic]AstNodeIndex, token: Token, tokenss: []Token) -> bool
+ast_try_parse_preproc_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dynamic]AstNodeIndex, token: Token, tokenss: []Token) -> bool
 {
 	#partial switch token.kind {
 		case .PreprocDefine:
@@ -357,6 +357,8 @@ ast_attach_comments :: proc(ctx: ^AstContext, sequence : ^[dynamic]AstNodeIndex,
 			attached_comments = &attach_to.function_def.attached_comments
 		case .Struct, .Union, .Enum:
 			attached_comments = &attach_to.structure.attached_comments
+		case .OperatorDefinition:
+			attached_comments = &ctx.ast[attach_to.operator_def.underlying_function].function_def.attached_comments
 		case:
 			unreachable()
 	}
@@ -480,6 +482,21 @@ ast_parse_declaration :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[
 
 			err = nil
 			return
+
+		case .Operator: // operator bool() { }    custom call operator comes without return type...
+			tokens^ = nexts
+
+			node := AstNode{ kind = .OperatorDefinition, operator_def = { kind = .ImplicitCast } }
+			implicit_cast_type := ast_parse_type(ctx, tokens) or_return
+			fn_node := ast_parse_function_def_no_return_type_and_name(ctx, tokens) or_return
+			fn_node.function_def.return_type = transmute(AstNodeIndex) append_return_index(ctx.ast, implicit_cast_type)
+
+			parsed_node = transmute(AstNodeIndex) append_return_index(ctx.ast, node)
+			append(sequence, parsed_node)
+
+			eat_paragraph = true // @hardcoded
+			err = nil
+			return
 	}
 
 	// var or fn def must have return type
@@ -490,32 +507,38 @@ ast_parse_declaration :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[
 
 		node := AstNode{ kind = .OperatorDefinition }
 
-		nn := eat_token(tokens);
+		nn, nns := peek_token(tokens);
 		#partial switch nn.kind {
 			// asume binary expressions, correct after fn arguments are known
-			case .Tilde:              node.operator_def.kind = .Invert
-			case .PrefixIncrement:    node.operator_def.kind = .Increment
-			case .PostfixDecrement:   node.operator_def.kind = .Decrement
-			case .Equals:             node.operator_def.kind = .Equals
-			case .NotEquals:          node.operator_def.kind = .NotEquals
-			case .Plus:               node.operator_def.kind = .Add
-			case .Minus:              node.operator_def.kind = .Subtract
-			case .Star:               node.operator_def.kind = .Multiply
-			case .ForwardSlash:       node.operator_def.kind = .Divide
-			case .Ampersand:          node.operator_def.kind = .BitAnd
-			case .Pipe:               node.operator_def.kind = .BitOr
-			case .Circumflex:         node.operator_def.kind = .BitXor
-			case .Assign:             node.operator_def.kind = .Assign
-			case .AssignPlus:         node.operator_def.kind = .AssignAdd
-			case .AssignMinus:        node.operator_def.kind = .AssignSubtract
-			case .AssignStar:         node.operator_def.kind = .AssignMultiply
-			case .AssignForwardSlash: node.operator_def.kind = .AssignDivide
+			case .Tilde:              tokens^ = nns; node.operator_def.kind = .Invert
+			case .PrefixIncrement:    tokens^ = nns; node.operator_def.kind = .Increment
+			case .PostfixDecrement:   tokens^ = nns; node.operator_def.kind = .Decrement
+			case .Equals:             tokens^ = nns; node.operator_def.kind = .Equals
+			case .NotEquals:          tokens^ = nns; node.operator_def.kind = .NotEquals
+			case .Plus:               tokens^ = nns; node.operator_def.kind = .Add
+			case .Minus:              tokens^ = nns; node.operator_def.kind = .Subtract
+			case .Star:               tokens^ = nns; node.operator_def.kind = .Multiply
+			case .ForwardSlash:       tokens^ = nns; node.operator_def.kind = .Divide
+			case .Ampersand:          tokens^ = nns; node.operator_def.kind = .BitAnd
+			case .Pipe:               tokens^ = nns; node.operator_def.kind = .BitOr
+			case .Circumflex:         tokens^ = nns; node.operator_def.kind = .BitXor
+			case .Assign:             tokens^ = nns; node.operator_def.kind = .Assign
+			case .AssignPlus:         tokens^ = nns; node.operator_def.kind = .AssignAdd
+			case .AssignMinus:        tokens^ = nns; node.operator_def.kind = .AssignSubtract
+			case .AssignStar:         tokens^ = nns; node.operator_def.kind = .AssignMultiply
+			case .AssignForwardSlash: tokens^ = nns; node.operator_def.kind = .AssignDivide
 			case .BracketSquareOpen: 
-				eat_token_expect(tokens, .BracketSquareClose) or_return
+				eat_token_expect(&nns, .BracketSquareClose) or_return
+				tokens^ = nns
 				node.operator_def.kind = .Index
 
 			case .Identifier:
-				if nn.source == "new" || nn.source == "delete" {
+				if nn.source == "new" {
+					tokens^ = nns
+					break
+				}
+				else if nn.source == "delete" {
+					tokens^ = nns
 					break
 				}
 				fallthrough
@@ -617,7 +640,8 @@ ast_parse_storage_modifier :: proc(tokens : ^[]Token) -> (storage : AstStorageMo
 			case "static": storage |= { .Static }
 			case "thread_local": storage |= { .ThreadLocal }
 			case "extern": storage |= { .Extern }
-			case "constexpr": storage |= { .Extern }
+			case "constexpr": storage |= { .Constexpr }
+			case "mutable": storage |= { .Mutable }
 			case: break storage_loop
 		}
 
@@ -1047,7 +1071,7 @@ ast_parse_scoped_sequence_no_open_brace :: proc(ctx: ^AstContext, tokens : ^[]To
 				}
 		}
 
-		was_preproc := try_ast_parse_preproc_statement(ctx, tokens, sequence, n, ns)
+		was_preproc := ast_try_parse_preproc_statement(ctx, tokens, sequence, n, ns)
 		if was_preproc {
 			continue
 		}
@@ -1703,48 +1727,35 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 
 				node = AstNode { kind = .OperatorCall }
 
-				n := eat_token(tokens)
+				n, ns := peek_token(tokens)
 				#partial switch n.kind {
 					// assume binary for now, adjust after counting arguments
 					//case .Plus:      node.operator_call.kind = .UnaryPlus
 					//case .Minus:     node.operator_call.kind = .UanryMinus
-					case .Tilde             : node.operator_call.kind = .Invert
-					case .PrefixIncrement   : node.operator_call.kind = .Increment
-					case .PostfixDecrement  : node.operator_call.kind = .Decrement
-					case .Equals            : node.operator_call.kind = .Equals
-					case .NotEquals         : node.operator_call.kind = .NotEquals
-					case .Plus              : node.operator_call.kind = .Add
-					case .Minus             : node.operator_call.kind = .Subtract
-					case .Star              : node.operator_call.kind = .Multiply
-					case .ForwardSlash      : node.operator_call.kind = .Divide
-					case .Assign            : node.operator_call.kind = .Assign
-					case .AssignPlus        : node.operator_call.kind = .AssignAdd
-					case .AssignMinus       : node.operator_call.kind = .AssignSubtract
-					case .AssignStar        : node.operator_call.kind = .AssignMultiply
-					case .AssignForwardSlash: node.operator_call.kind = .AssignDivide
+					case .Tilde             : tokens^ = ns; node.operator_call.kind = .Invert
+					case .PrefixIncrement   : tokens^ = ns; node.operator_call.kind = .Increment
+					case .PostfixDecrement  : tokens^ = ns; node.operator_call.kind = .Decrement
+					case .Equals            : tokens^ = ns; node.operator_call.kind = .Equals
+					case .NotEquals         : tokens^ = ns; node.operator_call.kind = .NotEquals
+					case .Plus              : tokens^ = ns; node.operator_call.kind = .Add
+					case .Minus             : tokens^ = ns; node.operator_call.kind = .Subtract
+					case .Star              : tokens^ = ns; node.operator_call.kind = .Multiply
+					case .ForwardSlash      : tokens^ = ns; node.operator_call.kind = .Divide
+					case .Assign            : tokens^ = ns; node.operator_call.kind = .Assign
+					case .AssignPlus        : tokens^ = ns; node.operator_call.kind = .AssignAdd
+					case .AssignMinus       : tokens^ = ns; node.operator_call.kind = .AssignSubtract
+					case .AssignStar        : tokens^ = ns; node.operator_call.kind = .AssignMultiply
+					case .AssignForwardSlash: tokens^ = ns; node.operator_call.kind = .AssignDivide
 					case .BracketSquareOpen:
-						eat_token_expect(tokens, .BracketSquareClose) or_return
+						eat_token_expect(&ns, .BracketSquareClose) or_return
+						tokens^ = ns
 						node.operator_call.kind = .Index
-					case:
+					case: // TODO explicit custom cast call doesnt make much sense
 						err = n
 						return
 				}
 
 				ast_parse_function_call_arguments(ctx, tokens, &node.operator_call.parameters) or_return
-
-				//NOTE TODO canot do this here, since it might be in a member function and tehrefore missing the first arg
-
-				// if len(node.operator_call.parameters) == 1 {
-				// 	#partial switch node.operator_call.kind {
-				// 		case .Add: node.operator_call.kind = .UnaryPlus
-				// 		case .Subtract: node.operator_call.kind = .UanryMinus
-				// 		case .Multiply: node.operator_call.kind = .Dereference
-				// 		case .BitAnd: node.operator_call.kind = .AddressOf
-				// 		case:
-				// 			err = n
-				// 			return
-				// 	}
-				// }
 
 				err = nil
 				return
@@ -1872,7 +1883,10 @@ AstOverloadedOp :: enum {
 	AssignBitOr,
 	AssignBitXor,
 
+	New,
+	Delete,
 	Index,
+	ImplicitCast,
 }
 
 // not castable to AstOp
@@ -2091,6 +2105,7 @@ AstStorageModifierFlag :: enum{
 	ThreadLocal,
 	Inline,
 	Constexpr,
+	Mutable,
 }
 AstStorageModifier :: bit_set[AstStorageModifierFlag]
 
@@ -2099,6 +2114,7 @@ AstVariableDefFlags :: bit_set[enum{
 	Extern      = cast(int) AstStorageModifier.Extern,
 	Inline      = cast(int) AstStorageModifier.Inline,
 	ThreadLocal = cast(int) AstStorageModifier.ThreadLocal,
+	Mutable     = cast(int) AstStorageModifier.Mutable,
 }]
 
 AstFunctionDefFlags :: bit_set[enum{

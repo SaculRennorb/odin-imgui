@@ -903,6 +903,8 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 						resize(ctx.context_heap, context_heap_reset)
 				}
 
+			case .OperatorDefinition:
+				/* just ignore for now */
 
 			case:
 				was_preproc := #force_inline write_preproc_node(ctx.result, current_node^)

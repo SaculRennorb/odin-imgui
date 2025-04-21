@@ -254,18 +254,38 @@ tokenize :: proc(tokens : ^[dynamic]Token, text : string, file_path : string)
 
 			case '0'..='9':
 				start := remaining
+				is_hex := false
 				is_float := false
+				switch remaining[1] {
+					case 'x': remaining = remaining[2:]; is_hex = true
+					case 'o': remaining = remaining[2:]
+					case 'b': remaining = remaining[2:]
+				}
 				number_loop: for remaining = remaining[1:]; remaining < end; remaining = remaining[1:] {
 					switch remaining[0]  {
 						case '0'..='9':
 
+						case '\'':
+
 						case '.':
 							is_float = true
 
-						case 'f':
-							is_float = true
+						case 'a'..='e', 'A'..='E':
+						case 'f', 'F':
+							if !is_hex {
+								append(tokens, Token{.LiteralFloat, str_from_se(start, remaining), loc})
+								remaining = remaining[1:]
+								break number_loop
+							}
+
+						case 'L':
+							append(tokens, Token{is_float ? .LiteralFloat : .LiteralInteger, str_from_se(start, remaining), loc})
 							remaining = remaining[1:]
-							append(tokens, Token{.LiteralFloat, str_from_se(start, remaining), loc})
+							break number_loop
+
+						case 'u':
+							append(tokens, Token{.LiteralInteger, str_from_se(start, remaining), loc})
+							remaining = remaining[1:]
 							break number_loop
 
 						case:

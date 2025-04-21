@@ -566,6 +566,20 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 			case .OperatorDefinition:
 				/* just ignore for now */
 
+			case .OperatorCall:
+				call := current_node.operator_call
+
+				str.write_string(ctx.result, "operator_")
+				fmt.sbprint(ctx.result, call.kind)
+				str.write_byte(ctx.result, '(')
+				for aidx, i in call.parameters {
+					if i != 0 { str.write_string(ctx.result, ", ") }
+					write_node(ctx, aidx, name_context)
+				}
+				str.write_byte(ctx.result, ')')
+
+				requires_termination = true
+
 			case:
 				was_preproc := #force_inline write_preproc_node(ctx.result, current_node^)
 				if was_preproc {
@@ -722,7 +736,7 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 				write_node(ctx, member.initializer_expression, name_context)
 				str.write_byte(ctx.result, '\n')
 			}
-			if initializer.kind == .FunctionDefinition && .ForwardDeclaration not_in initializer.function_def.flags {
+			if initializer.kind == .FunctionDefinition && .ForwardDeclaration not_in initializer.function_def.flags && len(initializer.function_def.body_sequence) > 0 {
 				write_node_sequence(ctx, initializer.function_def.body_sequence[:], name_context, member_indent_str)
 				if ctx.ast[last(initializer.function_def.body_sequence[:])^].kind != .NewLine { str.write_byte(ctx.result, '\n') }
 			}
@@ -1250,7 +1264,7 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 		for token in input {
 			#partial switch token.kind {
 				case .Identifier:
-					if generic_depth == 0 {
+					if generic_depth == 0 && token.source != "const" {
 						append(output, token)
 					}
 					

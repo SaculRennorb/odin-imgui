@@ -33,7 +33,7 @@ main :: proc()
 	result : str.Builder
 	convert_and_format(&result, ast[:])
 
-	os.write_entire_file("/out/imgui_gen.odin", result.buf[:])
+	os.write_entire_file("out/imgui_gen.odin", result.buf[:])
 
 
 	tokenize_file :: proc(map_ :  ^map[string]Input, path : string)

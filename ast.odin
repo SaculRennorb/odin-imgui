@@ -1518,7 +1518,7 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 
 		next, nexts := peek_token(tokens)
 
-		if err == nil { // we already have a "left" and ar looking for a binary operator
+		if err == nil { // we already have a "left" and are looking for a binary operator
 			#partial switch next.kind {
 				case .Dot, .DereferenceMember:
 					tokens^ = nexts // eat -> or .
@@ -1571,7 +1571,10 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 							presedence = .AssignModify
 					}
 
-					if max_presedence < presedence { break }
+					if max_presedence < presedence {
+						if err == nil { fixup_sequence(&node, ctx, &sequence) }
+						return
+					}
 
 					tokens^ = nexts
 
@@ -1637,7 +1640,10 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 					case .PrefixIncrement: presedence = .PrefixIncrement
 				}
 
-				if max_presedence < presedence { break }
+				if max_presedence < presedence {
+					if err == nil { fixup_sequence(&node, ctx, &sequence) }
+					return
+				}
 
 				tokens^ = nexts
 

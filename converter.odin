@@ -519,7 +519,7 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 					}
 				}
 
-
+				requires_termination = true
 				requires_new_paragraph = true
 
 			case .Branch:
@@ -594,6 +594,8 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 
 						resize(ctx.context_heap, context_heap_reset)
 				}
+
+				requires_termination = true
 
 			case .OperatorDefinition:
 				/* just ignore for now */

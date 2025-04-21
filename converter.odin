@@ -285,32 +285,60 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 				requires_termination = true
 
 			case .ExprBinary:
-				write_node(ctx, current_node.binary.left, name_context)
-				str.write_byte(ctx.result, ' ')
-				#partial switch current_node.binary.operator {
-					case .LogicAnd:   str.write_string(ctx.result, "&&")
-					case .LogicOr:    str.write_string(ctx.result, "||")
-					case .Equals:     str.write_string(ctx.result, "==")
-					case .NotEquals:  str.write_string(ctx.result, "!=")
-					case .LessEq:     str.write_string(ctx.result, "<=")
-					case .GreaterEq:  str.write_string(ctx.result, ">=")
-					case .ShiftLeft:  str.write_string(ctx.result, "<<")
-					case .ShiftRight: str.write_string(ctx.result, ">>")
-					case .AssignAdd:  str.write_string(ctx.result, "+=")
-					case .AssignSubtract: str.write_string(ctx.result, "-=")
-					case .AssignMultiply:   str.write_string(ctx.result, "*=")
-					case .AssignDivide:     str.write_string(ctx.result, "/=")
-					case .AssignModulo:     str.write_string(ctx.result, "%=")
-					case .AssignShiftLeft:  str.write_string(ctx.result, "<<=")
-					case .AssignShiftRight: str.write_string(ctx.result, ">>=")
-					case .AssignBitAnd:     str.write_string(ctx.result, "&=")
-					case .AssignBitOr:      str.write_string(ctx.result, "|=")
-					case .AssignBitXor:     str.write_string(ctx.result, "~=")
-					case:
-						str.write_byte(ctx.result, u8(current_node.binary.operator))
+				binary := current_node.binary
+
+				write_op :: proc(ctx : ConverterContext, operator : AstBinaryOp)
+				{
+					#partial switch operator {
+						case .LogicAnd:   str.write_string(ctx.result, "&&")
+						case .LogicOr:    str.write_string(ctx.result, "||")
+						case .Equals:     str.write_string(ctx.result, "==")
+						case .NotEquals:  str.write_string(ctx.result, "!=")
+						case .LessEq:     str.write_string(ctx.result, "<=")
+						case .GreaterEq:  str.write_string(ctx.result, ">=")
+						case .ShiftLeft:  str.write_string(ctx.result, "<<")
+						case .ShiftRight: str.write_string(ctx.result, ">>")
+						case .AssignAdd:  str.write_string(ctx.result, "+=")
+						case .AssignSubtract: str.write_string(ctx.result, "-=")
+						case .AssignMultiply:   str.write_string(ctx.result, "*=")
+						case .AssignDivide:     str.write_string(ctx.result, "/=")
+						case .AssignModulo:     str.write_string(ctx.result, "%=")
+						case .AssignShiftLeft:  str.write_string(ctx.result, "<<=")
+						case .AssignShiftRight: str.write_string(ctx.result, ">>=")
+						case .AssignBitAnd:     str.write_string(ctx.result, "&=")
+						case .AssignBitOr:      str.write_string(ctx.result, "|=")
+						case .AssignBitXor:     str.write_string(ctx.result, "~=")
+						case:
+							str.write_byte(ctx.result, u8(operator))
+					}
 				}
-				str.write_byte(ctx.result, ' ')
-				write_node(ctx, current_node.binary.right, name_context)
+
+				right := ctx.ast[binary.right]
+				right_switch: #partial switch right.kind {
+					case .ExprBinary:
+						#partial switch right.binary.operator {
+							case .Assign, .AssignAdd, .AssignBitAnd, .AssignBitOr, .AssignBitXor, .AssignDivide, .AssignModulo, .AssignMultiply, .AssignShiftLeft, .AssignShiftRight, .AssignSubtract:
+								write_node(ctx, binary.right, name_context)
+								str.write_string(ctx.result, "; ")
+
+								write_node(ctx, binary.left, name_context)
+								str.write_byte(ctx.result, ' ')
+								write_op(ctx, binary.operator)
+								str.write_byte(ctx.result, ' ')
+								write_node(ctx, right.binary.left, name_context)
+
+								break right_switch
+							}
+
+						fallthrough
+
+					case:
+						write_node(ctx, binary.left, name_context)
+						str.write_byte(ctx.result, ' ')
+						write_op(ctx, binary.operator)
+						str.write_byte(ctx.result, ' ')
+						write_node(ctx, binary.right, name_context)
+				}
 
 				requires_termination = true
 

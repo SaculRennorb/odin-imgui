@@ -105,6 +105,7 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 							last_broke_line = false
 					}
 				}
+				if !last_broke_line { str.write_byte(ctx.result, '\n') }
 				str.write_string(ctx.result, indent_str); str.write_string(ctx.result, "}\n")
 
 				insert_new_definition(ctx.context_heap, 0, macro.name.source, current_node_index, macro.name.source)
@@ -1020,15 +1021,31 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 		#partial switch current_node.kind {
 			case .PreprocIf:
 				str.write_string(result, "when ")
-				write_token_range(result, current_node.token_sequence[:], " ")
-				str.write_string(result, " {")
+				last := last(current_node.token_sequence[:])
+				if last.kind == .Comment { // put the comment after the brace so the brace does not get commented out
+					write_token_range(result, current_node.token_sequence[:len(current_node.token_sequence) - 1], " ")
+					str.write_string(result, " { ")
+					str.write_string(result, last.source)
+				}
+				else {
+					write_token_range(result, current_node.token_sequence[:], " ")
+					str.write_string(result, " {")
+				}
 
 			case .PreprocElse:
 				str.write_string(result, "} else ")
 				if len(current_node.token_sequence) > 0 {
 					str.write_string(result, "when ")
-					write_token_range(result, current_node.token_sequence[:], " ")
-					str.write_string(result, " {")
+					last := last(current_node.token_sequence[:])
+					if last.kind == .Comment { // put the comment after the brace so the brace does not get commented out
+						write_token_range(result, current_node.token_sequence[:len(current_node.token_sequence) - 1], " ")
+						str.write_string(result, " { ")
+						str.write_string(result, last.source)
+					}
+					else {
+						write_token_range(result, current_node.token_sequence[:], " ")
+						str.write_string(result, " {")
+					}
 				}
 				else {
 					str.write_string(result, "{ // preproc else")

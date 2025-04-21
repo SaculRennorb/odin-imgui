@@ -52,6 +52,9 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 
 				str.write_string(ctx.result, define.name.source)
 				str.write_string(ctx.result, " :: ")
+				if len(define.expansion_tokens) == 0 || define.expansion_tokens[0].kind == .Comment  {
+					str.write_string(ctx.result, "true")
+				}
 				write_token_range(ctx.result, define.expansion_tokens, "")
 
 				insert_new_definition(ctx.context_heap, 0, define.name.source, current_node_index, define.name.source)
@@ -1023,10 +1026,13 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 			case .PreprocElse:
 				str.write_string(result, "} else ")
 				if len(current_node.token_sequence) > 0 {
+					str.write_string(result, "when ")
 					write_token_range(result, current_node.token_sequence[:], " ")
-					str.write_byte(result, ' ')
+					str.write_string(result, " {")
 				}
-				str.write_string(result, "{ // preproc else")
+				else {
+					str.write_string(result, "{ // preproc else")
+				}
 
 			case .PreprocEndif:
 				str.write_string(result, "} // preproc endif")

@@ -183,13 +183,14 @@ ast_parse_preproc_define :: proc(ctx: ^AstContext, tokens : ^[]Token) -> (node :
 	tokens := &tokens__
 
 	name := eat_token_expect(tokens, .Identifier) or_return
-	next, nexts := peek_token(tokens)
-	if next.kind == .BracketRoundOpen {
-		tokens^ = nexts
+	//TODO(Rennorb): Put more of the preproc parsing in the tokenizer
+	is_fn_macro :: proc(name : string) -> bool #no_bounds_check { return name[len(name)] == '(' } // @hack
+	if is_fn_macro(name.source) {
+		eat_token_expect(tokens, .BracketRoundOpen) or_return // (
 		args : [dynamic]Token
 
 		arg_loop: for {
-			next, nexts = peek_token(tokens)
+			next, nexts := peek_token(tokens)
 			#partial switch next.kind {
 				case .BracketRoundClose:
 					tokens^ = nexts

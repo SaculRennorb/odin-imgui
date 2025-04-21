@@ -22,31 +22,21 @@ tokenize :: proc(tokens : ^[dynamic]Token, text : string, file_path : string)
 				remaining = remaining[1:]
 				continue
 
-			case '#', ',', ';', '*', '?', '~', '(', '[', '{', ')', ']', '}', '\\':
+			case '#', ',', ';', '?', '(', '[', '{', ')', ']', '}', '\\':
 				append(tokens, Token{cast(TokenKind) c, transmute(string)remaining[:1], loc})
 				remaining = remaining[1:]
 
-			case '%':
+			case '*', '~', '%', '^', '=', '!':
 				if remaining < end[-1:] && remaining[1] == '=' {
-					append(tokens, Token{.AssignPercent, transmute(string)remaining[:2], loc});
+					append(tokens, Token{TokenKind(0x100) + TokenKind(c), transmute(string)remaining[:2], loc});
 					remaining = remaining[2:]
 				}
 				else {
-					append(tokens, Token{.Percent, transmute(string)remaining[:1], loc});
+					append(tokens, Token{TokenKind(c), transmute(string)remaining[:1], loc});
 					remaining = remaining[1:]
 				}
 
-			case '^':
-				if remaining < end[-1:] && remaining[1] == '=' {
-					append(tokens, Token{.AssignCircumflex, transmute(string)remaining[:2], loc});
-					remaining = remaining[2:]
-				}
-				else {
-					append(tokens, Token{.Circumflex, transmute(string)remaining[:1], loc});
-					remaining = remaining[1:]
-				}
-
-			case '&': 
+			case '&':
 				if remaining < end[-1:] && remaining[1] == '&' {
 					append(tokens, Token{.DoubleAmpersand, transmute(string)remaining[:2], loc});
 					remaining = remaining[2:]
@@ -111,26 +101,6 @@ tokenize :: proc(tokens : ^[dynamic]Token, text : string, file_path : string)
 				}
 				else {
 					append(tokens, Token{.BracketTriangleClose, transmute(string)remaining[:1], loc});
-					remaining = remaining[1:]
-				}
-
-			case '=': 
-				if remaining < end[-1:] && remaining[1] == '=' {
-					append(tokens, Token{.Equals, transmute(string)remaining[:2], loc});
-					remaining = remaining[2:]
-				}
-				else {
-					append(tokens, Token{.Assign, transmute(string)remaining[:1], loc});
-					remaining = remaining[1:]
-				}
-
-			case '!': 
-				if remaining < end[-1:] && remaining[1] == '=' {
-					append(tokens, Token{.NotEquals, transmute(string)remaining[:2], loc});
-					remaining = remaining[2:]
-				}
-				else {
-					append(tokens, Token{.Exclamationmark, transmute(string)remaining[:1], loc});
 					remaining = remaining[1:]
 				}
 
@@ -357,7 +327,23 @@ TokenKind :: enum {
 
 	Tilde                = '~',  // #x7f
 
-	StaticScopingOperator  = 0x100,
+	NotEquals          = 0x100 + '!',
+	LessEq             = 0x100 + '<',
+	Equals             = 0x100 + '=',
+	GreaterEq          = 0x100 + '>',
+	AssignPlus         = 0x100 + '+',
+	AssignMinus        = 0x100 + '-',
+	AssignStar         = 0x100 + '*',
+	AssignAmpersand    = 0x100 + '&',
+	AssignPipe         = 0x100 + '|',
+	AssignCircumflex   = 0x100 + '^',
+	AssignForwardSlash = 0x100 + '/',
+	AssignPercent      = 0x100 + '%',
+	AssignTilde        = 0x100 + '~',
+	AssignShiftLeft,
+	AssignShiftRight,
+	
+	StaticScopingOperator  = 0x200,
 	DereferenceMember,
 	PrefixIncrement,
 	PrefixDecrement,
@@ -401,21 +387,6 @@ TokenKind :: enum {
 	DoublePipe,
 	ShiftLeft,
 	ShiftRight,
-
-	Equals,
-	NotEquals,
-	LessEq,
-	GreaterEq,
-	AssignPlus,
-	AssignMinus,
-	AssignStar,
-	AssignAmpersand,
-	AssignPipe,
-	AssignCircumflex,
-	AssignForwardSlash,
-	AssignPercent,
-	AssignShiftLeft,
-	AssignShiftRight,
 }
 
 Token :: struct {

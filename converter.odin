@@ -257,12 +257,12 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 					case .Increment:
 						str.write_string(ctx.result, "pre_incr(&")
 						write_node(ctx, current_node.unary_left.right, name_context)
-						str.write_string(ctx.result, ")")
+						str.write_byte(ctx.result, ')')
 
 					case .Decrement:
 						str.write_string(ctx.result, "pre_decr(&")
 						write_node(ctx, current_node.unary_left.right, name_context)
-						str.write_string(ctx.result, ")")
+						str.write_byte(ctx.result, ')')
 				}
 
 				requires_termination = true
@@ -270,12 +270,14 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 			case .ExprUnaryRight:
 				#partial switch current_node.unary_right.operator {
 					case .Increment:
+						str.write_string(ctx.result, "post_incr(&")
 						write_node(ctx, current_node.unary_right.left, name_context)
-						str.write_string(ctx.result, " += 1")
+						str.write_byte(ctx.result, ')')
 
 					case .Decrement:
+						str.write_string(ctx.result, "post_decr(&")
 						write_node(ctx, current_node.unary_right.left, name_context)
-						str.write_string(ctx.result, " -= 1")
+						str.write_byte(ctx.result, ')')
 				}
 
 				requires_termination = true

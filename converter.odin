@@ -242,6 +242,10 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 
 			case .ExprUnaryLeft:
 				switch current_node.unary_left.operator {
+					case .AddressOf, .Plus, .Minus:
+						str.write_byte(ctx.result, byte(current_node.unary_left.operator))
+						write_node(ctx, current_node.unary_left.right, name_context)
+
 					case .Invert:
 						str.write_byte(ctx.result, '!')
 						write_node(ctx, current_node.unary_left.right, name_context)
@@ -249,14 +253,6 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 					case .Dereference:
 						write_node(ctx, current_node.unary_left.right, name_context)
 						str.write_byte(ctx.result, '^')
-
-					case .Plus:
-						str.write_byte(ctx.result, '+')
-						write_node(ctx, current_node.unary_left.right, name_context)
-
-					case .Minus:
-						str.write_byte(ctx.result, '-')
-						write_node(ctx, current_node.unary_left.right, name_context)
 
 					case .Increment:
 						str.write_string(ctx.result, "pre_incr(&")
@@ -1553,6 +1549,9 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 								case .Dereference:
 									transform_expression(output, ast, node.unary_left.right)
 									append(output, Token{ kind = .Minus, source = "^" })
+								case .AddressOf:
+									append(output, Token{ kind = .Minus, source = "&" })
+									transform_expression(output, ast, node.unary_left.right)
 								case .Invert:
 									append(output, Token{ kind = .Minus, source = "!" })
 									transform_expression(output, ast, node.unary_left.right)

@@ -1899,6 +1899,7 @@ AstOverloadedOp :: enum {
 // not castable to AstOp
 AstUnaryOp :: enum {
 	Dereference  = cast(int) TokenKind.Star,
+	AddressOf    = cast(int) TokenKind.Ampersand,
 	Plus         = cast(int) TokenKind.Plus,
 	Minus        = cast(int) TokenKind.Minus,
 	Invert       = cast(int) TokenKind.Tilde,

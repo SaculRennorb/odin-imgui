@@ -1104,6 +1104,8 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 
 			str.write_byte(ctx.result, '$')
 			write_node(ctx, ti, name_context)
+
+			arg_count += 1
 		}
 
 		if parent_type != nil {
@@ -1519,6 +1521,10 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 					case "size_t":
 						remaining_input = input[1:]
 						append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = "uint" } })
+
+					case "ptrdiff_t":
+						remaining_input = input[1:]
+						append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = "int" } })
 
 					case "typename", "class":
 						remaining_input = input[1:]

@@ -1,0 +1,5 @@
+#define IM_UNICODE_CODEPOINT_MAX 256
+
+struct A1016 {
+	char Used4kPagesMap[(IM_UNICODE_CODEPOINT_MAX+1)/4096/8];
+};

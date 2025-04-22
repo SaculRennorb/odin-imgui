@@ -1303,7 +1303,7 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 
 				case _TypeArray:
 					str.write_byte(ctx.result, '[')
-					write_token_range(ctx.result, t.length_expression[:], "")
+					write_node(ctx, t.length_expression, name_context)
 					str.write_byte(ctx.result, ']')
 			}
 		}
@@ -1525,95 +1525,12 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 				inject_at(output, 0, _TypePtr{})
 
 			case .AstNode: // used for array expression for now
-				length_expression : [dynamic]Token
-				if input[0].location.column != {} {
-					transform_expression(&length_expression, ast, transmute(AstNodeIndex) input[0].location.column)
+			if input[0].location.column != {} {
+					length_expression := transmute(AstNodeIndex) input[0].location.column
 					inject_at(output, 0, _TypeArray{ length_expression })
 				}
 				else{
 					inject_at(output, 0, _TypeMultiptr{})
-				}
-
-				transform_expression :: proc(output : ^[dynamic]Token, ast : []AstNode, current_node_index : AstNodeIndex)
-				{
-					node := ast[current_node_index]
-					#partial switch node.kind {
-						case .LiteralBool, .LiteralCharacter, .LiteralFloat, .LiteralInteger, .LiteralString:
-							append(output, node.literal)
-						case .ExprUnaryLeft:
-							switch node.unary_left.operator {
-								case .Minus:
-									append(output, Token{ kind = .Minus, source = "-" })
-									transform_expression(output, ast, node.unary_left.right)
-								case .Plus:
-									append(output, Token{ kind = .Minus, source = "+" })
-									transform_expression(output, ast, node.unary_left.right)
-								case .Dereference:
-									transform_expression(output, ast, node.unary_left.right)
-									append(output, Token{ kind = .Minus, source = "^" })
-								case .AddressOf:
-									append(output, Token{ kind = .Minus, source = "&" })
-									transform_expression(output, ast, node.unary_left.right)
-								case .Invert:
-									append(output, Token{ kind = .Minus, source = "!" })
-									transform_expression(output, ast, node.unary_left.right)
-								case .Increment:
-									transform_expression(output, ast, node.unary_left.right)
-									append(output, Token{ kind = .PrefixIncrement, source = " += " })
-									append(output, Token{ kind = .LiteralInteger, source = "1 /*TODO: was prefix*/" })
-								case .Decrement:
-									transform_expression(output, ast, node.unary_left.right)
-									append(output, Token{ kind = .PrefixIncrement, source = " -= " })
-									append(output, Token{ kind = .LiteralInteger, source = "1 /*TODO: was prefix*/" })
-							}
-						case .ExprUnaryRight:
-							#partial switch node.unary_right.operator {
-								case .Increment:
-									transform_expression(output, ast, node.unary_right.left)
-									append(output, Token{ kind = .PrefixIncrement, source = " += " })
-									append(output, Token{ kind = .LiteralInteger, source = "1" })
-								case .Decrement:
-									transform_expression(output, ast, node.unary_right.left)
-									append(output, Token{ kind = .PrefixIncrement, source = " -= " })
-									append(output, Token{ kind = .LiteralInteger, source = "1" })
-							}
-						case .ExprBinary:
-							transform_expression(output, ast, node.binary.left)
-							t := Token{ kind = TokenKind(node.binary.operator) }
-							switch node.binary.operator {
-								case .Assign:           t.source = "="
-								case .Plus:             t.source = "+"
-								case .Minus:            t.source = "-"
-								case .Times:            t.source = "*"
-								case .Divide:           t.source = "/"
-								case .BitAnd:           t.source = "&"
-								case .BitOr:            t.source = "|"
-								case .BitXor:           t.source = "~"
-								case .Modulo:           t.source = "%"
-								case .Less:             t.source = "<"
-								case .Greater:          t.source = ">"
-								case .LogicAnd:         t.source = "&&"
-								case .LogicOr:          t.source = "||"
-								case .Equals:           t.source = "=="
-								case .NotEquals:        t.source = "!="
-								case .LessEq:           t.source = "<="
-								case .GreaterEq:        t.source = ">="
-								case .ShiftLeft:        t.source = "<<"
-								case .ShiftRight:       t.source = ">>"
-								case .AssignAdd:        t.source = "+="
-								case .AssignSubtract:   t.source = "-="
-								case .AssignMultiply:   t.source = "*="
-								case .AssignDivide:     t.source = "/="
-								case .AssignModulo:     t.source = "%="
-								case .AssignShiftLeft:  t.source = "<<="
-								case .AssignShiftRight: t.source = ">>="
-								case .AssignBitAnd:     t.source = "&="
-								case .AssignBitOr:      t.source = "|="
-								case .AssignBitXor:     t.source = "~="
-							}
-							append(output, t)
-							transform_expression(output, ast, node.binary.right)
-					}
 				}
 				remaining_input = input[1:]
 
@@ -1640,12 +1557,11 @@ insert_new_definition :: proc(context_heap : ^[dynamic]NameContext, current_inde
 	return idx
 }
 
-find_definition_for_name :: proc(context_heap : ^[dynamic]NameContext, current_index : NameContextIndex, compound_identifier : TokenRange) -> (root_context, name_context : ^NameContext)
+find_definition_for_name :: proc(context_heap : ^[dynamic]NameContext, current_index : NameContextIndex, compound_identifier : TokenRange, loc := #caller_location) -> (root_context, name_context : ^NameContext)
 {
 	root_context, name_context = try_find_definition_for_name(context_heap, current_index, compound_identifier)
 	if name_context != nil { return }
 
-	loc := runtime.Source_Code_Location{ compound_identifier[0].location.file_path, cast(i32) compound_identifier[0].location.row, cast(i32) compound_identifier[0].location.column, "" }
 	dump_context_stack(context_heap[:], current_index)
 	panic(fmt.tprintf("%v : '%v' was not found in context", compound_identifier[0].location, compound_identifier), loc)
 }
@@ -1744,7 +1660,7 @@ dump_context_stack :: proc(context_heap : []NameContext, name_context_idx : Name
 _TypePtr :: struct {}
 _TypeMultiptr :: struct {}
 _TypeArray :: struct {
-	length_expression : [dynamic]Token,
+	length_expression : AstNodeIndex,
 }
 
 _TypeFragment :: struct {

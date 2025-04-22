@@ -70,7 +70,7 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 					insert_new_definition(ctx.context_heap, 0, define.name.source, current_node_index, define.name.source)
 				}
 				else {
-					write_function(ctx, name_context, define.type, "", false, "", true)
+					write_function(ctx, name_context, define.type, "", nil, "", true)
 				}
 
 			case .PreprocMacro:
@@ -111,7 +111,7 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 				insert_new_definition(ctx.context_heap, 0, macro.name.source, current_node_index, macro.name.source)
 
 			case .FunctionDefinition:
-				write_function(ctx, name_context, current_node_index, definition_prefix, false, indent_str)
+				write_function(ctx, name_context, current_node_index, definition_prefix, nil, indent_str)
 
 				swallow_paragraph = .ForwardDeclaration in current_node.function_def.flags 
 
@@ -779,7 +779,7 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 			#partial switch ctx.ast[midx].kind {
 				case .FunctionDefinition:
 					str.write_string(ctx.result, "\n\n")
-					write_function(ctx, name_context, midx, complete_structure_name, true, indent_str)
+					write_function(ctx, name_context, midx, complete_structure_name, structure_node, indent_str)
 
 					requires_new_paragraph = true
 
@@ -1089,7 +1089,7 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 		return true
 	}
 
-	write_function_type :: proc(ctx : ConverterContext, name_context : NameContextIndex, fn_node : AstNode, complete_structure_name : string, is_member_fn : bool) -> (arg_count : int)
+	write_function_type :: proc(ctx : ConverterContext, name_context : NameContextIndex, fn_node : AstNode, complete_structure_name : string, parent_type : ^AstNode) -> (arg_count : int)
 	{
 		fn_node := fn_node.function_def
 
@@ -1106,11 +1106,24 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 			write_node(ctx, ti, name_context)
 		}
 
-		if is_member_fn {
+		if parent_type != nil {
 			if arg_count > 0 { str.write_string(ctx.result, ", ") }
 
 			str.write_string(ctx.result, "this : ^")
-			str.write_string(ctx.result, complete_structure_name);
+			str.write_string(ctx.result, complete_structure_name)
+			if len(parent_type.structure.template_spec) > 0 {
+				str.write_byte(ctx.result, '(')
+				for ti, i in parent_type.structure.template_spec {
+					if i > 0 { str.write_string(ctx.result, ", ") }
+
+					type_var := ctx.ast[ti]
+					assert_eq(type_var.kind, AstNodeKind.VariableDeclaration)
+
+					str.write_byte(ctx.result, '$')
+					str.write_string(ctx.result, type_var.var_declaration.var_name.source)
+				}
+				str.write_byte(ctx.result, ')')
+			}
 
 			insert_new_definition(ctx.context_heap, name_context, "this", -1, "this")
 
@@ -1167,7 +1180,7 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 		return
 	}
 
-	write_function :: proc(ctx : ConverterContext, name_context : NameContextIndex, function_node_idx : AstNodeIndex, complete_structure_name : string, is_member_fn : bool, indent_str : string, write_forward_declared := false)
+	write_function :: proc(ctx : ConverterContext, name_context : NameContextIndex, function_node_idx : AstNodeIndex, complete_structure_name : string, parent_type : ^AstNode, indent_str : string, write_forward_declared := false)
 	{
 		fn_node_ := &ctx.ast[function_node_idx]
 		fn_node := &fn_node_.function_def
@@ -1205,7 +1218,7 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 		str.write_string(ctx.result, indent_str);
 		str.write_string(ctx.result, complete_name);
 		str.write_string(ctx.result, " :: ");
-		arg_count := write_function_type(ctx, name_context, fn_node_^, complete_structure_name, is_member_fn)
+		arg_count := write_function_type(ctx, name_context, fn_node_^, complete_structure_name, parent_type)
 
 		if .ForwardDeclaration in fn_node.flags {
 			return
@@ -1259,7 +1272,7 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 				write_type_inner(ctx, r.type[:], name_context)
 
 			case .FunctionDefinition:
-				write_function_type(ctx, 0 /*hopefully not relevant*/, r, "", false)
+				write_function_type(ctx, 0 /*hopefully not relevant*/, r, "", nil)
 		}
 	}
 

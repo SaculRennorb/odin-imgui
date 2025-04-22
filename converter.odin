@@ -1505,6 +1505,10 @@ convert_and_format :: proc(result : ^str.Builder, nodes : []AstNode)
 						remaining_input = input[1:]
 						append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = "f64" } })
 
+					case "size_t":
+						remaining_input = input[1:]
+						append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = "uint" } })
+
 					case "typename", "class":
 						remaining_input = input[1:]
 						append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = "typeid" } })

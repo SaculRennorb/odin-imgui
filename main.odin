@@ -8,6 +8,16 @@ import str "core:strings"
 main :: proc()
 {
 	input_map : map[string]Input
+	tokenize_file :: proc(map_ :  ^map[string]Input, path : string)
+	{
+		content, ok := os.read_entire_file(str.concatenate({ "in/", path }, context.temp_allocator))
+		if !ok { panic(fmt.tprintf("Failed to read %v", path)) }
+
+		toks : [dynamic]Token
+		tokenize(&toks, cast(string) content, path)
+
+		map_[path] = { toks[:], false }
+	}
 	tokenize_file(&input_map, "imgui.h")
 	tokenize_file(&input_map, "imgui.cpp")
 	tokenize_file(&input_map, "imgui_internal.h")
@@ -30,24 +40,11 @@ main :: proc()
 	ast  : [dynamic]AstNode
 	ast_parse_filescope_sequence(&{ ast = &ast, ignore_identifiers = ignore_identifiers}, preprocessed[:])
 
-	result : str.Builder
-	convert_and_format(&result, ast[:])
+	converter_context : ConverterContext = {ast = ast[:]}
+	convert_and_format(&converter_context)
+	os.write_entire_file("out/imgui_gen.odin", converter_context.result.buf[:])
 
-	os.write_entire_file("out/imgui_gen.odin", result.buf[:])
-
-
-	tokenize_file :: proc(map_ :  ^map[string]Input, path : string)
-	{
-		content, ok := os.read_entire_file(str.concatenate({ "in/", path }, context.temp_allocator))
-		if !ok { panic(fmt.tprintf("Failed to read %v", path)) }
-
-		toks : [dynamic]Token
-		tokenize(&toks, cast(string) content, path)
-
-		map_[path] = { toks[:], false }
-	}
+	str.builder_reset(&converter_context.result)
+	write_shim(&converter_context)
+	os.write_entire_file("out/shim.odin", converter_context.result.buf[:])
 }
-
-
-
-

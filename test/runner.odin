@@ -136,18 +136,19 @@ test :: proc(t : ^testing.T)
 		clear(&result.buf)
 		loc.procedure = "converter.convert_and_format"
 		log.debug(len(ast), "ast nodes, converting ... ", location = loc)
-		converter.convert_and_format(&result, ast[:])
+		converter_context : converter.ConverterContext = { result = result, ast = ast[:] }
+		converter.convert_and_format(&converter_context)
 
-		os.write_entire_file(fmt.tprintf(BASEDIR+"/out/%v.odin", path.stem(file.name)), result.buf[:])
+		os.write_entire_file(fmt.tprintf(BASEDIR+"/out/%v.odin", path.stem(file.name)), converter_context.result.buf[:])
 
 		loc.procedure = "test.validate"
 
-		if(str.to_string(result) == string(ref)) {
+		if(str.to_string(converter_context.result) == string(ref)) {
 			loc.procedure = ""
 			log.info("OK", location = loc)
 		}
 		else {
-			log.errorf("expected\n---\n%v\n---\n\ngot\n---\n%v\n---", string(ref), str.to_string(result), location=loc)
+			log.errorf("expected\n---\n%v\n---\n\ngot\n---\n%v\n---", string(ref), str.to_string(converter_context.result), location=loc)
 		}
 	}
 

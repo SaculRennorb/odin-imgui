@@ -355,26 +355,26 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 			case .MemberAccess:
 				member := ctx.ast[current_node.member_access.member]
 
-				_, this_type_context := resolve_type(ctx, current_node.member_access.expression, name_context)
-				this_idx := transmute(NameContextIndex) mem.ptr_sub(this_type_context, &ctx.context_heap[0])
+				expression_type, expression_type_context_idx := resolve_type(ctx, current_node.member_access.expression, name_context)
+				expression_type_context := ctx.context_heap[expression_type_context_idx]
 
 				if member.kind == .FunctionCall {
 					fncall := member.function_call
 
-					this_type := ctx.ast[this_type_context.node]
+					expression_type_node := ctx.ast[expression_type_context.node]
 					structure_name : []Token
-					#partial switch this_type.kind { // TODO(Rennorb) @cleanup
+					#partial switch expression_type_node.kind { // TODO(Rennorb) @cleanup
 						case .Struct, .Union:
-							structure_name = this_type.structure.name
+							structure_name = expression_type_node.structure.name
 						case .VariableDeclaration:
-							structure_name = {this_type.var_declaration.var_name}
+							structure_name = {expression_type_node.var_declaration.var_name}
 					}
 					if len(structure_name) > 0 && last(structure_name).source == last(member.function_call.qualified_name[:]).source {
 						str.write_string(&ctx.result, member.function_call.is_destructor ? "deinit" : "init")
 					}
 					else {
-						if this_type_context.parent != {} {
-							containing_scope := ctx.ast[ctx.context_heap[this_type_context.parent].node]
+						if expression_type_context.parent != {} {
+							containing_scope := ctx.ast[ctx.context_heap[expression_type_context.parent].node]
 							if containing_scope.kind == .Namespace {
 								str.write_string(&ctx.result, containing_scope.namespace.name.source)
 								str.write_byte(&ctx.result, '_')
@@ -397,12 +397,11 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 					write_node(ctx, current_node.member_access.expression, name_context)
 					str.write_byte(&ctx.result, '.')
 
-					// maybe find basetype for this member
-					_, actual_member_context := find_definition_for_name(ctx.context_heap, this_idx, member.identifier[:])
+					_, actual_member_context := find_definition_for_name(ctx.context_heap, expression_type_context_idx, member.identifier[:])
 
-					this_type := ctx.ast[ctx.context_heap[actual_member_context.parent].node]
+					this_type := ctx.ast[expression_type_context.node]
 					if this_type.kind != .Struct && this_type.kind != .Union && this_type.kind != .Enum {
-						panic(fmt.tprintf("Unexpected this type %v for %", this_type, member.identifier))
+						panic(fmt.tprintf("Unexpected expression type %v for %", this_type, member.identifier))
 					}
 
 					str.write_string(&ctx.result, actual_member_context.complete_name)
@@ -1366,14 +1365,16 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 		}
 	}
 
-	strip_type :: proc(output : ^[dynamic]Token, input : TokenRange)
+	strip_type :: proc(input : TokenRange) -> (output : [dynamic]Token)
 	{
+		output = make([dynamic]Token, 0, len(input))
+
 		generic_depth := 0
 		for token in input {
 			#partial switch token.kind {
 				case .Identifier:
 					if generic_depth == 0 && token.source != "const" {
-						append(output, token)
+						append(&output, token)
 					}
 					
 				case .BracketTriangleOpen:
@@ -1382,9 +1383,11 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 					generic_depth -= 1
 			}
 		}
+
+		return
 	}
 
-	resolve_type :: proc(ctx : ^ConverterContext, current_node_index : AstNodeIndex, name_context : NameContextIndex) -> (root, leaf : ^NameContext)
+	resolve_type :: proc(ctx : ^ConverterContext, current_node_index : AstNodeIndex, name_context : NameContextIndex) -> (TokenRange, NameContextIndex)
 	{
 		current_node := ctx.ast[current_node_index]
 		#partial switch current_node.kind {
@@ -1400,29 +1403,52 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 			case .ExprUnaryRight:
 				return resolve_type(ctx, current_node.unary_right.left, name_context)
 
+			case .ExprIndex:
+				indexed_type, expression_context := resolve_type(ctx, current_node.index.array_expression, name_context)
+				if last(indexed_type).kind == .Star {
+					// ptr index
+					return indexed_type[:len(indexed_type) - 1], expression_context // slice of one layer of 
+				}
+				else { // assume the type is indexable and look for a matchin operator
+					indexed_type_stripped := strip_type(indexed_type)
+					_, structure_def := find_definition_for_name(ctx.context_heap, name_context, indexed_type_stripped[:])
+					structure_node := ctx.ast[structure_def.node]
+					assert(structure_node.kind == .Struct || structure_node.kind == .Union)
+
+					for mi in structure_node.structure.members {
+						member := ctx.ast[mi]
+						if member.kind != .OperatorDefinition || member.operator_def.kind != .Index { continue }
+
+						ri := ctx.ast[member.operator_def.underlying_function].function_def.return_type
+						type := ctx.ast[ri].type[:]
+						type_stripped := strip_type(type)
+						_, type_context := find_definition_for_name(ctx.context_heap, name_context, type_stripped[:])
+
+						return type, transmute(NameContextIndex) mem.ptr_sub(type_context, &ctx.context_heap[0])
+					}
+				}
+
 			case .MemberAccess:
 				member_access := current_node.member_access
-				_, this_context := resolve_type(ctx, member_access.expression, name_context)
-				this_idx := transmute(NameContextIndex) mem.ptr_sub(this_context, &ctx.context_heap[0])
+				expr_type, expr_type_context_idx := resolve_type(ctx, member_access.expression, name_context)
 
 				member := ctx.ast[member_access.member]
 				#partial switch member.kind {
 					case .Identifier:
-						return resolve_type(ctx, member_access.member, this_idx)
+						return resolve_type(ctx, member_access.member, expr_type_context_idx)
 
 					case .FunctionCall:
-						fndef_idx := this_context.definitions[last(member.function_call.qualified_name[:]).source]
+						fndef_idx := ctx.context_heap[expr_type_context_idx].definitions[last(member.function_call.qualified_name[:]).source]
 						fndef_ctx := ctx.context_heap[fndef_idx]
 
 						assert_eq(ctx.ast[fndef_ctx.node].kind, AstNodeKind.FunctionDefinition)
 						fndef := ctx.ast[fndef_ctx.node].function_def
 
-						return_type := ctx.ast[fndef.return_type].type
+						type := ctx.ast[fndef.return_type].type[:]
+						type_stripped := strip_type(type)
+						_, type_context := find_definition_for_name(ctx.context_heap, name_context, type_stripped[:])
 
-						stripped_type := make([dynamic]Token, 0, len(return_type), context.temp_allocator)
-						strip_type(&stripped_type, return_type[:])
-
-						return find_definition_for_name(ctx.context_heap, this_idx, stripped_type[:])
+						return type, transmute(NameContextIndex) mem.ptr_sub(type_context, &ctx.context_heap[0])
 
 					case:
 						panic(fmt.tprintf("Not implemented %v", member))
@@ -1431,18 +1457,16 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 			case .VariableDeclaration:
 				def_node := current_node.var_declaration
 
-				stripped_type := make([dynamic]Token, 0, len(ctx.ast[def_node.type].type), context.temp_allocator)
-				strip_type(&stripped_type, ctx.ast[def_node.type].type[:])
+				type := ctx.ast[def_node.type].type[:]
 
-				if last(stripped_type[:]).source == "auto" {
+				if type[0].source == "auto" {
 					panic("auto resolver not implemented");
 				}
 
-				return find_definition_for_name(ctx.context_heap, name_context, stripped_type[:])
+				type_stripped := strip_type(type)
+				_, type_context := find_definition_for_name(ctx.context_heap, name_context, type_stripped[:])
 
-			// case .FunctionCall:
-			// 	fncall := current_node.function_call
-			// 	fncall.
+				return type, transmute(NameContextIndex) mem.ptr_sub(type_context, &ctx.context_heap[0])
 
 			case:
 				panic(fmt.tprintf("Not implemented %v", current_node))

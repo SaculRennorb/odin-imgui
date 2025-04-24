@@ -130,7 +130,7 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 				og_name_context := name_context
 				name_context := name_context
 
-				_, forward_declared_context := try_find_definition_for_name(&ctx.context_heap, name_context, structure.name)
+				_, forward_declared_context := try_find_definition_for_name(ctx.context_heap, name_context, structure.name)
 				if forward_declared_context != nil {
 					forward_declaration := ctx.ast[forward_declared_context.node]
 					assert_eq(forward_declaration.kind, AstNodeKind.Enum)
@@ -355,25 +355,37 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 			case .MemberAccess:
 				member := ctx.ast[current_node.member_access.member]
 
-				_, this_context := resolve_type(ctx, current_node.member_access.expression, name_context)
-				this_idx := transmute(NameContextIndex) mem.ptr_sub(this_context, &ctx.context_heap[0])
+				_, this_type_context := resolve_type(ctx, current_node.member_access.expression, name_context)
+				this_idx := transmute(NameContextIndex) mem.ptr_sub(this_type_context, &ctx.context_heap[0])
 
 				if member.kind == .FunctionCall {
 					fncall := member.function_call
 
-					is_ptr := current_node.member_access.through_pointer
+					this_type := ctx.ast[this_type_context.node]
+					structure_name : []Token
+					#partial switch this_type.kind { // TODO(Rennorb) @cleanup
+						case .Struct, .Union:
+							structure_name = this_type.structure.name
+						case .VariableDeclaration:
+							structure_name = {this_type.var_declaration.var_name}
+					}
+					if len(structure_name) > 0 && last(structure_name).source == last(member.function_call.qualified_name[:]).source {
+						str.write_string(&ctx.result, member.function_call.is_destructor ? "deinit" : "init")
+					}
+					else {
+						if this_type_context.parent != {} {
+							containing_scope := ctx.ast[ctx.context_heap[this_type_context.parent].node]
+							if containing_scope.kind == .Namespace {
+								str.write_string(&ctx.result, containing_scope.namespace.name.source)
+								str.write_byte(&ctx.result, '_')
+							}
+						}
 
-					// maybe find basetype for this member
-					_, actual_member_context := find_definition_for_name(&ctx.context_heap, this_idx, fncall.qualified_name[:])
-
-					this_type := ctx.ast[ctx.context_heap[actual_member_context.parent].node]
-					if this_type.kind != .Struct {
-						panic(fmt.tprintf("Unexpected this type %v for %", this_type, fncall))
+						write_token_range(&ctx.result, fncall.qualified_name[:])
 					}
 
-					str.write_string(&ctx.result, actual_member_context.complete_name)
 					str.write_byte(&ctx.result, '(')
-					if !is_ptr { str.write_byte(&ctx.result, '&') }
+					if !current_node.member_access.through_pointer { str.write_byte(&ctx.result, '&') }
 					write_node(ctx, current_node.member_access.expression, name_context)
 					for aidx, i in fncall.arguments {
 						str.write_string(&ctx.result, ", ")
@@ -386,7 +398,7 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 					str.write_byte(&ctx.result, '.')
 
 					// maybe find basetype for this member
-					_, actual_member_context := find_definition_for_name(&ctx.context_heap, this_idx, member.identifier[:])
+					_, actual_member_context := find_definition_for_name(ctx.context_heap, this_idx, member.identifier[:])
 
 					this_type := ctx.ast[ctx.context_heap[actual_member_context.parent].node]
 					if this_type.kind != .Struct && this_type.kind != .Union && this_type.kind != .Enum {
@@ -412,7 +424,7 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 				write_node(ctx, current_node.tenary.false_expression, name_context)
 
 			case .Identifier:
-				_, def := find_definition_for_name(&ctx.context_heap, name_context, current_node.identifier[:])
+				_, def := find_definition_for_name(ctx.context_heap, name_context, current_node.identifier[:])
 				parent := ctx.ast[ctx.context_heap[def.parent].node]
 
 				if ((parent.kind == .Struct || parent.kind == .Union) && .Static not_in ctx.ast[def.node].var_declaration.flags) {
@@ -668,7 +680,7 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 		og_name_context := name_context
 		name_context := name_context
 
-		_, forward_declared_context := try_find_definition_for_name(&ctx.context_heap, name_context, structure.name)
+		_, forward_declared_context := try_find_definition_for_name(ctx.context_heap, name_context, structure.name)
 		if forward_declared_context != nil {
 			forward_declaration := ctx.ast[forward_declared_context.node]
 			assert(forward_declaration.kind == .Struct || forward_declaration.kind == .Union)
@@ -778,6 +790,33 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 			str.write_string(&ctx.result, indent_str); str.write_byte(&ctx.result, '}')
 		}
 
+		if (structure.deinitializer != {} && .ForwardDeclaration not_in ctx.ast[structure.deinitializer].function_def.flags) {
+			deinitializer := ctx.ast[structure.deinitializer]
+
+			complete_deinitializer_name := str.concatenate({ complete_structure_name, "_deinit" })
+			name_context := insert_new_definition(&ctx.context_heap, name_context, last(deinitializer.function_def.function_name[:]).source, structure.deinitializer, complete_deinitializer_name)
+			insert_new_overload(ctx, "deinit", complete_deinitializer_name)
+
+			context_heap_reset := len(&ctx.context_heap) // keep fn as leaf node
+			defer {
+				clear(&ctx.context_heap[name_context].definitions)
+				resize(&ctx.context_heap, context_heap_reset)
+			}
+
+			insert_new_definition(&ctx.context_heap, name_context, "this", -1, "this")
+
+			str.write_string(&ctx.result, "\n\n")
+			str.write_string(&ctx.result, indent_str);
+			str.write_string(&ctx.result, complete_deinitializer_name);
+			str.write_string(&ctx.result, " :: proc(this : ^")
+			str.write_string(&ctx.result, complete_structure_name);
+			str.write_string(&ctx.result, ")\n")
+
+			str.write_string(&ctx.result, indent_str); str.write_string(&ctx.result, "{")
+			write_node_sequence(ctx, deinitializer.function_def.body_sequence[:], name_context, member_indent_str)
+			str.write_string(&ctx.result, indent_str); str.write_byte(&ctx.result, '}')
+		}
+
 		for midx in structure.members {
 			#partial switch ctx.ast[midx].kind {
 				case .FunctionDefinition:
@@ -822,7 +861,7 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 		name_context = name_context_
 		if structure.base_type != nil {
 			// copy over defs from base type, using their location
-			_, base_context := find_definition_for_name(&ctx.context_heap, name_context, structure.base_type)
+			_, base_context := find_definition_for_name(ctx.context_heap, name_context, structure.base_type)
 
 			base_member_name := str.concatenate({ "__base_", str.to_lower(structure.base_type[len(structure.base_type) - 1].source, context.temp_allocator) })
 			name_context = transmute(NameContextIndex) append_return_index(&ctx.context_heap, NameContext{
@@ -1194,7 +1233,7 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 
 		assert_eq(len(fn_node.function_name), 1)
 		// fold attached comments form forward declaration. This also works when chaining forward declarations
-		_, forward_declared_context := try_find_definition_for_name(&ctx.context_heap, name_context, fn_node.function_name[:])
+		_, forward_declared_context := try_find_definition_for_name(ctx.context_heap, name_context, fn_node.function_name[:])
 		if forward_declared_context != nil {
 			forward_declaration := ctx.ast[forward_declared_context.node]
 			assert_eq(forward_declaration.kind, AstNodeKind.FunctionDefinition)
@@ -1350,7 +1389,7 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 		current_node := ctx.ast[current_node_index]
 		#partial switch current_node.kind {
 			case .Identifier:
-				_, var_def := find_definition_for_name(&ctx.context_heap, name_context, current_node.identifier[:])
+				_, var_def := find_definition_for_name(ctx.context_heap, name_context, current_node.identifier[:])
 				assert_eq(ctx.ast[var_def.node].kind, AstNodeKind.VariableDeclaration)
 
 				return resolve_type(ctx, var_def.node, var_def.parent)
@@ -1383,7 +1422,7 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 						stripped_type := make([dynamic]Token, 0, len(return_type), context.temp_allocator)
 						strip_type(&stripped_type, return_type[:])
 
-						return find_definition_for_name(&ctx.context_heap, this_idx, stripped_type[:])
+						return find_definition_for_name(ctx.context_heap, this_idx, stripped_type[:])
 
 					case:
 						panic(fmt.tprintf("Not implemented %v", member))
@@ -1399,7 +1438,7 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 					panic("auto resolver not implemented");
 				}
 
-				return find_definition_for_name(&ctx.context_heap, name_context, stripped_type[:])
+				return find_definition_for_name(ctx.context_heap, name_context, stripped_type[:])
 
 			// case .FunctionCall:
 			// 	fncall := current_node.function_call
@@ -1610,7 +1649,7 @@ insert_new_overload :: proc(ctx : ^ConverterContext, name, overload : string)
 	append(overlaods, overload)
 }
 
-find_definition_for_name :: proc(context_heap : ^[dynamic]NameContext, current_index : NameContextIndex, compound_identifier : TokenRange, loc := #caller_location) -> (root_context, name_context : ^NameContext)
+find_definition_for_name :: proc(context_heap : [dynamic]NameContext, current_index : NameContextIndex, compound_identifier : TokenRange, loc := #caller_location) -> (root_context, name_context : ^NameContext)
 {
 	root_context, name_context = try_find_definition_for_name(context_heap, current_index, compound_identifier)
 	if name_context != nil { return }
@@ -1619,7 +1658,7 @@ find_definition_for_name :: proc(context_heap : ^[dynamic]NameContext, current_i
 	panic(fmt.tprintf("%v : '%v' was not found in context", compound_identifier[0].location, compound_identifier), loc)
 }
 
-try_find_definition_for_name :: proc(context_heap : ^[dynamic]NameContext, current_index : NameContextIndex, compound_identifier : TokenRange) -> (root_context, name_context : ^NameContext)
+try_find_definition_for_name :: proc(context_heap : [dynamic]NameContext, current_index : NameContextIndex, compound_identifier : TokenRange) -> (root_context, name_context : ^NameContext)
 {
 	im_root_context := &context_heap[current_index]
 

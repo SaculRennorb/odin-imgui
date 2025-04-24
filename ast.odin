@@ -1526,7 +1526,12 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 					member_name, ns := peek_token(tokens)
 
 					member_node : AstNode
-					if n, nns := peek_token(&ns); n.kind == .BracketRoundOpen {
+					if member_name.kind == .Tilde {
+						tokens^ = ns // skip ~
+						member_node = ast_parse_function_call(ctx, tokens) or_return
+						member_node.function_call.is_destructor = true
+					}
+					else if n, _ := peek_token(&ns); n.kind == .BracketRoundOpen {
 						member_node = ast_parse_function_call(ctx, tokens) or_return
 					}
 					else {
@@ -2023,6 +2028,7 @@ AstNode :: struct {
 		function_call : struct {
 			qualified_name : [dynamic]Token,
 			arguments : [dynamic]AstNodeIndex,
+			is_destructor : bool,
 		},
 		operator_call : struct {
 			kind : AstOverloadedOp,

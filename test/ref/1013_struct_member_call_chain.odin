@@ -13,5 +13,5 @@ B1013_B :: proc(this : ^B1013) -> ^A1013 { return nil }
 fn1013 :: proc()
 {
 	b : B1013
-	c : i32 = A1013_A(B1013_B(&b))
+	c : i32 = A(B(&b))
 }

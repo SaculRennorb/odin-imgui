@@ -51,7 +51,7 @@ ImGuiDockNodeFlagsPrivate_ :: enum i32 {
 	ImGuiDockNodeFlags_SavedFlagsMask_ = ImGuiDockNodeFlags_NoResizeFlagsMask_ | ImGuiDockNodeFlags_DockSpace | ImGuiDockNodeFlags_CentralNode | ImGuiDockNodeFlags_NoTabBar | ImGuiDockNodeFlags_HiddenTabBar | ImGuiDockNodeFlags_NoWindowMenuButton | ImGuiDockNodeFlags_NoCloseButton,
 }
 
-ImVector :: struct(T : typeid) {
+ImVector :: struct($T : typeid) {
 	Data : ^T,
 	Size : i32,
 }

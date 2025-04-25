@@ -1,6 +1,6 @@
 package test
 
-A1305 :: struct(T : typeid, T2 : typeid) {
+A1305 :: struct($T : typeid, $T2 : typeid) {
 	t : T,
 }
 

@@ -130,7 +130,7 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 				og_name_context := name_context
 				name_context := name_context
 
-				_, forward_declared_context := try_find_definition_for_name(ctx.context_heap, name_context, structure.name)
+				_, forward_declared_context := try_find_definition_for_name(ctx, name_context, structure.name)
 				if forward_declared_context != nil {
 					forward_declaration := ctx.ast[forward_declared_context.node]
 					assert_eq(forward_declaration.kind, AstNodeKind.Enum)
@@ -397,11 +397,11 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 					write_node(ctx, current_node.member_access.expression, name_context)
 					str.write_byte(&ctx.result, '.')
 
-					_, actual_member_context := find_definition_for_name(ctx.context_heap, expression_type_context_idx, member.identifier[:])
+					_, actual_member_context := find_definition_for_name(ctx, expression_type_context_idx, member.identifier[:])
 
 					this_type := ctx.ast[expression_type_context.node]
 					if this_type.kind != .Struct && this_type.kind != .Union && this_type.kind != .Enum {
-						panic(fmt.tprintf("Unexpected expression type %v for %v", this_type, member.identifier))
+						panic(fmt.tprintf("Unexpected expression type %#v for %v", this_type, member.identifier))
 					}
 
 					str.write_string(&ctx.result, actual_member_context.complete_name)
@@ -423,7 +423,7 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 				write_node(ctx, current_node.tenary.false_expression, name_context)
 
 			case .Identifier:
-				_, def := find_definition_for_name(ctx.context_heap, name_context, current_node.identifier[:])
+				_, def := find_definition_for_name(ctx, name_context, current_node.identifier[:])
 				parent := ctx.ast[ctx.context_heap[def.parent].node]
 
 				if ((parent.kind == .Struct || parent.kind == .Union) && .Static not_in ctx.ast[def.node].var_declaration.flags) {
@@ -679,7 +679,7 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 		og_name_context := name_context
 		name_context := name_context
 
-		_, forward_declared_context := try_find_definition_for_name(ctx.context_heap, name_context, structure.name)
+		_, forward_declared_context := try_find_definition_for_name(ctx, name_context, structure.name)
 		if forward_declared_context != nil {
 			forward_declaration := ctx.ast[forward_declared_context.node]
 			assert(forward_declaration.kind == .Struct || forward_declaration.kind == .Union)
@@ -750,6 +750,19 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 			str.write_string(&ctx.result, complete_initializer_name);
 			str.write_string(&ctx.result, " :: proc(this : ^")
 			str.write_string(&ctx.result, complete_structure_name);
+			if len(structure.template_spec) > 0 {
+				str.write_byte(&ctx.result, '(')
+				for ti, i in structure.template_spec {
+					if i > 0 { str.write_string(&ctx.result, ", ") }
+
+					type_var := ctx.ast[ti]
+					assert_eq(type_var.kind, AstNodeKind.VariableDeclaration)
+
+					str.write_byte(&ctx.result, '$')
+					str.write_string(&ctx.result, type_var.var_declaration.var_name.source)
+				}
+				str.write_byte(&ctx.result, ')')
+			}
 			if initializer.kind == .FunctionDefinition && .ForwardDeclaration not_in initializer.function_def.flags {
 				for nidx, i in initializer.function_def.arguments {
 					str.write_string(&ctx.result, ", ")
@@ -847,6 +860,7 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 			str.write_byte(&ctx.result, '(')
 			for ti, i in structure.template_spec {
 				if i > 0 { str.write_string(&ctx.result, ", ") }
+				str.write_byte(&ctx.result, '$')
 				write_node(ctx, ti, name_context)
 			}
 			str.write_byte(&ctx.result, ')')
@@ -860,7 +874,7 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 		name_context = name_context_
 		if structure.base_type != nil {
 			// copy over defs from base type, using their location
-			_, base_context := find_definition_for_name(ctx.context_heap, name_context, structure.base_type)
+			_, base_context := find_definition_for_name(ctx, name_context, structure.base_type)
 
 			base_member_name := str.concatenate({ "__base_", str.to_lower(structure.base_type[len(structure.base_type) - 1].source, context.temp_allocator) })
 			name_context = transmute(NameContextIndex) append_return_index(&ctx.context_heap, NameContext{
@@ -1232,7 +1246,7 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 
 		assert_eq(len(fn_node.function_name), 1)
 		// fold attached comments form forward declaration. This also works when chaining forward declarations
-		_, forward_declared_context := try_find_definition_for_name(ctx.context_heap, name_context, fn_node.function_name[:])
+		_, forward_declared_context := try_find_definition_for_name(ctx, name_context, fn_node.function_name[:], { .Function })
 		if forward_declared_context != nil {
 			forward_declaration := ctx.ast[forward_declared_context.node]
 			assert_eq(forward_declaration.kind, AstNodeKind.FunctionDefinition)
@@ -1398,7 +1412,7 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 		current_node := ctx.ast[current_node_index]
 		#partial switch current_node.kind {
 			case .Identifier:
-				_, var_def := find_definition_for_name(ctx.context_heap, name_context, current_node.identifier[:])
+				_, var_def := find_definition_for_name(ctx, name_context, current_node.identifier[:])
 				assert_eq(ctx.ast[var_def.node].kind, AstNodeKind.VariableDeclaration)
 
 				return resolve_type(ctx, var_def.node, var_def.parent)
@@ -1417,7 +1431,7 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 				}
 				else { // assume the type is indexable and look for a matchin operator
 					indexed_type_stripped := strip_type(indexed_type)
-					_, structure_def := find_definition_for_name(ctx.context_heap, name_context, indexed_type_stripped[:])
+					_, structure_def := find_definition_for_name(ctx, name_context, indexed_type_stripped[:])
 					structure_node := ctx.ast[structure_def.node]
 					assert(structure_node.kind == .Struct || structure_node.kind == .Union)
 
@@ -1428,7 +1442,7 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 						ri := ctx.ast[member.operator_def.underlying_function].function_def.return_type
 						type := ctx.ast[ri].type[:]
 						type_stripped := strip_type(type)
-						_, type_context := find_definition_for_name(ctx.context_heap, name_context, type_stripped[:])
+						_, type_context := find_definition_for_name(ctx, name_context, type_stripped[:])
 
 						return type, transmute(NameContextIndex) mem.ptr_sub(type_context, &ctx.context_heap[0])
 					}
@@ -1452,7 +1466,7 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 
 						type := ctx.ast[fndef.return_type].type[:]
 						type_stripped := strip_type(type)
-						_, type_context := find_definition_for_name(ctx.context_heap, name_context, type_stripped[:])
+						_, type_context := find_definition_for_name(ctx, name_context, type_stripped[:])
 
 						return type, transmute(NameContextIndex) mem.ptr_sub(type_context, &ctx.context_heap[0])
 
@@ -1470,7 +1484,7 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 				}
 
 				type_stripped := strip_type(type)
-				_, type_context := find_definition_for_name(ctx.context_heap, name_context, type_stripped[:])
+				_, type_context := find_definition_for_name(ctx, name_context, type_stripped[:], {.Type})
 
 				return type, transmute(NameContextIndex) mem.ptr_sub(type_context, &ctx.context_heap[0])
 
@@ -1480,184 +1494,184 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 
 		unreachable();
 	}
+}
 
-	translate_type :: proc(output : ^[dynamic]TypeSegment, ast : []AstNode, input : ^TokenRange)
+translate_type :: proc(output : ^[dynamic]TypeSegment, ast : []AstNode, input : ^TokenRange)
+{
+	transform_from_short :: proc(output : ^[dynamic]TypeSegment, input : TokenRange, $prefix : string) -> (remaining_input : TokenRange)
 	{
-		transform_from_short :: proc(output : ^[dynamic]TypeSegment, input : TokenRange, $prefix : string) -> (remaining_input : TokenRange)
-		{
-			if len(input) == 0 || input[0].kind != .Identifier { // short, short*
-				remaining_input = input
-				append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = prefix+"16" } })
-			}
-			else if input[0].source == "int" { // short int
+		if len(input) == 0 || input[0].kind != .Identifier { // short, short*
+			remaining_input = input
+			append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = prefix+"16" } })
+		}
+		else if input[0].source == "int" { // short int
+			remaining_input = input[1:]
+			append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = prefix+"16" } })
+		}
+		else {
+			panic("Failed to transform "+prefix+" short");
+		}
+
+		return
+	}
+
+	transform_from_long :: proc(output : ^[dynamic]TypeSegment, input : TokenRange, $prefix : string) -> (remaining_input : TokenRange)
+	{
+		if len(input) == 0 || input[0].kind != .Identifier { // long, long*
+			remaining_input = input
+			append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = prefix+"32" } })
+		}
+		else if input[0].source == "int" { // long int
+			remaining_input = input[1:]
+			append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = prefix+"32" } })
+		}
+		else if input[0].source == "long" { // long long
+			if len(input) == 1 || input[1].kind != .Identifier { // long long, long long*
 				remaining_input = input[1:]
-				append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = prefix+"16" } })
+				append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = prefix+"64" } })
 			}
-			else {
-				panic("Failed to transform "+prefix+" short");
-			}
-
-			return
-		}
-
-		transform_from_long :: proc(output : ^[dynamic]TypeSegment, input : TokenRange, $prefix : string) -> (remaining_input : TokenRange)
-		{
-			if len(input) == 0 || input[0].kind != .Identifier { // long, long*
-				remaining_input = input
-				append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = prefix+"32" } })
-			}
-			else if input[0].source == "int" { // long int
-				remaining_input = input[1:]
-				append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = prefix+"32" } })
-			}
-			else if input[0].source == "long" { // long long
-				if len(input) == 1 || input[1].kind != .Identifier { // long long, long long*
-					remaining_input = input[1:]
-					append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = prefix+"64" } })
-				}
-				else if input[1].source == "int" { // long long int
-					remaining_input = input[2:]
-					append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = prefix+"64" } })
-				}
-			}
-			else {
-				panic("Failed to transform "+prefix+" long");
-			}
-			return
-		}
-
-		try_atach_generic_parameters :: proc(params : ^[dynamic][dynamic]TypeSegment, ast : []AstNode, input : ^TokenRange)
-		{
-			next, ns := peek_token(input)
-			if next.kind != .BracketTriangleOpen { return }
-
-			input^ = ns
-			for {
-				next, ns = peek_token(input)
-				#partial switch next.kind {
-					case .BracketTriangleClose:
-						input^ = ns
-						return
-
-					case .Comma:
-						input^ = ns
-						continue
-
-					case:
-						p : [dynamic]TypeSegment
-						translate_type(&p, ast, input)
-						append(params, p)
-				}
+			else if input[1].source == "int" { // long long int
+				remaining_input = input[2:]
+				append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = prefix+"64" } })
 			}
 		}
+		else {
+			panic("Failed to transform "+prefix+" long");
+		}
+		return
+	}
 
-		for len(input) > 0 {
-			#partial switch input[0].kind {
-				case .Identifier:
-					switch input[0].source {
-						case "const":
-							input^ = input[1:]
+	try_atach_generic_parameters :: proc(params : ^[dynamic][dynamic]TypeSegment, ast : []AstNode, input : ^TokenRange)
+	{
+		next, ns := peek_token(input)
+		if next.kind != .BracketTriangleOpen { return }
 
-						case "signed":
-							switch input[1].source {
-								case "char":
-									input^ = input[2:]
-									append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = "i8" } })
+		input^ = ns
+		for {
+			next, ns = peek_token(input)
+			#partial switch next.kind {
+				case .BracketTriangleClose:
+					input^ = ns
+					return
 
-								case "int":
-									input^ = input[2:]
-									append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = "i32" } })
-
-								case "short":
-									input^ = transform_from_short(output, input[2:], "i")
-
-								case "long":
-									input^ = transform_from_long(output, input[2:], "i")
-							}
-
-						case "unsigned":
-							switch input[1].source {
-								case "char":
-									input^ = input[2:]
-									append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = "u8" } })
-
-								case "int":
-									input^ = input[2:]
-									append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = "u32" } })
-
-								case "short":
-									input^ = transform_from_short(output, input[2:], "u")
-
-								case "long":
-									input^ = transform_from_long(output, input[2:], "u")
-							}
-
-						case "char":
-							input^ = input[1:]
-							append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = "u8" } }) // funny implementation defined singnedness, interpret as unsigned
-
-						case "int":
-							input^ = input[1:]
-							append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = "i32" } })
-
-						case "short":
-							input^ = transform_from_short(output, input[1:], "i")
-
-						case "long":
-							input^ = transform_from_long(output, input[1:], "i")
-
-						case "float":
-							input^ = input[1:]
-							append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = "f32" } })
-
-						case "double":
-							input^ = input[1:]
-							append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = "f64" } })
-
-						case "size_t":
-							input^ = input[1:]
-							append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = "uint" } })
-
-						case "ptrdiff_t":
-							input^ = input[1:]
-							append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = "int" } })
-
-						case "typename", "class":
-							input^ = input[1:]
-							append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = "typeid" } })
-
-						case:
-							frag := _TypeFragment{ identifier = input[0] }
-							input^ = input[1:]
-							try_atach_generic_parameters(&frag.generic_arguments, ast, input)
-							append(output, frag)
-					}
-
-				case .Class:
-					input^ = input[1:]
-					append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = "typeid" } })
-
-				case .Star, .Ampersand:
-					input^ = input[1:]
-					inject_at(output, 0, _TypePtr{})
-
-				case .AstNode: // used for array expression for now
-					if input[0].location.column != {} {
-						length_expression := transmute(AstNodeIndex) input[0].location.column
-						inject_at(output, 0, _TypeArray{ length_expression })
-					}
-					else{
-						inject_at(output, 0, _TypeMultiptr{})
-					}
-					input^ = input[1:]
-
-				case .StaticScopingOperator:
-					input^ = input[1:]
-					// just eat the token and dont copy it over
+				case .Comma:
+					input^ = ns
+					continue
 
 				case:
-					return
+					p : [dynamic]TypeSegment
+					translate_type(&p, ast, input)
+					append(params, p)
 			}
+		}
+	}
+
+	for len(input) > 0 {
+		#partial switch input[0].kind {
+			case .Identifier:
+				switch input[0].source {
+					case "const":
+						input^ = input[1:]
+
+					case "signed":
+						switch input[1].source {
+							case "char":
+								input^ = input[2:]
+								append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = "i8" } })
+
+							case "int":
+								input^ = input[2:]
+								append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = "i32" } })
+
+							case "short":
+								input^ = transform_from_short(output, input[2:], "i")
+
+							case "long":
+								input^ = transform_from_long(output, input[2:], "i")
+						}
+
+					case "unsigned":
+						switch input[1].source {
+							case "char":
+								input^ = input[2:]
+								append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = "u8" } })
+
+							case "int":
+								input^ = input[2:]
+								append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = "u32" } })
+
+							case "short":
+								input^ = transform_from_short(output, input[2:], "u")
+
+							case "long":
+								input^ = transform_from_long(output, input[2:], "u")
+						}
+
+					case "char":
+						input^ = input[1:]
+						append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = "u8" } }) // funny implementation defined singnedness, interpret as unsigned
+
+					case "int":
+						input^ = input[1:]
+						append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = "i32" } })
+
+					case "short":
+						input^ = transform_from_short(output, input[1:], "i")
+
+					case "long":
+						input^ = transform_from_long(output, input[1:], "i")
+
+					case "float":
+						input^ = input[1:]
+						append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = "f32" } })
+
+					case "double":
+						input^ = input[1:]
+						append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = "f64" } })
+
+					case "size_t":
+						input^ = input[1:]
+						append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = "uint" } })
+
+					case "ptrdiff_t":
+						input^ = input[1:]
+						append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = "int" } })
+
+					case "typename", "class":
+						input^ = input[1:]
+						append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = "typeid" } })
+
+					case:
+						frag := _TypeFragment{ identifier = input[0] }
+						input^ = input[1:]
+						try_atach_generic_parameters(&frag.generic_arguments, ast, input)
+						append(output, frag)
+				}
+
+			case .Class:
+				input^ = input[1:]
+				append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = "typeid" } })
+
+			case .Star, .Ampersand:
+				input^ = input[1:]
+				inject_at(output, 0, _TypePtr{})
+
+			case .AstNode: // used for array expression for now
+				if input[0].location.column != {} {
+					length_expression := transmute(AstNodeIndex) input[0].location.column
+					inject_at(output, 0, _TypeArray{ length_expression })
+				}
+				else{
+					inject_at(output, 0, _TypeMultiptr{})
+				}
+				input^ = input[1:]
+
+			case .StaticScopingOperator:
+				input^ = input[1:]
+				// just eat the token and dont copy it over
+
+			case:
+				return
 		}
 	}
 }
@@ -1708,18 +1722,26 @@ insert_new_overload :: proc(ctx : ^ConverterContext, name, overload : string)
 	append(overlaods, overload)
 }
 
-find_definition_for_name :: proc(context_heap : [dynamic]NameContext, current_index : NameContextIndex, compound_identifier : TokenRange, loc := #caller_location) -> (root_context, name_context : ^NameContext)
+DefinitionFilter :: bit_set[DefinitionKind]
+DefinitionKind :: enum {
+	Type,
+	Function,
+	Variable,
+}
+DeffinitionFilterAll := all(DefinitionFilter)
+
+find_definition_for_name :: proc(ctx : ^ConverterContext, current_index : NameContextIndex, compound_identifier : TokenRange, filter := DeffinitionFilterAll, loc := #caller_location) -> (root_context, name_context : ^NameContext)
 {
-	root_context, name_context = try_find_definition_for_name(context_heap, current_index, compound_identifier)
+	root_context, name_context = try_find_definition_for_name(ctx, current_index, compound_identifier, filter)
 	if name_context != nil { return }
 
-	dump_context_stack(context_heap[:], current_index)
-	panic(fmt.tprintf("%v : '%v' was not found in context", compound_identifier[0].location, compound_identifier), loc)
+	dump_context_stack(ctx, current_index, ctx.context_heap[current_index].complete_name)
+	panic(fmt.tprintf("%v : %v '%v' was not found in context", compound_identifier[0].location, filter, compound_identifier), loc)
 }
 
-try_find_definition_for_name :: proc(context_heap : [dynamic]NameContext, current_index : NameContextIndex, compound_identifier : TokenRange) -> (root_context, name_context : ^NameContext)
+try_find_definition_for_name :: proc(ctx : ^ConverterContext, current_index : NameContextIndex, compound_identifier : TokenRange, filter := DeffinitionFilterAll) -> (root_context, name_context : ^NameContext)
 {
-	im_root_context := &context_heap[current_index]
+	im_root_context := &ctx.context_heap[current_index]
 
 	ctx_stack: for {
 		current_context := im_root_context
@@ -1728,15 +1750,45 @@ try_find_definition_for_name :: proc(context_heap : [dynamic]NameContext, curren
 			child_idx, exists := current_context.definitions[segment.source]
 			if !exists {
 				if im_root_context.parent == -1 { break ctx_stack }
-
-				im_root_context = &context_heap[im_root_context.parent]
-
+				im_root_context = &ctx.context_heap[im_root_context.parent]
 				continue ctx_stack
 			}
 
-			current_context = &context_heap[child_idx]
+			
+			current_context = &ctx.context_heap[child_idx]
 		}
 
+		#partial switch ctx.ast[current_context.node].kind {
+			case .Struct, .Union, .Enum, .Type:
+				if .Type not_in filter {
+					if im_root_context.parent == -1 { break ctx_stack }
+					im_root_context = &ctx.context_heap[im_root_context.parent]
+					continue ctx_stack
+				}
+			case .FunctionDefinition, .OperatorDefinition:
+				if .Function not_in filter {
+					if im_root_context.parent == -1 { break ctx_stack }
+					im_root_context = &ctx.context_heap[im_root_context.parent]
+					continue ctx_stack
+				}
+			case .VariableDeclaration:
+				is_type :: proc(ctx : ^ConverterContext, current_context : ^NameContext) -> (is_type : bool)
+				{
+					ti := ctx.ast[current_context.node].var_declaration.type
+					type := ctx.ast[ti].type[:]
+					translated : [dynamic]TypeSegment
+					translate_type(&translated, ctx.ast, &type)
+					_, is_type = translated[0].(_TypeFragment)
+					delete(translated)
+					return
+				}
+				if .Variable not_in filter && (.Type not_in filter || !is_type(ctx, current_context)) {
+					if im_root_context.parent == -1 { break ctx_stack }
+					im_root_context = &ctx.context_heap[im_root_context.parent]
+					continue ctx_stack
+				}
+		}
+		
 		return im_root_context, current_context
 	}
 
@@ -1783,11 +1835,11 @@ fmt_name_ctx_idx :: proc(fi: ^fmt.Info, idx: ^NameContextIndex, verb: rune) -> b
 
 
 
-dump_context_stack :: proc(context_heap : []NameContext, name_context_idx : NameContextIndex, name := "", indent := " ", return_at : NameContextIndex = -1)
+dump_context_stack :: proc(ctx : ^ConverterContext, name_context_idx : NameContextIndex, name := "", indent := " ", return_at : NameContextIndex = -1)
 {
-	name_context := context_heap[name_context_idx]
+	name_context := ctx.context_heap[name_context_idx]
 	
-	fmt.eprintf("#%3v %v%v -> ", transmute(int)name_context_idx, indent, name);
+	fmt.eprintf("#%3v %v%v\t\t-> %v | ", transmute(int)name_context_idx, indent, name, name_context.node >= 0 ? ctx.ast[name_context.node].kind : AstNodeKind{});
 
 	if len(name_context.definitions) == 0 {
 		fmt.eprintf("<leaf>\n");
@@ -1797,14 +1849,14 @@ dump_context_stack :: proc(context_heap : []NameContext, name_context_idx : Name
 
 		indent := str.concatenate({ indent, "  " }, context.temp_allocator)
 		for name, didx in name_context.definitions {
-			dump_context_stack(context_heap, didx, name, indent, name_context_idx)
+			dump_context_stack(ctx, didx, name, indent, name_context_idx)
 		}
 	}
 
 	if name_context.parent == -1 || name_context.parent == return_at { return }
 
 	indent := str.concatenate({ indent, "  " }, context.temp_allocator)
-	dump_context_stack(context_heap, name_context.parent, "<parent>", indent, name_context_idx)
+	dump_context_stack(ctx, name_context.parent, "<parent>", indent, name_context_idx)
 }
 
 

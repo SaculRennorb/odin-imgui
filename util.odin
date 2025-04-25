@@ -50,6 +50,11 @@ last :: #force_inline proc "contextless" (arr : []$T) -> ^T
 	return &arr[len(arr) - 1]
 }
 
+all :: #force_inline proc "contextless" ($E : typeid) -> E
+{
+	return transmute(E) cast(intrinsics.type_bit_set_underlying_type(E)) ((1 << (uint(max(intrinsics.type_bit_set_elem_type(E))) + 1)) - 1)
+}
+
 assert_eq :: proc(a, b : $T, ax := #caller_expression(a), bx := #caller_expression(b), loc := #caller_location) where intrinsics.type_is_comparable(T)
 {
 	if a != b {

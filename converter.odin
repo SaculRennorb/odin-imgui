@@ -1637,7 +1637,7 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 					input^ = input[1:]
 					append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = "typeid" } })
 
-				case .Star:
+				case .Star, .Ampersand:
 					input^ = input[1:]
 					inject_at(output, 0, _TypePtr{})
 

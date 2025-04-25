@@ -1758,35 +1758,37 @@ try_find_definition_for_name :: proc(ctx : ^ConverterContext, current_index : Na
 			current_context = &ctx.context_heap[child_idx]
 		}
 
-		#partial switch ctx.ast[current_context.node].kind {
-			case .Struct, .Union, .Enum, .Type:
-				if .Type not_in filter {
-					if im_root_context.parent == -1 { break ctx_stack }
-					im_root_context = &ctx.context_heap[im_root_context.parent]
-					continue ctx_stack
-				}
-			case .FunctionDefinition, .OperatorDefinition:
-				if .Function not_in filter {
-					if im_root_context.parent == -1 { break ctx_stack }
-					im_root_context = &ctx.context_heap[im_root_context.parent]
-					continue ctx_stack
-				}
-			case .VariableDeclaration:
-				is_type :: proc(ctx : ^ConverterContext, current_context : ^NameContext) -> (is_type : bool)
-				{
-					ti := ctx.ast[current_context.node].var_declaration.type
-					type := ctx.ast[ti].type[:]
-					translated : [dynamic]TypeSegment
-					translate_type(&translated, ctx.ast, &type)
-					_, is_type = translated[0].(_TypeFragment)
-					delete(translated)
-					return
-				}
-				if .Variable not_in filter && (.Type not_in filter || !is_type(ctx, current_context)) {
-					if im_root_context.parent == -1 { break ctx_stack }
-					im_root_context = &ctx.context_heap[im_root_context.parent]
-					continue ctx_stack
-				}
+		if current_context.node != -1 {
+			#partial switch ctx.ast[current_context.node].kind {
+				case .Struct, .Union, .Enum, .Type:
+					if .Type not_in filter {
+						if im_root_context.parent == -1 { break ctx_stack }
+						im_root_context = &ctx.context_heap[im_root_context.parent]
+						continue ctx_stack
+					}
+				case .FunctionDefinition, .OperatorDefinition:
+					if .Function not_in filter {
+						if im_root_context.parent == -1 { break ctx_stack }
+						im_root_context = &ctx.context_heap[im_root_context.parent]
+						continue ctx_stack
+					}
+				case .VariableDeclaration:
+					is_type :: proc(ctx : ^ConverterContext, current_context : ^NameContext) -> (is_type : bool)
+					{
+						ti := ctx.ast[current_context.node].var_declaration.type
+						type := ctx.ast[ti].type[:]
+						translated : [dynamic]TypeSegment
+						translate_type(&translated, ctx.ast, &type)
+						_, is_type = translated[0].(_TypeFragment)
+						delete(translated)
+						return
+					}
+					if .Variable not_in filter && (.Type not_in filter || !is_type(ctx, current_context)) {
+						if im_root_context.parent == -1 { break ctx_stack }
+						im_root_context = &ctx.context_heap[im_root_context.parent]
+						continue ctx_stack
+					}
+			}
 		}
 		
 		return im_root_context, current_context

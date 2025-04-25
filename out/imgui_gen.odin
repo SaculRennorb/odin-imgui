@@ -1463,7 +1463,7 @@ IM_NEW :: #force_inline proc "contextless" (_TYPE : $T0) //TODO: validate those 
 	new(ImNewWrapper(),ImGui::MemAlloc(sizeof(_TYPE)))_TYPE
 }
 
-IM_DELETE :: proc($T : typeid, p : ^T) { if p {T(); MemFree(p)} }
+IM_DELETE :: proc($T : typeid, p : ^T) { if p {deinit(p); MemFree(p)} }
 
 //-----------------------------------------------------------------------------
 // ImVector<>
@@ -1477,7 +1477,7 @@ IM_DELETE :: proc($T : typeid, p : ^T) { if p {T(); MemFree(p)} }
 //-----------------------------------------------------------------------------
 
 
-ImVector :: struct(T : typeid) {
+ImVector :: struct($T : typeid) {
 	Size : i32,
 	Capacity : i32,
 	Data : ^T,
@@ -1489,10 +1489,13 @@ ImVector :: struct(T : typeid) {
 
 }
 
-ImVector_init :: proc(this : ^ImVector, src : ImVector_T)
+ImVector_init :: proc(this : ^ImVector($T), src : ^ImVector(T))
 {
 this.Capacity = 0; this.Size = this.Capacity; this.Data = nil; operator_Assign(src)
 }
+
+ImVector_deinit :: proc(this : ^ImVector)
+{if this.Data { IM_FREE(this.Data) }}
 
 // Important: does not destruct anything
 ImVector_clear :: #force_inline proc(this : ^ImVector($T)) { if this.Data {this.Capacity = 0; this.Size = this.Capacity; IM_FREE(this.Data); this.Data = nil} }
@@ -1503,7 +1506,7 @@ ImVector_clear_delete :: #force_inline proc(this : ^ImVector($T))
 
 // Important: never called automatically! always explicit.
 ImVector_clear_destruct :: #force_inline proc(this : ^ImVector($T))
-{for n : i32 = 0; n < this.Size; post_incr(&n) { T() }; clear()}
+{for n : i32 = 0; n < this.Size; post_incr(&n) { deinit(&this.Data[n]) }; clear()}
 
 ImVector_empty :: #force_inline proc(this : ^ImVector($T)) -> bool { return this.Size == 0 }
 
@@ -1523,19 +1526,19 @@ ImVector_end :: #force_inline proc(this : ^ImVector($T)) -> ^T { return this.Dat
 
 ImVector_end :: #force_inline proc(this : ^ImVector($T)) -> ^T { return this.Data + this.Size }
 
-ImVector_front :: #force_inline proc(this : ^ImVector($T)) -> T
+ImVector_front :: #force_inline proc(this : ^ImVector($T)) -> ^T
 {IM_ASSERT(this.Size > 0); return this.Data[0]}
 
-ImVector_front :: #force_inline proc(this : ^ImVector($T)) -> T
+ImVector_front :: #force_inline proc(this : ^ImVector($T)) -> ^T
 {IM_ASSERT(this.Size > 0); return this.Data[0]}
 
-ImVector_back :: #force_inline proc(this : ^ImVector($T)) -> T
+ImVector_back :: #force_inline proc(this : ^ImVector($T)) -> ^T
 {IM_ASSERT(this.Size > 0); return this.Data[this.Size - 1]}
 
-ImVector_back :: #force_inline proc(this : ^ImVector($T)) -> T
+ImVector_back :: #force_inline proc(this : ^ImVector($T)) -> ^T
 {IM_ASSERT(this.Size > 0); return this.Data[this.Size - 1]}
 
-ImVector_swap :: #force_inline proc(this : ^ImVector($T), rhs : ImVector_T)
+ImVector_swap :: #force_inline proc(this : ^ImVector($T), rhs : ^ImVector(T))
 {rhs_size : i32 = rhs.Size; rhs.Size = this.Size; this.Size = rhs_size; rhs_cap : i32 = rhs.Capacity; rhs.Capacity = this.Capacity; this.Capacity = rhs_cap; rhs_data : ^T = rhs.Data; rhs.Data = this.Data; this.Data = rhs_data}
 
 ImVector__grow_capacity :: #force_inline proc(this : ^ImVector($T), sz : i32) -> i32
@@ -1544,7 +1547,7 @@ ImVector__grow_capacity :: #force_inline proc(this : ^ImVector($T), sz : i32) ->
 ImVector_resize :: #force_inline proc(this : ^ImVector($T), new_size : i32)
 {if new_size > this.Capacity { reserve(_grow_capacity(new_size)) }; this.Size = new_size}
 
-ImVector_resize :: #force_inline proc(this : ^ImVector($T), new_size : i32, v : T)
+ImVector_resize :: #force_inline proc(this : ^ImVector($T), new_size : i32, v : ^T)
 {if new_size > this.Capacity { reserve(_grow_capacity(new_size)) }; if new_size > this.Size { for n : i32 = this.Size; n < new_size; post_incr(&n) { memcpy(&this.Data[n], &v, sizeof(v)) } }; this.Size = new_size}
 
 // Resize a vector to a smaller size, guaranteed not to cause a reallocation
@@ -1558,13 +1561,13 @@ ImVector_reserve_discard :: #force_inline proc(this : ^ImVector($T), new_capacit
 {if new_capacity <= this.Capacity { return }; if this.Data { IM_FREE(this.Data) }; this.Data = cast(^T) IM_ALLOC(cast(uint) new_capacity * sizeof(T)); this.Capacity = new_capacity}
 
 // NB: It is illegal to call push_back/push_front/insert with a reference pointing inside the ImVector data itself! e.g. v.push_back(v[10]) is forbidden.
-ImVector_push_back :: #force_inline proc(this : ^ImVector($T), v : T)
+ImVector_push_back :: #force_inline proc(this : ^ImVector($T), v : ^T)
 {if this.Size == this.Capacity { reserve(_grow_capacity(this.Size + 1)) }; memcpy(&this.Data[this.Size], &v, sizeof(v)); post_incr(&this.Size)}
 
 ImVector_pop_back :: #force_inline proc(this : ^ImVector($T))
 {IM_ASSERT(this.Size > 0); post_decr(&this.Size)}
 
-ImVector_push_front :: #force_inline proc(this : ^ImVector($T), v : T) { if this.Size == 0 { push_back(v) }
+ImVector_push_front :: #force_inline proc(this : ^ImVector($T), v : ^T) { if this.Size == 0 { push_back(v) }
 else { insert(this.Data, v) } }
 
 ImVector_erase :: #force_inline proc(this : ^ImVector($T), it : ^T) -> ^T
@@ -1576,27 +1579,27 @@ ImVector_erase :: #force_inline proc(this : ^ImVector($T), it : ^T, it_last : ^T
 ImVector_erase_unsorted :: #force_inline proc(this : ^ImVector($T), it : ^T) -> ^T
 {IM_ASSERT(it >= this.Data && it < this.Data + this.Size); off : int = it - this.Data; if it < this.Data + this.Size - 1 { memcpy(this.Data + off, this.Data + this.Size - 1, sizeof(T)) }; post_decr(&this.Size); return this.Data + off}
 
-ImVector_insert :: #force_inline proc(this : ^ImVector($T), it : ^T, v : T) -> ^T
+ImVector_insert :: #force_inline proc(this : ^ImVector($T), it : ^T, v : ^T) -> ^T
 {IM_ASSERT(it >= this.Data && it <= this.Data + this.Size); off : int = it - this.Data; if this.Size == this.Capacity { reserve(_grow_capacity(this.Size + 1)) }; if off < cast(i32) this.Size { memmove(this.Data + off + 1, this.Data + off, (cast(uint) this.Size - cast(uint) off) * sizeof(T)) }; memcpy(&this.Data[off], &v, sizeof(v)); post_incr(&this.Size); return this.Data + off}
 
-ImVector_contains :: #force_inline proc(this : ^ImVector($T), v : T) -> bool
+ImVector_contains :: #force_inline proc(this : ^ImVector($T), v : ^T) -> bool
 {data : ^T = this.Data; data_end : ^T = this.Data + this.Size; for data < data_end { if post_incr(&data)^ == v { return true } }; return false}
 
-ImVector_find :: #force_inline proc(this : ^ImVector($T), v : T) -> ^T
+ImVector_find :: #force_inline proc(this : ^ImVector($T), v : ^T) -> ^T
 {data : ^T = this.Data; data_end : ^T = this.Data + this.Size; for data < data_end { if data^ == v {  }
 else { pre_incr(&data) } }; return data}
 
-ImVector_find :: #force_inline proc(this : ^ImVector($T), v : T) -> ^T
+ImVector_find :: #force_inline proc(this : ^ImVector($T), v : ^T) -> ^T
 {data : ^T = this.Data; data_end : ^T = this.Data + this.Size; for data < data_end { if data^ == v {  }
 else { pre_incr(&data) } }; return data}
 
-ImVector_find_index :: #force_inline proc(this : ^ImVector($T), v : T) -> i32
+ImVector_find_index :: #force_inline proc(this : ^ImVector($T), v : ^T) -> i32
 {data_end : ^T = this.Data + this.Size; it : ^T = find(v); if it == data_end { return -1 }; off : int = it - this.Data; return cast(i32) off}
 
-ImVector_find_erase :: #force_inline proc(this : ^ImVector($T), v : T) -> bool
+ImVector_find_erase :: #force_inline proc(this : ^ImVector($T), v : ^T) -> bool
 {it : ^T = find(v); if it < this.Data + this.Size {erase(it); return true}	; return false}
 
-ImVector_find_erase_unsorted :: #force_inline proc(this : ^ImVector($T), v : T) -> bool
+ImVector_find_erase_unsorted :: #force_inline proc(this : ^ImVector($T), v : ^T) -> bool
 {it : ^T = find(v); if it < this.Data + this.Size {erase_unsorted(it); return true}	; return false}
 
 ImVector_index_from_ptr :: #force_inline proc(this : ^ImVector($T), it : ^T) -> i32
@@ -1888,7 +1891,7 @@ ImGuiIO :: struct {
 	AppFocusLost : bool, // Only modify via AddFocusEvent()
 	AppAcceptingEvents : bool, // Only modify via SetAppAcceptingEvents()
 	InputQueueSurrogate : ImWchar16, // For AddInputCharacterUTF16()
-	InputQueueCharacters : ImVector_ImWchar, // Queue of _characters_ input (obtained by platform backend). Fill using AddInputCharacter() helper.
+	InputQueueCharacters : ImVector(ImWchar), // Queue of _characters_ input (obtained by platform backend). Fill using AddInputCharacter() helper.
 
 	// Legacy: before 1.87, we required backend to fill io.KeyMap[] (imgui->native map) during initialization and io.KeysDown[] (native indices) every frame.
 	// This is still temporarily supported as a legacy feature. However the new preferred scheme is for backend to call io.AddKeyEvent().
@@ -2082,7 +2085,7 @@ this.RefFrame = -1
 // Helper: Parse and apply text filters. In format "aaaaa[,bbbb][,ccccc]"
 ImGuiTextFilter :: struct {
 	InputBuf : [256]u8,
-	Filters : ImVector_ImGuiTextRange,
+	Filters : ImVector(ImGuiTextRange),
 	CountGrep : i32,
 }
 
@@ -2116,7 +2119,7 @@ ImGuiTextFilter_ImGuiTextRange_empty :: proc(this : ^ImGuiTextFilter_ImGuiTextRa
 // Helper: Growable text buffer for logging/accumulating text
 // (this could be called 'ImGuiTextBuilder' / 'ImGuiStringBuilder')
 ImGuiTextBuffer :: struct {
-	Buf : ImVector_u8,
+	Buf : ImVector(u8),
 }
 
 ImGuiTextBuffer_EmptyString : [1]u8
@@ -2125,18 +2128,18 @@ ImGuiTextBuffer_init :: proc(this : ^ImGuiTextBuffer)
 {
 }
 
-ImGuiTextBuffer_begin :: proc(this : ^ImGuiTextBuffer) -> ^u8 { return this.Buf.Data ? &ImVector_front(&this.Buf) : EmptyString }
+ImGuiTextBuffer_begin :: proc(this : ^ImGuiTextBuffer) -> ^u8 { return this.Buf.Data ? &front(&this.Buf) : EmptyString }
 
 // Buf is zero-terminated, so end() will point on the zero-terminator
-ImGuiTextBuffer_end :: proc(this : ^ImGuiTextBuffer) -> ^u8 { return this.Buf.Data ? &ImVector_back(&this.Buf) : EmptyString }
+ImGuiTextBuffer_end :: proc(this : ^ImGuiTextBuffer) -> ^u8 { return this.Buf.Data ? &back(&this.Buf) : EmptyString }
 
 ImGuiTextBuffer_size :: proc(this : ^ImGuiTextBuffer) -> i32 { return this.Buf.Size ? this.Buf.Size - 1 : 0 }
 
 ImGuiTextBuffer_empty :: proc(this : ^ImGuiTextBuffer) -> bool { return this.Buf.Size <= 1 }
 
-ImGuiTextBuffer_clear :: proc(this : ^ImGuiTextBuffer) { ImVector_clear(&this.Buf) }
+ImGuiTextBuffer_clear :: proc(this : ^ImGuiTextBuffer) { clear(&this.Buf) }
 
-ImGuiTextBuffer_reserve :: proc(this : ^ImGuiTextBuffer, capacity : i32) { ImVector_reserve(&this.Buf, capacity) }
+ImGuiTextBuffer_reserve :: proc(this : ^ImGuiTextBuffer, capacity : i32) { reserve(&this.Buf, capacity) }
 
 ImGuiTextBuffer_c_str :: proc(this : ^ImGuiTextBuffer) -> ^u8 { return this.Buf.Data ? this.Buf.Data : EmptyString }
 
@@ -2169,7 +2172,7 @@ this.key = _key; this.val_p = _val
 // Types are NOT stored, so it is up to you to make sure your Key don't collide with different types.
 ImGuiStorage :: struct {
 	// [Internal]
-	Data : ImVector_ImGuiStoragePair,
+	Data : ImVector(ImGuiStoragePair),
 
 when ! defined ( IMGUI_DISABLE_OBSOLETE_FUNCTIONS ) {
 	//typedef ::ImGuiStoragePair ImGuiStoragePair;  // 1.90.8: moved type outside struct
@@ -2179,7 +2182,7 @@ when ! defined ( IMGUI_DISABLE_OBSOLETE_FUNCTIONS ) {
 // - Get***() functions find pair, never add/allocate. Pairs are sorted so a query is O(log N)
 // - Set***() functions find pair, insertion on demand if missing.
 // - Sorted insertion is costly, paid once. A typical frame shouldn't need to insert any new pair.
-ImGuiStorage_Clear :: proc(this : ^ImGuiStorage) { ImVector_clear(&this.Data) }
+ImGuiStorage_Clear :: proc(this : ^ImGuiStorage) { clear(&this.Data) }
 
 
 
@@ -2394,7 +2397,7 @@ ImGuiMultiSelectFlags_ :: enum i32 {
 // - Below: who reads/writes each fields? 'r'=read, 'w'=write, 'ms'=multi-select code, 'app'=application/user code.
 ImGuiMultiSelectIO :: struct {
 	//------------------------------------------// BeginMultiSelect / EndMultiSelect
-	Requests : ImVector_ImGuiSelectionRequest, //  ms:w, app:r     /  ms:w  app:r   // Requests to apply to your selection data.
+	Requests : ImVector(ImGuiSelectionRequest), //  ms:w, app:r     /  ms:w  app:r   // Requests to apply to your selection data.
 	RangeSrcItem : ImGuiSelectionUserData, //  ms:w  app:r     /                // (If using clipper) Begin: Source item (often the first selected item) must never be clipped: use clipper.IncludeItemByIndex() to ensure it is submitted.
 	NavIdItem : ImGuiSelectionUserData, //  ms:w, app:r     /                // (If using deletion) Last known SetNextItemSelectionUserData() value for NavId (if part of submitted items).
 	NavIdSelected : bool, //  ms:w, app:r     /        app:r   // (If using deletion) Last known selection state for NavId (if part of submitted items).
@@ -2553,8 +2556,8 @@ ImDrawCmdHeader :: struct {
 // Forward declarations
 // [Internal] For use by ImDrawListSplitter
 ImDrawChannel :: struct {
-	_CmdBuffer : ImVector_ImDrawCmd,
-	_IdxBuffer : ImVector_ImDrawIdx,
+	_CmdBuffer : ImVector(ImDrawCmd),
+	_IdxBuffer : ImVector(ImDrawIdx),
 }
 
 
@@ -2564,12 +2567,15 @@ ImDrawChannel :: struct {
 ImDrawListSplitter :: struct {
 	_Current : i32, // Current channel number (0)
 	_Count : i32, // Number of active channels (1+)
-	_Channels : ImVector_ImDrawChannel, }
+	_Channels : ImVector(ImDrawChannel), }
 
 ImDrawListSplitter_init :: proc(this : ^ImDrawListSplitter)
 {
 memset(this, 0, sizeof(this^))
 }
+
+ImDrawListSplitter_deinit :: proc(this : ^ImDrawListSplitter)
+{ClearFreeMemory()}
 
 // Draw channels (not resized down so _Count might be < Channels.Size)
 
@@ -2626,9 +2632,9 @@ ImDrawListFlags_ :: enum i32 {
 // Important: Primitives are always added to the list and not culled (culling is done at higher-level by ImGui:: functions), if you use this API a lot consider coarse culling your drawn objects.
 ImDrawList :: struct {
 	// This is what you have to render
-	CmdBuffer : ImVector_ImDrawCmd, // Draw commands. Typically 1 command = 1 GPU draw call, unless the command is a callback.
-	IdxBuffer : ImVector_ImDrawIdx, // Index buffer. Each command consume ImDrawCmd::ElemCount of those
-	VtxBuffer : ImVector_ImDrawVert, // Vertex buffer.
+	CmdBuffer : ImVector(ImDrawCmd), // Draw commands. Typically 1 command = 1 GPU draw call, unless the command is a callback.
+	IdxBuffer : ImVector(ImDrawIdx), // Index buffer. Each command consume ImDrawCmd::ElemCount of those
+	VtxBuffer : ImVector(ImDrawVert), // Vertex buffer.
 	Flags : ImDrawListFlags, // Flags, you may poke into these to adjust anti-aliasing settings per-primitive.
 
 	// [Internal, used while building lists]
@@ -2636,12 +2642,12 @@ ImDrawList :: struct {
 	_Data : ^ImDrawListSharedData, // Pointer to shared draw data (you can use ImGui::GetDrawListSharedData() to get the one from current ImGui context)
 	_VtxWritePtr : ^ImDrawVert, // [Internal] point within VtxBuffer.Data after each add command (to avoid using the ImVector<> operators too much)
 	_IdxWritePtr : ^ImDrawIdx, // [Internal] point within IdxBuffer.Data after each add command (to avoid using the ImVector<> operators too much)
-	_Path : ImVector_ImVec2, // [Internal] current path building
+	_Path : ImVector(ImVec2), // [Internal] current path building
 	_CmdHeader : ImDrawCmdHeader, // [Internal] template of active commands. Fields should match those of CmdBuffer.back().
 	_Splitter : ImDrawListSplitter, // [Internal] for channels api (note: prefer using your own persistent instance of ImDrawListSplitter!)
-	_ClipRectStack : ImVector_ImVec4, // [Internal]
-	_TextureIdStack : ImVector_ImTextureID, // [Internal]
-	_CallbacksDataBuf : ImVector_ImU8, // [Internal]
+	_ClipRectStack : ImVector(ImVec4), // [Internal]
+	_TextureIdStack : ImVector(ImTextureID), // [Internal]
+	_CallbacksDataBuf : ImVector(ImU8), // [Internal]
 	_FringeScale : f32, // [Internal] anti-alias fringe is scaled by this value, this helps to keep things sharp while zooming at vertex buffer content
 	_OwnerName : ^u8, }
 
@@ -2656,10 +2662,10 @@ ImDrawList :: struct {
 
 
 ImDrawList_GetClipRectMin :: #force_inline proc(this : ^ImDrawList) -> ImVec2
-{cr : ImVec4 = ImVector_back(&this._ClipRectStack); return ImVec2(cr.x, cr.y)}
+{cr : ^ImVec4 = back(&this._ClipRectStack); return ImVec2(cr.x, cr.y)}
 
 ImDrawList_GetClipRectMax :: #force_inline proc(this : ^ImDrawList) -> ImVec2
-{cr : ImVec4 = ImVector_back(&this._ClipRectStack); return ImVec2(cr.z, cr.w)}
+{cr : ^ImVec4 = back(&this._ClipRectStack); return ImVec2(cr.z, cr.w)}
 
 
 
@@ -2714,9 +2720,9 @@ ImDrawList_GetClipRectMax :: #force_inline proc(this : ^ImDrawList) -> ImVec2
 //   so e.g. 'PathArcTo(center, radius, PI * -0.5f, PI)' is ok, whereas 'PathArcTo(center, radius, PI, PI * -0.5f)' won't have correct anti-aliasing when followed by PathFillConvex().
 ImDrawList_PathClear :: #force_inline proc(this : ^ImDrawList) { this._Path.Size = 0 }
 
-ImDrawList_PathLineTo :: #force_inline proc(this : ^ImDrawList, pos : ImVec2) { ImVector_push_back(&this._Path, pos) }
+ImDrawList_PathLineTo :: #force_inline proc(this : ^ImDrawList, pos : ^ImVec2) { push_back(&this._Path, pos) }
 
-ImDrawList_PathLineToMergeDuplicate :: #force_inline proc(this : ^ImDrawList, pos : ImVec2) { if this._Path.Size == 0 || memcmp(&this._Path.Data[this._Path.Size - 1], &pos, 8) != 0 { ImVector_push_back(&this._Path, pos) } }
+ImDrawList_PathLineToMergeDuplicate :: #force_inline proc(this : ^ImDrawList, pos : ^ImVec2) { if this._Path.Size == 0 || memcmp(&this._Path.Data[this._Path.Size - 1], &pos, 8) != 0 { push_back(&this._Path, pos) } }
 
 ImDrawList_PathFillConvex :: #force_inline proc(this : ^ImDrawList, col : ImU32)
 {AddConvexPolyFilled(this._Path.Data, this._Path.Size, col); this._Path.Size = 0}
@@ -2751,13 +2757,11 @@ ImDrawList_PathStroke :: #force_inline proc(this : ^ImDrawList, col : ImU32, fla
 // - This API shouldn't have been in ImDrawList in the first place!
 //   Prefer using your own persistent instance of ImDrawListSplitter as you can stack them.
 //   Using the ImDrawList::ChannelsXXXX you cannot stack a split over another.
-ImDrawList_ChannelsSplit :: #force_inline proc(this : ^ImDrawList, count : i32) { ImDrawListSplitter_Split(&this._Splitter, this, count) }
+ImDrawList_ChannelsSplit :: #force_inline proc(this : ^ImDrawList, count : i32) { Split(&this._Splitter, this, count) }
 
-ImDrawList_ChannelsMerge :: #force_inline proc(this : ^ImDrawList) { ImDrawListSplitter_Merge(&this._Splitter, this) }
+ImDrawList_ChannelsMerge :: #force_inline proc(this : ^ImDrawList) { Merge(&this._Splitter, this) }
 
-ImDrawList_ChannelsSetCurrent :: #force_inline proc(this : ^ImDrawList, n : i32) { ImDrawListSplitter_SetCurrentChannel(&this._Splitter, this, n) }
-
-
+ImDrawList_ChannelsSetCurrent :: #force_inline proc(this : ^ImDrawList, n : i32) { SetCurrentChannel(&this._Splitter, this, n) }
 
 
 
@@ -2767,14 +2771,16 @@ ImDrawList_ChannelsSetCurrent :: #force_inline proc(this : ^ImDrawList, n : i32)
 
 
 
-ImDrawList_PrimWriteVtx :: #force_inline proc(this : ^ImDrawList, pos : ImVec2, uv : ImVec2, col : ImU32)
+
+
+ImDrawList_PrimWriteVtx :: #force_inline proc(this : ^ImDrawList, pos : ^ImVec2, uv : ^ImVec2, col : ImU32)
 {this._VtxWritePtr.pos = pos; this._VtxWritePtr.uv = uv; this._VtxWritePtr.col = col; post_incr(&this._VtxWritePtr); post_incr(&this._VtxCurrentIdx)}
 
 ImDrawList_PrimWriteIdx :: #force_inline proc(this : ^ImDrawList, idx : ImDrawIdx)
 {this._IdxWritePtr^ = idx; post_incr(&this._IdxWritePtr)}
 
 // Write vertex with unique index
-ImDrawList_PrimVtx :: #force_inline proc(this : ^ImDrawList, pos : ImVec2, uv : ImVec2, col : ImU32)
+ImDrawList_PrimVtx :: #force_inline proc(this : ^ImDrawList, pos : ^ImVec2, uv : ^ImVec2, col : ImU32)
 {PrimWriteIdx(cast(ImDrawIdx) this._VtxCurrentIdx); PrimWriteVtx(pos, uv, col)}
 
 
@@ -2808,7 +2814,7 @@ ImDrawData :: struct {
 	CmdListsCount : i32, // Number of ImDrawList* to render
 	TotalIdxCount : i32, // For convenience, sum of all ImDrawList's IdxBuffer.Size
 	TotalVtxCount : i32, // For convenience, sum of all ImDrawList's VtxBuffer.Size
-	CmdLists : ^ImVector_ImDrawList, // Array of ImDrawList* to render. The ImDrawLists are owned by ImGuiContext and only pointed to from here.
+	CmdLists : ImVector(^ImDrawList), // Array of ImDrawList* to render. The ImDrawLists are owned by ImGuiContext and only pointed to from here.
 	DisplayPos : ImVec2, // Top-left position of the viewport to render (== top-left of the orthogonal projection matrix to use) (== GetMainViewport()->Pos for the main viewport, == (0.0) in most single-viewport applications)
 	DisplaySize : ImVec2, // Size of the viewport to render (== GetMainViewport()->Size for the main viewport, == io.DisplaySize in most single-viewport applications)
 	FramebufferScale : ImVec2, // Amount of pixels for each unit of DisplaySize. Based on io.DisplayFramebufferScale. Generally (1,1) on normal display, (2,2) on OSX with Retina display.
@@ -2875,7 +2881,7 @@ ImFontGlyph :: struct {
 // Helper to build glyph ranges from text/string data. Feed your application strings/characters to it then call BuildRanges().
 // This is essentially a tightly packed of vector of 64k booleans = 8KB storage.
 ImFontGlyphRangesBuilder :: struct {
-	UsedChars : ImVector_ImU32, }
+	UsedChars : ImVector(ImU32), }
 
 ImFontGlyphRangesBuilder_init :: proc(this : ^ImFontGlyphRangesBuilder)
 {
@@ -2885,7 +2891,7 @@ Clear()
 // Store 1-bit per Unicode code point (0=unused, 1=used)
 
 ImFontGlyphRangesBuilder_Clear :: #force_inline proc(this : ^ImFontGlyphRangesBuilder)
-{size_in_bytes : i32 = (IM_UNICODE_CODEPOINT_MAX + 1) / 8; ImVector_resize(&this.UsedChars, size_in_bytes / cast(i32) sizeof(ImU32)); memset(this.UsedChars.Data, 0, cast(uint) size_in_bytes)}
+{size_in_bytes : i32 = (IM_UNICODE_CODEPOINT_MAX + 1) / 8; resize(&this.UsedChars, size_in_bytes / cast(i32) sizeof(ImU32)); memset(this.UsedChars.Data, 0, cast(uint) size_in_bytes)}
 
 // Get bit n in the array
 ImFontGlyphRangesBuilder_GetBit :: #force_inline proc(this : ^ImFontGlyphRangesBuilder, n : uint) -> bool
@@ -2974,9 +2980,9 @@ ImFontAtlas :: struct {
 	TexHeight : i32, // Texture height calculated during Build().
 	TexUvScale : ImVec2, // = (1.0f/TexWidth, 1.0f/TexHeight)
 	TexUvWhitePixel : ImVec2, // Texture coordinates to a white pixel
-	Fonts : ^ImVector_ImFont, // Hold all the fonts returned by AddFont*. Fonts[0] is the default font upon calling ImGui::NewFrame(), use ImGui::PushFont()/PopFont() to change the current font.
-	CustomRects : ImVector_ImFontAtlasCustomRect, // Rectangles for packing custom texture data into the atlas.
-	ConfigData : ImVector_ImFontConfig, // Configuration data
+	Fonts : ImVector(^ImFont), // Hold all the fonts returned by AddFont*. Fonts[0] is the default font upon calling ImGui::NewFrame(), use ImGui::PushFont()/PopFont() to change the current font.
+	CustomRects : ImVector(ImFontAtlasCustomRect), // Rectangles for packing custom texture data into the atlas.
+	ConfigData : ImVector(ImFontConfig), // Configuration data
 	TexUvLines : [IM_DRAWLIST_TEX_LINES_WIDTH_MAX + 1]ImVec4, // UVs for baked anti-aliased lines
 
 	// [Internal] Font builder
@@ -3057,13 +3063,13 @@ ImFontAtlas_GetCustomRectByIndex :: proc(this : ^ImFontAtlas, index : i32) -> ^I
 // ImFontAtlas automatically loads a default embedded font for you when you call GetTexDataAsAlpha8() or GetTexDataAsRGBA32().
 ImFont :: struct {
 	// [Internal] Members: Hot ~20/24 bytes (for CalcTextSize)
-	IndexAdvanceX : ImVector_f32, // 12-16 // out //            // Sparse. Glyphs->AdvanceX in a directly indexable way (cache-friendly for CalcTextSize functions which only this info, and are often bottleneck in large UI).
+	IndexAdvanceX : ImVector(f32), // 12-16 // out //            // Sparse. Glyphs->AdvanceX in a directly indexable way (cache-friendly for CalcTextSize functions which only this info, and are often bottleneck in large UI).
 	FallbackAdvanceX : f32, // 4     // out // = FallbackGlyph->AdvanceX
 	FontSize : f32, // 4     // in  //            // Height of characters/line, set during loading (don't change after loading)
 
 	// [Internal] Members: Hot ~28/40 bytes (for RenderText loop)
-	IndexLookup : ImVector_ImWchar, // 12-16 // out //            // Sparse. Index glyphs by Unicode code-point.
-	Glyphs : ImVector_ImFontGlyph, // 12-16 // out //            // All glyphs.
+	IndexLookup : ImVector(ImWchar), // 12-16 // out //            // Sparse. Index glyphs by Unicode code-point.
+	Glyphs : ImVector(ImFontGlyph), // 12-16 // out //            // All glyphs.
 	FallbackGlyph : ^ImFontGlyph, // 4-8   // out // = FindGlyph(FontFallbackChar)
 
 	// [Internal] Members: Cold ~32/40 bytes
@@ -3176,6 +3182,9 @@ ImGuiViewport_init :: proc(this : ^ImGuiViewport)
 {
 memset(this, 0, sizeof(this^))
 }
+
+ImGuiViewport_deinit :: proc(this : ^ImGuiViewport)
+{IM_ASSERT(this.PlatformUserData == nil && this.RendererUserData == nil)}
 
 // Platform window requested closure (e.g. window was moved by the OS / host window manager, e.g. pressing ALT-F4)
 
@@ -3316,7 +3325,7 @@ ImGuiPlatformIO :: struct {
 	// (Optional) Monitor list
 	// - Updated by: app/backend. Update every frame to dynamically support changing monitor or DPI configuration.
 	// - Used by: dear imgui to query DPI info, clamp popups/tooltips within same monitor and not have them straddle monitors.
-	Monitors : ImVector_ImGuiPlatformMonitor,
+	Monitors : ImVector(ImGuiPlatformMonitor),
 
 	//------------------------------------------------------------------
 	// Output - List of viewports to render into platform windows
@@ -3324,7 +3333,7 @@ ImGuiPlatformIO :: struct {
 
 	// Viewports list (the list is updated by calling ImGui::EndFrame or ImGui::Render)
 	// (in the future we will attempt to organize this feature to remove the need for a "main viewport")
-	Viewports : ^ImVector_ImGuiViewport, // Main viewports, followed by all secondary viewports.
+	Viewports : ImVector(^ImGuiViewport), // Main viewports, followed by all secondary viewports.
 }
 
 // Platform IME data for io.PlatformSetImeDataFn() function.
@@ -3367,7 +3376,7 @@ ImGui_PopButtonRepeat :: #force_inline proc() { PopItemFlag() }
 ImGui_PushTabStop :: #force_inline proc(tab_stop : bool) { PushItemFlag(ImGuiItemFlags_NoTabStop, ) }
 ImGui_PopTabStop :: #force_inline proc() { PopItemFlag() }
 // OBSOLETED in 1.90.0 (from September 2023)// OBSOLETED in 1.90.0 (from September 2023)
-ImGui_BeginChildFrame :: #force_inline proc(id : ImGuiID, size : ImVec2, window_flags : ImGuiWindowFlags = 0) -> bool { return BeginChild(id, size, ImGuiChildFlags_FrameStyle, window_flags) }
+ImGui_BeginChildFrame :: #force_inline proc(id : ImGuiID, size : ^ImVec2, window_flags : ImGuiWindowFlags = 0) -> bool { return BeginChild(id, size, ImGuiChildFlags_FrameStyle, window_flags) }
 ImGui_EndChildFrame :: #force_inline proc() { EndChild() }
 //static inline bool BeginChild(const char* str_id, const ImVec2& size_arg, bool borders, ImGuiWindowFlags window_flags){ return BeginChild(str_id, size_arg, borders ? ImGuiChildFlags_Borders : ImGuiChildFlags_None, window_flags); } // Unnecessary as true == ImGuiChildFlags_Borders
 //static inline bool BeginChild(ImGuiID id, const ImVec2& size_arg, bool borders, ImGuiWindowFlags window_flags)        { return BeginChild(id, size_arg, borders ? ImGuiChildFlags_Borders : ImGuiChildFlags_None, window_flags);     } // Unnecessary as true == ImGuiChildFlags_Borders

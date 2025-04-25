@@ -231,10 +231,14 @@ ast_parse_template_spec_no_keyword :: proc(ctx : ^AstContext, tokens : ^[]Token)
 	}
 
 	eat_token_expect(tokens, .BracketTriangleOpen) or_return
-	for {
-		if n, ns := peek_token(tokens); n.kind == .BracketTriangleClose {
-			tokens^ = ns
-			break
+	loop: for {
+		#partial switch n, ns := peek_token(tokens); n.kind {
+			case .BracketTriangleClose:
+				tokens^ = ns
+				break loop
+
+			case .Comma:
+				tokens^ = ns
 		}
 
 		type : AstNode
@@ -1341,6 +1345,7 @@ ast_parse_type_inner :: proc(ctx : ^AstContext, tokens : ^[]Token, type : ^[dyna
 	// int const
 	// const char***
 	// const ::char const** const&
+	// A<int, int*>
 
 	type_reset := len(type)
 	defer if err != nil {
@@ -1405,8 +1410,19 @@ ast_parse_type_inner :: proc(ctx : ^AstContext, tokens : ^[]Token, type : ^[dyna
 			case .BracketTriangleOpen:
 				append(type, n); tokens^ = ns
 
-				ast_parse_type_inner(ctx, tokens, type)
-				append(type, eat_token_expect(tokens, .BracketTriangleClose) or_return) // closing >
+				generics_loop: for {
+					#partial switch nn, nns := peek_token(tokens); nn.kind {
+						case .BracketTriangleClose:
+							append(type, nn); tokens^ = nns // closing >
+							break generics_loop
+
+						case .Comma:
+							append(type, nn); tokens^ = nns
+
+						case:
+							ast_parse_type_inner(ctx, tokens, type) or_return
+					}
+				}
 
 			case:
 				if !has_name && !has_int_modifier { err = n }

@@ -68,7 +68,7 @@ ImGuiDockNode :: struct {
 	State : ImGuiDockNodeState,
 	ParentNode : ^ImGuiDockNode,
 	ChildNodes : [2]^ImGuiDockNode, // [Split node only] Child nodes (left/right or top/bottom). Consider switching to an array.
-	Windows : ^ImVector_ImGuiWindow, // Note: unordered list! Iterate TabBar->Tabs for user-order.
+	Windows : ImVector(^ImGuiWindow), // Note: unordered list! Iterate TabBar->Tabs for user-order.
 	TabBar : ^ImGuiTabBar,
 	Pos : ImVec2, // Current position
 	Size : ImVec2, // Current size

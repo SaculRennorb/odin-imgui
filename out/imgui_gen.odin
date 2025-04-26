@@ -2317,7 +2317,7 @@ ImColor :: struct {
 ImColor_init :: proc(this : ^ImColor, rgba : ImU32)
 {
 
-	this.Value = cast(f32) ((rgba >> IM_COL32_R_SHIFT) & 0xFF) * (1.0 / 255.0); cast(f32) ((rgba >> IM_COL32_G_SHIFT) & 0xFF) * (1.0 / 255.0); cast(f32) ((rgba >> IM_COL32_B_SHIFT) & 0xFF) * (1.0 / 255.0); cast(f32) ((rgba >> IM_COL32_A_SHIFT) & 0xFF) * (1.0 / 255.0)
+	init(&this.Value, cast(f32) ((rgba >> IM_COL32_R_SHIFT) & 0xFF) * (1.0 / 255.0), cast(f32) ((rgba >> IM_COL32_G_SHIFT) & 0xFF) * (1.0 / 255.0), cast(f32) ((rgba >> IM_COL32_B_SHIFT) & 0xFF) * (1.0 / 255.0), cast(f32) ((rgba >> IM_COL32_A_SHIFT) & 0xFF) * (1.0 / 255.0))
 }
 
 // FIXME-OBSOLETE: May need to obsolete/cleanup those helpers.

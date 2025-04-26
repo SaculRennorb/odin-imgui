@@ -798,24 +798,20 @@ ast_parse_function_def_no_return_type_and_name :: proc(ctx: ^AstContext, tokens 
 			t, sss = peek_token(tokens)
 			#partial switch t.kind {
 				case .Identifier:
-					tokens^ = sss // eat the member name
-
-					identifier := make([dynamic]Token, 1, 1)
-					identifier[0] = t
-					left := AstNode{ kind = .Identifier, identifier = identifier }
-
-					eat_token_expect(tokens, .BracketRoundOpen) or_return
-					expr := ast_parse_expression(ctx, tokens) or_return
-					eat_token_expect(tokens, .BracketRoundClose) or_return
+					node := ast_parse_function_call(ctx, tokens) or_return
 					
-					node := AstNode { kind = .ExprBinary, binary = {
-						left = transmute(AstNodeIndex) append_return_index(ctx.ast, left),
-						operator = .Assign,
-						right = transmute(AstNodeIndex) append_return_index(ctx.ast, expr),
+					initialized_member := AstNode{ kind = .Identifier, identifier = node.function_call.qualified_name }
+
+					node.function_call.qualified_name = make([dynamic]Token, 1, 1)
+					node.function_call.qualified_name[0] = Token{ kind = .Identifier, source = "init" }
+
+					call := AstNode{ kind = .MemberAccess, member_access = {
+						expression = transmute(AstNodeIndex) append_return_index(ctx.ast, initialized_member),
+						member = transmute(AstNodeIndex) append_return_index(ctx.ast, node)
 					}}
 
 					append(&body_sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .NewLine }))
-					append(&body_sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, node))
+					append(&body_sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, call))
 
 				case .Comma:
 					tokens^ = sss

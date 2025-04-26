@@ -373,15 +373,26 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 						str.write_string(&ctx.result, member.function_call.is_destructor ? "deinit" : "init")
 					}
 					else {
-						if expression_type_context.parent != {} {
+						if expression_type_context.parent != -1 {
 							containing_scope := ctx.ast[ctx.context_heap[expression_type_context.parent].node]
 							if containing_scope.kind == .Namespace {
 								str.write_string(&ctx.result, containing_scope.namespace.name.source)
 								str.write_byte(&ctx.result, '_')
 							}
-						}
 
-						write_token_range(&ctx.result, fncall.qualified_name[:])
+							write_token_range(&ctx.result, fncall.qualified_name[:])
+						}
+						else if fncall.qualified_name[0].source == "init" && len(fncall.arguments) == 1 { // likely a initializer call for a primitive type
+							write_node(ctx, current_node.member_access.expression, name_context)
+							str.write_string(&ctx.result, " = ")
+							write_node(ctx, fncall.arguments[0], name_context)
+
+							requires_termination = true
+							break
+						}
+						else{
+							write_token_range(&ctx.result, fncall.qualified_name[:])
+						}
 					}
 
 					str.write_byte(&ctx.result, '(')
@@ -1484,9 +1495,9 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 				}
 
 				type_stripped := strip_type(type)
-				_, type_context := find_definition_for_name(ctx, name_context, type_stripped[:], {.Type})
+				_, type_context := try_find_definition_for_name(ctx, name_context, type_stripped[:], {.Type}) // can be builtin type
 
-				return type, transmute(NameContextIndex) mem.ptr_sub(type_context, &ctx.context_heap[0])
+				return type, type_context != nil ? transmute(NameContextIndex) mem.ptr_sub(type_context, &ctx.context_heap[0]) : 0
 
 			case:
 				panic(fmt.tprintf("Not implemented %v", current_node))
@@ -1718,7 +1729,7 @@ insert_new_definition :: proc(context_heap : ^[dynamic]NameContext, current_inde
 
 insert_new_overload :: proc(ctx : ^ConverterContext, name, overload : string)
 {
-	_, overlaods, _, _ := map_entry(&ctx.overload_resolver, "init")
+	_, overlaods, _, _ := map_entry(&ctx.overload_resolver, name)
 	append(overlaods, overload)
 }
 

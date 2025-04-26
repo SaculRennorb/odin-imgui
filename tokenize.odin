@@ -22,7 +22,7 @@ tokenize :: proc(tokens : ^[dynamic]Token, text : string, file_path : string)
 				remaining = remaining[1:]
 				continue
 
-			case '#', ',', ';', '?', '(', '[', '{', ')', ']', '}', '\\':
+			case ',', ';', '?', '(', '[', '{', ')', ']', '}', '\\':
 				append(tokens, Token{cast(TokenKind) c, transmute(string)remaining[:1], loc})
 				remaining = remaining[1:]
 
@@ -123,6 +123,16 @@ tokenize :: proc(tokens : ^[dynamic]Token, text : string, file_path : string)
 				}
 				else {
 					append(tokens, Token{.Colon, transmute(string)remaining[:1], loc})
+					remaining = remaining[1:]
+				}
+
+			case '#':
+				if(remaining < end[-1:] && remaining[1] == '#') {
+					append(tokens, Token{.DoublePound, transmute(string)remaining[:2], loc})
+					remaining = remaining[2:]
+				}
+				else {
+					append(tokens, Token{.Pound, transmute(string)remaining[:1], loc})
 					remaining = remaining[1:]
 				}
 
@@ -402,7 +412,8 @@ TokenKind :: enum {
 	PreprocIf,
 	PreprocElse,
 	PreprocEndif,
-	
+
+	DoublePound,
 	DoubleAmpersand,
 	DoublePipe,
 	ShiftLeft,

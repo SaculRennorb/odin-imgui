@@ -27,7 +27,7 @@ main :: proc()
 	tokenize_file(&input_map, "imconfig.h")
 
 	preprocessed : [dynamic]Token
-	preprocess(&{ result = &preprocessed, inputs = input_map }, "imgui.h")
+	preprocess(&{ result = &preprocessed, inputs = input_map }, "imgui.cpp")
 
 	ignore_identifiers := []string {
 		"IM_MSVC_RUNTIME_CHECKS_OFF",

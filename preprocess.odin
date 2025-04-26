@@ -157,6 +157,14 @@ preprocess :: proc(ctx : ^PreProcContext, entry_file : string)
 				case:
 					panic(fmt.tprint("Unknown preprocessor directive:", ident))
 			}
+
+			// copy over remaining line
+			for len(tokens) > 0 {
+				t := tokens[0]
+				append(ctx.result, t)
+				tokens = tokens[1:]
+				if t.kind == .NewLine { break }
+			}
 		}
 
 		return nil

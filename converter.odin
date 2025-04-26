@@ -77,29 +77,82 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 			case .PreprocMacro:
 				macro := current_node.preproc_macro
 
+				arg_count := 0
+
 				str.write_string(&ctx.result, macro.name.source)
 				str.write_string(&ctx.result, " :: #force_inline proc \"contextless\" (")
-				for arg, i in macro.args {
-					if i > 0 { str.write_string(&ctx.result, ", ") }
+				for arg in macro.args {
 					if arg.kind != .Ellipsis {
+						if arg_count > 0 { str.write_string(&ctx.result, ", ") }
 						str.write_string(&ctx.result, arg.source)
 						str.write_string(&ctx.result, " : ")
-						fmt.sbprintf(&ctx.result, "$T%v", i)
+						fmt.sbprintf(&ctx.result, "$T%v", arg_count)
 					}
-					else {
-						str.write_string(&ctx.result, "args : ..[]any")
+
+					arg_count += 1
+				}
+
+				// scan the expansion and find stringify operations to turn into #caller_expression's
+				idents_to_stringify : map[string]struct{}
+				defer delete(idents_to_stringify)
+				for i := 0; i < len(macro.expansion_tokens); i += 1 {
+					if macro.expansion_tokens[i].kind == .Pound && i + 1 < len(macro.expansion_tokens) && macro.expansion_tokens[i + 1].kind == .Identifier {
+						idents_to_stringify[macro.expansion_tokens[i + 1].source] = {}
 					}
 				}
-				str.write_string(&ctx.result, ") //TODO: validate those args are not by-ref\n")
+
+				for i in idents_to_stringify {
+					if arg_count > 0 { str.write_string(&ctx.result, ", ") }
+					str.write_string(&ctx.result, "__")
+					str.write_string(&ctx.result, i)
+					str.write_string(&ctx.result, "_str := #caller_expression(")
+					str.write_string(&ctx.result, i)
+					str.write_byte(&ctx.result, ')')
+				}
+
+				// varargs after synthesized args
+				for arg in macro.args {
+					if arg.kind == .Ellipsis {
+						if arg_count > 0 { str.write_string(&ctx.result, ", ") }
+						str.write_string(&ctx.result, "args : ..[]any")
+					}
+
+					arg_count += 1
+				}
+
+				str.write_string(&ctx.result, ") //TODO @gen: Validate the parameters were not passed by reference.\n")
 				str.write_string(&ctx.result, indent_str); str.write_string(&ctx.result, "{\n")
 				current_member_indent_str := str.concatenate({ indent_str, ONE_INDENT }, context.temp_allocator)
+
+				for i in idents_to_stringify {
+					str.write_string(&ctx.result, current_member_indent_str)
+					str.write_string(&ctx.result, "_ = ")
+					str.write_string(&ctx.result, i)
+					str.write_string(&ctx.result, " // Silence warnings in case the param is no longer used because of stringification changes. @gen\n")
+				}
+
 				last_broke_line := true
-				for tok in macro.expansion_tokens {
+				for i := 0; i < len(macro.expansion_tokens); i += 1 {
+					tok := macro.expansion_tokens[i]
 					if last_broke_line { str.write_string(&ctx.result, current_member_indent_str) }
 					#partial switch tok.kind {
 						case .Semicolon:
 							str.write_string(&ctx.result, ";\n")
 							last_broke_line = true
+
+						case .Pound:
+							if i + 1 < len(macro.expansion_tokens) && macro.expansion_tokens[i + 1].kind == .Identifier {
+								i += 1 // skip pound, ident will be skipped by loop
+
+								str.write_string(&ctx.result, "__")
+								str.write_string(&ctx.result, macro.expansion_tokens[i].source)
+								str.write_string(&ctx.result, "_str")
+
+								last_broke_line = false
+								break
+							}
+
+							fallthrough
 
 						case:
 							str.write_string(&ctx.result, tok.source)

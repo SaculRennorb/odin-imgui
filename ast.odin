@@ -35,7 +35,7 @@ ast_parse_filescope_sequence :: proc(ctx : ^AstContext, tokens_ : []Token) -> As
 
 				node, err := ast_parse_typedef_no_keyword(ctx, tokens)
 				if err != nil {
-					panic(fmt.tprintf("Failed to parse typedef at %v.", err))
+					panic(fmt.tprintf("Failed to parse typedef: %v.", err))
 				}
 				append(&sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, node))
 
@@ -47,7 +47,7 @@ ast_parse_filescope_sequence :: proc(ctx : ^AstContext, tokens_ : []Token) -> As
 				err : AstError
 				template_spec, err = ast_parse_template_spec_no_keyword(ctx, tokens)
 				if err != nil {
-					panic(fmt.tprintf("Failed to parse template spec at %v.", err))
+					panic(fmt.tprintf("Failed to parse template spec: %v.", err))
 				}
 
 				eat_token_expect(tokens, .NewLine, false)
@@ -62,16 +62,16 @@ ast_parse_filescope_sequence :: proc(ctx : ^AstContext, tokens_ : []Token) -> As
 					append(&sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, node))
 					
 					if _, err := eat_token_expect(tokens, .Semicolon); err != nil {
-						panic(fmt.tprintf("Unexpected token after %v def: %v\n", token.source, err))
+						panic(fmt.tprintf("Unexpected token after %v def: %v.", token.source, err))
 					}
 				}
 				else {
-					panic(fmt.tprintf("Failed to parse %v at %v.", token.source, node_err))
+					panic(fmt.tprintf("Failed to parse %v: %v.", token.source, node_err))
 				}
 
 			case .Namespace, .Identifier:
 				if node_idx, eat_paragraph, err := ast_parse_declaration(ctx, tokens, &sequence); err != nil {
-					panic(fmt.tprintf("Failed to parse declaration at %v.", err))
+					panic(fmt.tprintf("Failed to parse declaration: %v.", err))
 				}
 				else {
 					#partial switch ctx.ast[node_idx].kind {
@@ -118,7 +118,7 @@ ast_try_parse_preproc_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, seq
 			tokens^ = tokenss
 			node, err := ast_parse_preproc_define(ctx, tokens)
 			if err != nil {
-				panic(fmt.tprintf("Failed to parse preproc define at %v.", err))
+				panic(fmt.tprintf("Failed to parse preproc define: %v.", err))
 			}
 			append(sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, node))
 
@@ -126,7 +126,7 @@ ast_try_parse_preproc_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, seq
 			tokens^ = tokenss
 			expr, err := ast_parse_preproc_to_line_end(tokens)
 			if err != nil {
-				panic(fmt.tprintf("Failed to parse preproc undef at %v.", err))
+				panic(fmt.tprintf("Failed to parse preproc undef: %v.", err))
 			}
 			append(sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .Comment, literal = {
 				kind = .Comment,
@@ -138,7 +138,7 @@ ast_try_parse_preproc_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, seq
 			tokens^ = tokenss
 			expr, err := ast_parse_preproc_to_line_end(tokens)
 			if err != nil {
-				panic(fmt.tprintf("Failed to parse preproc if at %v.", err))
+				panic(fmt.tprintf("Failed to parse preproc if: %v.", err))
 			}
 			append(sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .PreprocIf, token_sequence = expr }))
 
@@ -146,7 +146,7 @@ ast_try_parse_preproc_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, seq
 			tokens^ = tokenss
 			expr, err := ast_parse_preproc_to_line_end(tokens)
 			if err != nil {
-				panic(fmt.tprintf("Failed to parse preproc else at %v.", err))
+				panic(fmt.tprintf("Failed to parse preproc else: %v.", err))
 			}
 			append(sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .PreprocElse, token_sequence = expr }))
 
@@ -261,10 +261,10 @@ ast_parse_template_spec_no_keyword :: proc(ctx : ^AstContext, tokens : ^[]Token)
 		name := tokens[0]; tokens^ = tokens[1:]
 		
 		initializer_expression : AstNodeIndex
-		if n, ns := peek_token(tokens); n.kind == .Equals {
+		if n, ns := peek_token(tokens); n.kind == .Assign {
 			tokens^ = ns // eat = 
 
-			initializer := ast_parse_expression(ctx, tokens, .Comma - ._1) or_return
+			initializer := ast_parse_expression(ctx, tokens, .Comparison - ._1) or_return
 			initializer_expression = transmute(AstNodeIndex) append_return_index(ctx.ast, initializer)
 		}
 
@@ -324,7 +324,7 @@ ast_parse_structure :: proc(ctx: ^AstContext, tokens : ^[]Token) -> (node : AstN
 	}
 	
 	if next.kind != .BracketCurlyOpen {
-		err = next
+		err = AstError_{ actual = next, expected = { kind = .BracketCurlyOpen } }
 		return
 	}
 	tokens^ = nexts
@@ -389,6 +389,12 @@ ast_parse_declaration :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[
 		resize(ctx.ast, ast_reset)
 		resize(sequence, sequence_reset)
 		tokens^ = tokens_reset
+	}
+
+	template_spec : [dynamic]AstNodeIndex
+	if n, ns := peek_token(tokens); n.kind == .Template {
+		tokens^ = ns
+		template_spec = ast_parse_template_spec_no_keyword(ctx, tokens) or_return
 	}
 
 	storage := ast_parse_storage_modifier(tokens)
@@ -554,7 +560,7 @@ ast_parse_declaration :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[
 				fallthrough
 
 			case:
-				err = nn
+				err = AstError_{ actual = nn, message = "Expected valid operator (one of ~, ++, --, ==, !=, +, -, *, /, &, |, ^, =, +=, -=, *=, /=, [], new, delete)" }
 				return
 		}
 			
@@ -571,7 +577,7 @@ ast_parse_declaration :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[
 				case .Star:      node.operator_def.kind = .Dereference
 				case .Ampersand: node.operator_def.kind = .AddressOf
 				case:
-					err = nn
+					err = AstError_{ actual = nn, message = "Expected valid unary operator (one of +, -, *, &)" }
 					return
 			}
 		}
@@ -590,6 +596,7 @@ ast_parse_declaration :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[
 
 		if next.kind == .BracketRoundOpen {
 			fndef_node := ast_parse_function_def_no_return_type_and_name(ctx, tokens) or_return
+			fndef_node.function_def.template_spec = template_spec
 			fndef_node.function_def.return_type =  transmute(AstNodeIndex) append_return_index(ctx.ast, type_node)
 			fndef_node.function_def.function_name = ast_filter_qualified_name(name)
 			fndef_node.function_def.flags |= transmute(AstFunctionDefFlags) storage;
@@ -789,7 +796,7 @@ ast_parse_function_def_no_return_type_and_name :: proc(ctx: ^AstContext, tokens 
 		}
 		else if t.kind == .Identifier && (t.source == "IM_FMTARGS" || t.source == "IM_FMTLIST") { // IM_FMTARGS(1)  @hardcoded
 			tokens^ = sss[3:] // skip evetything
-			
+
 			t, sss = peek_token(tokens)
 		}
 		else if t.kind == .Comment {
@@ -846,7 +853,7 @@ ast_parse_function_def_no_return_type_and_name :: proc(ctx: ^AstContext, tokens 
 		node.function_def.body_sequence = body_sequence
 	}
 	else {
-		err = t
+		err = AstError_{ actual = t, message = "Expected either ';' as forward declaration or '{' folowed by funcion body" }
 		return
 	}
 
@@ -1036,7 +1043,7 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 			err = nil
 			return
 	}
-	err = next
+	err = AstError_{ actual = next, message = "Expected a type into a var declaration" }
 
 	if type_node, type_err := ast_parse_type(ctx, tokens); type_err == nil {
 		err = ast_parse_var_declaration_no_type(ctx, tokens, type_node, sequence, transmute(AstVariableDefFlags) storage)
@@ -1212,7 +1219,7 @@ ast_parse_var_declaration_no_type :: proc(ctx: ^AstContext, tokens : ^[]Token, p
 					break type_prefix_loop
 
 				case:
-					err = next
+					err = AstError_{ actual = next, message = "Expected type extension" }
 					return
 			}
 		}
@@ -1349,7 +1356,9 @@ ast_parse_type_inner :: proc(ctx : ^AstContext, tokens : ^[]Token, type : ^[dyna
 	// A<int, int*>
 
 	type_reset := len(type)
+	tokens_reset := tokens^
 	defer if err != nil {
+		tokens^ = tokens_reset
 		resize(type, type_reset)
 	}
 
@@ -1421,12 +1430,24 @@ ast_parse_type_inner :: proc(ctx : ^AstContext, tokens : ^[]Token, type : ^[dyna
 							append(type, nn); tokens^ = nns
 
 						case:
-							ast_parse_type_inner(ctx, tokens, type) or_return
+							type_err := ast_parse_type_inner(ctx, tokens, type)
+							if type_err == nil { continue }
+
+							expr, expr_err := ast_parse_expression(ctx, tokens, .Comparison - ._1)
+							if expr_err == nil {
+								append(type, Token{ kind = .AstNode, location = {
+									column = append_return_index(ctx.ast, expr)
+								}});
+								continue
+							}
+							else {
+								return AstError_{ actual = expr_err.?.actual, message = "Expected inner type or expression" }
+							}
 					}
 				}
 
 			case:
-				if !has_name && !has_int_modifier { err = n }
+				if !has_name && !has_int_modifier { err = AstError_{ actual = n, message = "Expected type" } }
 				return
 		}
 	}
@@ -1457,10 +1478,13 @@ ast_parse_qualified_name :: proc(tokens : ^[]Token) -> (r : TokenRange, err : As
 	}
 
 	end := raw_data(tokens^)
-	if start > end { err = start[0]; return }
+	if start > end {
+		err = AstError_{ actual = start[0], message = "Expected qualified name" }
+		return
+	}
 
 	range := slice_from_se(start, end)
-	return range, len(range) > 0 ? nil : start[0]
+	return range, len(range) > 0 ? nil : AstError_{ actual = start[0], message = "Expected qualified name" }
 }
 
 ast_filter_qualified_name :: proc(tokens : TokenRange) -> (dest : [dynamic]Token)
@@ -1529,7 +1553,8 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 		}
 	}
 	
-	err, _ = peek_token(tokens)
+	err_, _ := peek_token(tokens)
+	err = AstError_{ actual = err_, message = "Expected valid expression" }
 	for {
 		before_iteration := tokens^
 
@@ -1543,7 +1568,7 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 					member_name, ns := peek_token(tokens)
 
 					member_node : AstNode
-					if member_name.kind == .Tilde {
+					if member_name.kind == .Tilde { // explicit dtor call
 						tokens^ = ns // skip ~
 						member_node = ast_parse_function_call(ctx, tokens) or_return
 						member_node.function_call.is_destructor = true
@@ -1786,7 +1811,7 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 						tokens^ = ns
 						node.operator_call.kind = .Index
 					case: // TODO explicit custom cast call doesnt make much sense
-						err = n
+						err = AstError_{ actual = n, message = "Expected valid operator (one of ~, ++, --, ==, !=, +, -, *, /, &, |, ^, =, +=, -=, *=, /=, [])" }
 						return
 				}
 
@@ -1799,7 +1824,7 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 				if err == nil && max_presedence >= .Comma {
 					tokens^ = nexts // eat the ,
 					append(&sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, node))
-					err = next
+					err = AstError_{ actual = next, message = "Expected preceeding comma to not be freestanding" }
 					continue
 				}
 				else {
@@ -1839,7 +1864,7 @@ eat_token_expect :: proc(tokens : ^[]Token, expected_type : TokenKind, ignore_ne
 		tokens^ = s
 	}
 	else {
-		err = t
+		err = AstError_{ actual = t, expected = { kind = expected_type } }
 	}
 
 	return
@@ -1886,7 +1911,11 @@ find_next_actual_token :: proc(tokens : ^[]Token) -> [^]Token #no_bounds_check
 
 
 
-AstError :: Maybe(Token)
+AstError :: Maybe(AstError_)
+AstError_ :: struct {
+	actual, expected : Token,
+	message : string,
+}
 
 // not castable to AstUnaryOp or AstBinaryOp
 AstOverloadedOp :: enum {
@@ -2271,5 +2300,23 @@ fmt_astnode :: proc(fi: ^fmt.Info, node: ^AstNode, verb: rune) -> bool
 		case .Enum               : fmt.fmt_arg(fi, node.enum_, 'v')
 		case .Varargs            :
 	}
+	return true
+}
+
+fmt_ast_err_a : fmt.User_Formatter : proc(fi: ^fmt.Info, arg: any, verb: rune) -> bool
+{
+	err := transmute(^AstError_)arg.data
+	return fmt_ast_err(fi, err, 'v')
+}
+
+fmt_ast_err :: proc(fi: ^fmt.Info, err: ^AstError_, verb: rune) -> bool
+{
+	if err.message != "" {
+		fmt.fmt_string(fi, err.message, 'v')
+	}
+	else {
+		fmt.fmt_string(fi, fmt.tprintf("Expected %v", err.expected.kind), 'v')
+	}
+	fmt.fmt_string(fi, fmt.tprintf(" but found %v", err.actual), 'v')
 	return true
 }

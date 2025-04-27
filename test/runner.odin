@@ -131,7 +131,7 @@ test :: proc(t : ^testing.T)
 		clear(&ast)
 		loc.procedure = "converter.ast_parse_filescope_sequence"
 		log.debug(len(preprocessed), "tokens, building ast ... ", location = loc)
-		converter.ast_parse_filescope_sequence(&{&ast, {}}, preprocessed[:])
+		converter.ast_parse_filescope_sequence(&{ast = &ast}, preprocessed[:])
 
 		clear(&result.buf)
 		loc.procedure = "converter.convert_and_format"

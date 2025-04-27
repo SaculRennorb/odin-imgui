@@ -26,19 +26,20 @@ main :: proc()
 	tokenize_file(&input_map, "imgui_widgets.cpp")
 	tokenize_file(&input_map, "imconfig.h")
 
-	preprocessed : [dynamic]Token
-	preprocess(&{ result = &preprocessed, inputs = input_map }, "imgui.cpp")
-
-	ignore_identifiers := []string {
+	ignored_identifiers := []string {
 		"IM_MSVC_RUNTIME_CHECKS_OFF",
 		"IM_MSVC_RUNTIME_CHECKS_RESTORE",
 		"IM_VEC2_CLASS_EXTRA",
 		"IM_VEC4_CLASS_EXTRA",
-		"IMGUI_API"
+		"IMGUI_API",
+		"IMGUI_CDECL",
 	}
 
+	preprocessed : [dynamic]Token
+	preprocess(&{ result = &preprocessed, inputs = input_map, ignored_identifiers = ignored_identifiers }, "imgui.cpp")
+
 	ast  : [dynamic]AstNode
-	ast_parse_filescope_sequence(&{ ast = &ast, ignore_identifiers = ignore_identifiers}, preprocessed[:])
+	ast_parse_filescope_sequence(&{ ast = &ast }, preprocessed[:])
 
 	converter_context : ConverterContext = {ast = ast[:]}
 	convert_and_format(&converter_context)

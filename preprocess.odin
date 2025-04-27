@@ -13,6 +13,7 @@ PreProcContext :: struct {
 	result  : ^[dynamic]Token,
 	inputs  : map[string]Input,
 	defines : map[string]Token,
+	ignored_identifiers : []string,
 }
 
 preprocess :: proc(ctx : ^PreProcContext, entry_file : string)
@@ -27,9 +28,21 @@ preprocess :: proc(ctx : ^PreProcContext, entry_file : string)
 		loop: for len(tokens) > 0 {
 			current_token := tokens[0]
 			tokens = tokens[1:]
-			if current_token.kind != .Pound {
-				append(ctx.result, current_token)
-				continue
+			#partial switch current_token.kind {
+				case .Pound:
+					break; // do processing
+
+				case .Identifier:
+					for ignored in ctx.ignored_identifiers {
+						if current_token.source == ignored {
+							continue loop // skip appending the ignored token if it is not part of a preproc statement
+						}
+					}
+					fallthrough
+
+				case:
+					append(ctx.result, current_token)
+					continue
 			}
 
 			ident := eat_token(&tokens) // cleanup
@@ -66,9 +79,9 @@ preprocess :: proc(ctx : ^PreProcContext, entry_file : string)
 
 					included, found := &ctx.inputs[include_path]
 					if !found {
-						str := fmt.tprintf("%v\nFailed to find include %v in", args, include_path)
+						str := fmt.tprintf("%v\nFailed to find include %v for %v in", args, include_path, ident.location)
 						for k, v in ctx.inputs {
-							str = fmt.tprintf("%v\n%v => [%v]Token", str, k, len(v.tokens))
+							str = fmt.tprintf("  %v\n%v => [%v]Token", str, k, len(v.tokens))
 						}
 						panic(str)
 					}
@@ -76,6 +89,7 @@ preprocess :: proc(ctx : ^PreProcContext, entry_file : string)
 					if !included.used {
 						do_preprocess(ctx, included)
 					}
+					continue loop
 
 				case "pragma":
 					args : []Token
@@ -88,24 +102,34 @@ preprocess :: proc(ctx : ^PreProcContext, entry_file : string)
 						args = slice_from_se(raw_data(args_start), raw_data(tokens))
 
 						tokens = tokens[1:]
-						eat_token_expect(&tokens, .NewLine)
+						eat_token_expect(&tokens, .NewLine) // maybe eat second newline
 					}
 
 					switch args[0].source {
 						case "once":
 							input.used = true
+							continue loop
 
 						case "warning", "clang", "GCC": // pragma warning push
 							/* just ignore */
+							continue loop
+
+						case "comment":
+							// #pragma comment(lib, "user32")
+							// just ignore for now 
+							continue loop
 
 						case:
-							panic(fmt.tprintf("Unknown pragma: %v", args))
+							panic(fmt.tprintf("Unknown pragma: %v at %v", args, ident.location))
 					}
 					
 
 
 				case "define":
 					append(ctx.result, Token{ kind = .PreprocDefine, location = ident.location })
+
+				case "undef":
+					append(ctx.result, Token{ kind = .PreprocUndefine, location = ident.location })
 
 				case "if":
 					append(ctx.result, Token{ kind = .PreprocIf, location = ident.location })

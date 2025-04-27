@@ -3,11 +3,11 @@ package program
 import "core:fmt"
 import "core:slice"
 import "core:io"
+import "base:intrinsics"
 import str "core:strings"
 
 AstContext :: struct {
 	ast: ^[dynamic]AstNode,
-	ignore_identifiers : []string,
 }
 
 ast_parse_filescope_sequence :: proc(ctx : ^AstContext, tokens_ : []Token) -> AstNode
@@ -70,13 +70,6 @@ ast_parse_filescope_sequence :: proc(ctx : ^AstContext, tokens_ : []Token) -> As
 				}
 
 			case .Namespace, .Identifier:
-				for name in ctx.ignore_identifiers {
-					if token.source == name {
-						tokens^ = tokenss
-						break type_switch
-					}
-				}
-
 				if node_idx, eat_paragraph, err := ast_parse_declaration(ctx, tokens, &sequence); err != nil {
 					panic(fmt.tprintf("Failed to parse declaration at %v.", err))
 				}
@@ -128,6 +121,18 @@ ast_try_parse_preproc_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, seq
 				panic(fmt.tprintf("Failed to parse preproc define at %v.", err))
 			}
 			append(sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, node))
+
+		case .PreprocUndefine:
+			tokens^ = tokenss
+			expr, err := ast_parse_preproc_to_line_end(tokens)
+			if err != nil {
+				panic(fmt.tprintf("Failed to parse preproc undef at %v.", err))
+			}
+			append(sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .Comment, literal = {
+				kind = .Comment,
+				location = token.location,
+				source = fmt.aprintf("//TODO @gen: there was a '#undef %v' here, that cannot be emulated in odin. Make sure everything works as expected."),
+			}}))
 
 		case .PreprocIf:
 			tokens^ = tokenss
@@ -647,6 +652,7 @@ ast_parse_storage_modifier :: proc(tokens : ^[]Token) -> (storage : AstStorageMo
 			case "extern": storage |= { .Extern }
 			case "constexpr": storage |= { .Constexpr }
 			case "mutable": storage |= { .Mutable }
+			case "explicit": storage |= { .Explicit }
 			case: break storage_loop
 		}
 
@@ -783,6 +789,13 @@ ast_parse_function_def_no_return_type_and_name :: proc(ctx: ^AstContext, tokens 
 		}
 		else if t.kind == .Identifier && (t.source == "IM_FMTARGS" || t.source == "IM_FMTLIST") { // IM_FMTARGS(1)  @hardcoded
 			tokens^ = sss[3:] // skip evetything
+			
+			t, sss = peek_token(tokens)
+		}
+		else if t.kind == .Comment {
+			tokens^ = sss
+
+			append(&node.function_def.attached_comments, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .Comment, literal = t }))
 
 			t, sss = peek_token(tokens)
 		}
@@ -1062,14 +1075,6 @@ ast_parse_scoped_sequence_no_open_brace :: proc(ctx: ^AstContext, tokens : ^[]To
 				tokens^ = ns
 				append(sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .Comment, literal = n }))
 				continue
-
-			case .Identifier:
-				for ignore in ctx.ignore_identifiers {
-					if n.source == ignore {
-						tokens^ = ns
-						continue loop
-					}
-				}
 		}
 
 		was_preproc := ast_try_parse_preproc_statement(ctx, tokens, sequence, n, ns)
@@ -1707,23 +1712,29 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 
 				if type, type_err := ast_parse_type(ctx, &nexts); type_err == nil && find_next_actual_token(&nexts)[0].kind == .BracketRoundClose { // cast: (type) expression
 					eat_token_expect(&nexts, .BracketRoundClose) or_return
-					expression := ast_parse_expression(ctx, &nexts, .CCast) or_return
 
-					tokens^ = nexts
+					if expression, expr_err := ast_parse_expression(ctx, &nexts, .CCast); expr_err == nil {
+						// next expression parsed properly, this was in fact a cast
+						tokens^ = nexts
 
-					node = AstNode { kind = .ExprCast, cast_ = {
-						type = transmute(AstNodeIndex) append_return_index(ctx.ast, type),
-						expression = transmute(AstNodeIndex) append_return_index(ctx.ast, expression),
-					}}
+						node = AstNode { kind = .ExprCast, cast_ = {
+							type = transmute(AstNodeIndex) append_return_index(ctx.ast, type),
+							expression = transmute(AstNodeIndex) append_return_index(ctx.ast, expression),
+						}}
+
+						err = nil
+						continue
+					}
+					// next expression failed to parse, this was actualyl a bracketed expression that looked like a type
+					//TODO(Rennorb) @perf: Duplicate some work by reparsing, probably doenst matter.
 				}
-				else { // bracketed expression: (expression)
-					tokens^ = og_nexts
+				// bracketed expression: (expression)
+				tokens^ = og_nexts
 
-					inner := ast_parse_expression(ctx, tokens) or_return
-					node = AstNode { kind = .ExprBacketed, inner = transmute(AstNodeIndex) append_return_index(ctx.ast, inner)}
+				inner := ast_parse_expression(ctx, tokens) or_return
+				node = AstNode { kind = .ExprBacketed, inner = transmute(AstNodeIndex) append_return_index(ctx.ast, inner)}
 
-					eat_token_expect(tokens, .BracketRoundClose) or_return
-				}
+				eat_token_expect(tokens, .BracketRoundClose) or_return
 
 				err = nil
 				continue
@@ -2071,6 +2082,7 @@ AstNode :: struct {
 		operator_def : struct {
 			kind : AstOverloadedOp,
 			underlying_function : AstNodeIndex,
+			is_explicit : bool,
 		},
 		index : struct {
 			array_expression : AstNodeIndex,
@@ -2132,6 +2144,8 @@ AstStorageModifierFlag :: enum{
 	Inline,
 	Constexpr,
 	Mutable,
+	Explicit,
+	_1 = 10,
 }
 AstStorageModifier :: bit_set[AstStorageModifierFlag]
 
@@ -2141,6 +2155,7 @@ AstVariableDefFlags :: bit_set[enum{
 	Inline      = cast(int) AstStorageModifier.Inline,
 	ThreadLocal = cast(int) AstStorageModifier.ThreadLocal,
 	Mutable     = cast(int) AstStorageModifier.Mutable,
+	_1 = 10,
 }]
 
 AstFunctionDefFlags :: bit_set[enum{

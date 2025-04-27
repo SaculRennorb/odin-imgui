@@ -409,6 +409,7 @@ TokenKind :: enum {
 	Else,
 
 	PreprocDefine,
+	PreprocUndefine,
 	PreprocIf,
 	PreprocElse,
 	PreprocEndif,

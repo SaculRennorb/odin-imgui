@@ -1818,7 +1818,30 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 				ast_parse_function_call_arguments(ctx, tokens, &node.operator_call.parameters) or_return
 
 				err = nil
-				return
+				continue
+
+			case .BracketCurlyOpen: // compound initializer
+				tokens^ = nexts // eat the {
+				node = AstNode{ kind = .CompoundInitializer }
+
+				member_loop: for {
+					n, ns := peek_token(tokens)
+					#partial switch n.kind {
+						case .BracketCurlyClose:
+							tokens^ = ns // eat the }
+							break member_loop
+
+						case .Comma:
+							tokens^ = ns // eat the ,
+
+						case:
+							expression := ast_parse_expression(ctx, tokens, .Comma - ._1) or_return
+							append(&node.compound_initializer.values, transmute(AstNodeIndex) append_return_index(ctx.ast, expression))
+					}
+				}
+
+				err = nil
+				continue
 
 			case .Comma:
 				if err == nil && max_presedence >= .Comma {
@@ -2019,6 +2042,7 @@ AstNodeKind :: enum {
 	MemberAccess,
 	FunctionCall,
 	OperatorCall,
+	CompoundInitializer,
 	FunctionDefinition,
 	OperatorDefinition,
 	Type,
@@ -2085,6 +2109,9 @@ AstNode :: struct {
 		operator_call : struct {
 			kind : AstOverloadedOp,
 			parameters : [dynamic]AstNodeIndex,
+		},
+		compound_initializer : struct {
+			values : [dynamic]AstNodeIndex,
 		},
 		assert : struct {
 			condition : AstNodeIndex,
@@ -2287,6 +2314,7 @@ fmt_astnode :: proc(fi: ^fmt.Info, node: ^AstNode, verb: rune) -> bool
 		case .MemberAccess       : fmt.fmt_arg(fi, node.member_access, 'v')
 		case .FunctionCall       : fmt.fmt_arg(fi, node.function_call, 'v')
 		case .OperatorCall       : fmt.fmt_arg(fi, node.operator_call, 'v')
+		case .CompoundInitializer: fmt.fmt_arg(fi, node.compound_initializer, 'v')
 		case .FunctionDefinition : fmt.fmt_arg(fi, node.function_def, 'v')
 		case .OperatorDefinition : fmt.fmt_arg(fi, node.operator_def, 'v')
 		case .Type               : fmt.fmt_arg(fi, node.type, 'v')

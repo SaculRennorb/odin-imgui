@@ -509,6 +509,16 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 
 				requires_termination = true
 
+			case .CompoundInitializer:
+				str.write_string(&ctx.result, "{ ")
+				for vidx, i in current_node.compound_initializer.values {
+					if i != 0 { str.write_string(&ctx.result, ", ") }
+					write_node(ctx, vidx, name_context)
+				}
+				str.write_string(&ctx.result, " }")
+
+				requires_termination = true
+
 			case .Namespace:
 				ns := current_node.namespace
 

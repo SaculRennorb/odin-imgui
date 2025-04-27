@@ -244,6 +244,9 @@ tokenize :: proc(tokens : ^[dynamic]Token, text : string, file_path : string)
 					case "namespace":   append(tokens, Token{.Namespace, str, loc})
 					case "operator":    append(tokens, Token{.Operator, str, loc})
 					case "static_cast": append(tokens, Token{.StaticCast, str, loc})
+					case "public":      append(tokens, Token{.Public, str, loc})
+					case "protected":   append(tokens, Token{.Protected, str, loc})
+					case "private":     append(tokens, Token{.Private, str, loc})
 					case:
 						append(tokens, Token{.Identifier, str, loc})
 				}
@@ -388,6 +391,10 @@ TokenKind :: enum {
 	LiteralNull,
 	Comment,
 	Ellipsis,
+
+	Public,
+	Private,
+	Protected,
 
 	Typedef,
 	Struct,

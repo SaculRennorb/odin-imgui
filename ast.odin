@@ -309,6 +309,13 @@ ast_parse_structure :: proc(ctx: ^AstContext, tokens : ^[]Token) -> (node : AstN
 		if next.kind == .Colon {
 			tokens^ = nexts // eat the : 
 
+			//NOTE(Rennorb): no multiple inheritance for now
+
+			#partial switch n, ns := peek_token(tokens); n.kind {
+				case .Public, .Protected, .Private:
+					tokens^ = ns
+			}
+
 			bt : [dynamic]Token
 			ast_parse_type_inner(ctx, tokens, &bt) or_return
 			node.structure.base_type = bt[:]

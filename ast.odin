@@ -961,6 +961,12 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 
 			body_sequence : [dynamic]AstNodeIndex
 			defer if err != nil { delete(body_sequence) }
+			// @brittle
+			if c, cerr := eat_token_expect(tokens, .Comment); cerr == nil {
+				append(&body_sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .NewLine }))
+				append(&body_sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .Comment, literal = c }))
+			}
+
 			n, ns := peek_token(tokens)
 			if n.kind == .BracketCurlyOpen {
 				tokens^ = ns
@@ -992,6 +998,12 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 
 			body_sequence : [dynamic]AstNodeIndex
 			defer if err != nil { delete(body_sequence) }
+			// @brittle
+			if c, cerr := eat_token_expect(tokens, .Comment); cerr == nil {
+				append(&body_sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .NewLine }))
+				append(&body_sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .Comment, literal = c }))
+			}
+
 			n, ns := peek_token(tokens)
 			if n.kind == .BracketCurlyOpen {
 				tokens^ = ns
@@ -1017,6 +1029,13 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 
 			body_sequence : [dynamic]AstNodeIndex
 			defer if err != nil { delete(body_sequence) }
+
+			// @brittle
+			if c, cerr := eat_token_expect(tokens, .Comment); cerr == nil {
+				append(&body_sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .NewLine }))
+				append(&body_sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .Comment, literal = c }))
+			}
+
 			n, ns := peek_token(tokens)
 			if n.kind == .BracketCurlyOpen {
 				tokens^ = ns

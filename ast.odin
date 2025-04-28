@@ -1317,6 +1317,26 @@ ast_parse_var_declaration_no_type :: proc(ctx: ^AstContext, tokens : ^[]Token, p
 		}}
 		append(sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, node))
 
+		if next.kind == .BracketRoundOpen { //  S123  a(1, 2, 3) type of initializer
+			// dont eat opeing (, it will get eaten by ast_aprse_function_call_arguments
+
+			ident := make([dynamic]Token, 1)
+			ident[0] = name
+
+			call := AstNode{ kind = .FunctionCall, function_call = { qualified_name = make([dynamic]Token, 1) } }
+			call.function_call.qualified_name[0] = Token{ kind = .Identifier, source = "init", location = next.location }
+			ast_parse_function_call_arguments(ctx, tokens, &call.function_call.arguments) or_return
+
+			synthesized_initializer := AstNode{ kind = .MemberAccess, member_access = {
+				expression = transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .Identifier, identifier = ident }),
+				member = transmute(AstNodeIndex) append_return_index(ctx.ast, call),
+			}}
+
+			append(sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, synthesized_initializer))
+
+			next, ns = peek_token(tokens)
+		}
+
 		if next.kind != .Comma || stop_at_comma { return }
 		
 		tokens^ = ns // eat ,

@@ -6,5 +6,11 @@ A1019 :: struct {
 
 fn1019 :: proc()
 {
-	a : A1019 = { 1, 2 }
+	a : A1019 = {1, 2}
+	b : A1019 = {
+		when defined ( A ) {
+		1,
+		} // preproc endif
+		2, // test
+	}
 }

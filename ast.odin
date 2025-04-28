@@ -1925,7 +1925,7 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 				node = AstNode{ kind = .CompoundInitializer }
 
 				member_loop: for {
-					n, ns := peek_token(tokens)
+					n, ns := peek_token(tokens, false)
 					#partial switch n.kind {
 						case .BracketCurlyClose:
 							tokens^ = ns // eat the }
@@ -1934,9 +1934,21 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 						case .Comma:
 							tokens^ = ns // eat the ,
 
+						case .Comment:
+							tokens^ = ns
+							append(&node.compound_initializer.values, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .Comment, literal = n }))
+
+						case .NewLine:
+							tokens^ = ns
+							append(&node.compound_initializer.values, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .NewLine }))
+
 						case:
-							expression := ast_parse_expression(ctx, tokens, .Comma - ._1) or_return
-							append(&node.compound_initializer.values, transmute(AstNodeIndex) append_return_index(ctx.ast, expression))
+							was_preproc := ast_try_parse_preproc_statement(ctx, tokens, &node.compound_initializer.values, n, ns)
+
+							if !was_preproc {
+								expression := ast_parse_expression(ctx, tokens, .Comma - ._1) or_return
+								append(&node.compound_initializer.values, transmute(AstNodeIndex) append_return_index(ctx.ast, expression))
+							}
 					}
 				}
 

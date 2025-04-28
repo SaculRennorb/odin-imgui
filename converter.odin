@@ -279,8 +279,9 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 
 				if vardef.initializer_expression != {} {
 					str.write_string(&ctx.result, " = ")
-					write_node(ctx, vardef.initializer_expression, name_context)
+					write_node(ctx, vardef.initializer_expression, name_context, indent_str)
 				}
+
 				requires_termination = true
 
 			case .Return:
@@ -294,8 +295,12 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 			case .LiteralBool, .LiteralFloat, .LiteralInteger, .LiteralString, .LiteralCharacter, .Continue, .Break:
 				str.write_string(&ctx.result, current_node.literal.source)
 
+				requires_termination = true
+
 			case .LiteralNull:
 				str.write_string(&ctx.result, "nil")
+
+				requires_termination = true
 
 			case .ExprUnaryLeft:
 				switch current_node.unary_left.operator {
@@ -402,11 +407,15 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 				write_node(ctx, current_node.inner, name_context)
 				str.write_byte(&ctx.result, ')')
 
+				requires_termination = true
+
 			case .ExprCast:
 				str.write_string(&ctx.result, "cast(")
 				write_type_node(ctx, ctx.ast[current_node.cast_.type], name_context)
 				str.write_string(&ctx.result, ") ")
 				write_node(ctx, current_node.cast_.expression, name_context)
+
+				requires_termination = true
 
 			case .MemberAccess:
 				member := ctx.ast[current_node.member_access.member]
@@ -482,12 +491,16 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 				write_node(ctx, current_node.index.index_expression, name_context)
 				str.write_byte(&ctx.result, ']')
 
+				requires_termination = true
+
 			case .ExprTenary:
 				write_node(ctx, current_node.tenary.condition, name_context)
 				str.write_string(&ctx.result, " ? ")
 				write_node(ctx, current_node.tenary.true_expression, name_context)
 				str.write_string(&ctx.result, " : ")
 				write_node(ctx, current_node.tenary.false_expression, name_context)
+
+				requires_termination = true
 
 			case .Identifier:
 				_, def := find_definition_for_name(ctx, name_context, current_node.identifier[:])
@@ -513,12 +526,13 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 				requires_termination = true
 
 			case .CompoundInitializer:
-				str.write_string(&ctx.result, "{ ")
-				for vidx, i in current_node.compound_initializer.values {
-					if i != 0 { str.write_string(&ctx.result, ", ") }
-					write_node(ctx, vidx, name_context)
-				}
-				str.write_string(&ctx.result, " }")
+				body_indent_str := str.concatenate({ indent_str, ONE_INDENT }, context.temp_allocator)
+
+				body := current_node.compound_initializer.values[:]
+				str.write_byte(&ctx.result, '{')
+				write_node_sequence(ctx, body, name_context, body_indent_str, termination = ",", always_terminate = true)
+				if len(body) > 0 && ctx.ast[last(body)^].kind == .NewLine { str.write_string(&ctx.result, indent_str) }
+				str.write_byte(&ctx.result, '}')
 
 				requires_termination = true
 
@@ -717,7 +731,7 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 		return
 	}
 
-	write_node_sequence :: proc(ctx : ^ConverterContext, sequence : []AstNodeIndex, name_context : NameContextIndex, indent_str : string, definition_prefix := "")
+	write_node_sequence :: proc(ctx : ^ConverterContext, sequence : []AstNodeIndex, name_context : NameContextIndex, indent_str : string, definition_prefix := "", termination := ";", always_terminate := false)
 	{
 		previous_requires_termination := false
 		previous_requires_new_paragraph := false
@@ -729,7 +743,10 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 			if ctx.ast[ci].attached { continue }
 
 			node_kind := ctx.ast[ci].kind
-			if previous_requires_termination && node_kind != .NewLine { str.write_string(&ctx.result, "; ") }
+			if previous_requires_termination && (always_terminate ||  (node_kind != .NewLine)) {
+				str.write_string(&ctx.result, termination)
+				if node_kind != .NewLine { str.write_byte(&ctx.result, ' ') }
+			}
 			if previous_requires_new_paragraph && len(sequence) > cii + 1 {
 				if node_kind != .NewLine { str.write_string(&ctx.result, "\n\n") }
 				else if ctx.ast[sequence[cii + 1]].kind != .NewLine { str.write_byte(&ctx.result, '\n') }

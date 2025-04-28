@@ -599,7 +599,7 @@ ast_parse_declaration :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[
 				err = AstError_{ actual = nn, message = "Expected valid operator (one of ~, ++, --, ==, !=, +, -, *, /, &, |, ^, =, +=, -=, *=, /=, [], new, delete)" }
 				return
 		}
-			
+
 		fn_node := ast_parse_function_def_no_return_type_and_name(ctx, tokens) or_return
 		node.operator_def.underlying_function = transmute(AstNodeIndex) append_return_index(ctx.ast, fn_node)
 
@@ -1376,8 +1376,21 @@ ast_parse_function_call :: proc(ctx: ^AstContext, tokens : ^[]Token) -> (node : 
 
 
 	qualified_name := ast_parse_qualified_name(tokens) or_return
-	ast_parse_function_call_arguments(ctx, tokens, &arguments) or_return
-
+	// Some special parsing for va_arg function...
+	// Ually this would have to be way more complicated to handle macros, but ill jsut hardcode this.
+	if last(qualified_name).source == "va_arg" {
+		eat_token_expect(tokens, .BracketRoundOpen) or_return
+		resize(&arguments, 2)
+		arguments[0] = transmute(AstNodeIndex) append_return_index(ctx.ast, ast_parse_expression(ctx, tokens, .Comma - ._1) or_return)
+		eat_token_expect(tokens, .Comma) or_return
+		type_node := AstNode{ kind = .Type }
+		ast_parse_type_inner(ctx, tokens, &type_node.type) or_return
+		arguments[1] = transmute(AstNodeIndex) append_return_index(ctx.ast, type_node)
+		eat_token_expect(tokens, .BracketRoundClose) or_return
+	}
+	else {
+		ast_parse_function_call_arguments(ctx, tokens, &arguments) or_return
+	}
 	node = AstNode{ kind = .FunctionCall, function_call = {
 		qualified_name = ast_filter_qualified_name(qualified_name),
 		arguments = arguments,

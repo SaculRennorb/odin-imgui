@@ -74,6 +74,9 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 					write_function(ctx, name_context, define.type, "", nil, "", true)
 				}
 
+			case .Type:
+				write_type(ctx, current_node.type[:], name_context)
+
 			case .PreprocMacro:
 				macro := current_node.preproc_macro
 
@@ -1719,6 +1722,10 @@ translate_type :: proc(output : ^[dynamic]TypeSegment, ast : []AstNode, input : 
 						input^ = input[1:]
 						append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = "typeid" } })
 
+					case "va_list":
+						input^ = input[1:]
+						append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = "[]any" } })
+
 					case:
 						frag := _TypeFragment{ identifier = input[0] }
 						input^ = input[1:]
@@ -1765,6 +1772,9 @@ defined :: #force_inline proc "contextless" ($I) -> bool { I }
  pre_incr :: #force_inline proc "contextless" (p : ^$T) -> (new : T) { p^ += 1; return p }
 post_decr :: #force_inline proc "contextless" (p : ^$T) -> (old : T) { old = p; p^ -= 1; return }
 post_incr :: #force_inline proc "contextless" (p : ^$T) -> (old : T) { old = p; p^ += 1; return }
+
+va_arg :: #force_inline proc(args : ^[]any, $T : typeid) -> (r : T) { r = (cast(T^) args[0])^; args^ = args[1:] }
+
 `)
 
 	for name, overloads in ctx.overload_resolver {

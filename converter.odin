@@ -634,11 +634,12 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 						str.write_string(&ctx.result, " {")
 						body_indent_str = str.concatenate({ indent_str, ONE_INDENT }, context.temp_allocator)
 						write_node_sequence(ctx, branch.true_branch_sequence[:], name_context, body_indent_str)
+						if ctx.ast[last(branch.true_branch_sequence[:])^].kind == .NewLine {
+							str.write_string(&ctx.result, indent_str);
+						}
 						str.write_byte(&ctx.result, '}')
 
 						resize(&ctx.context_heap, context_heap_reset)
-
-						str.write_string(&ctx.result, indent_str);
 				}
 
 				switch len(branch.false_branch_sequence) {
@@ -659,6 +660,9 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 							str.write_string(&ctx.result, indent_str)
 							str.write_string(&ctx.result, "else { ")
 							write_node(ctx, branch.false_branch_sequence[0], name_context)
+							if ctx.ast[last(branch.false_branch_sequence[:])^].kind == .NewLine {
+								str.write_string(&ctx.result, indent_str);
+							}
 							str.write_string(&ctx.result, " }")
 						}
 

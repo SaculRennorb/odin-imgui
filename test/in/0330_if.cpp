@@ -4,4 +4,8 @@ void fn0330()
 	int b;
 
 	if(a) { b = 0; }
+	if(a) //comment
+	{
+		b = 0;
+	}
 }

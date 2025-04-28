@@ -1050,6 +1050,12 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 			eat_token_expect(tokens, .BracketRoundOpen) or_return
 			condition := ast_parse_expression(ctx, tokens) or_return
 			eat_token_expect(tokens, .BracketRoundClose) or_return
+
+			// @brittle
+			if c, cerr := eat_token_expect(tokens, .Comment); cerr == nil {
+				append(&node.branch.true_branch_sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .NewLine }))
+				append(&node.branch.true_branch_sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .Comment, literal = c }))
+			}
 			
 			node.branch.condition = transmute(AstNodeIndex) append_return_index(ctx.ast, condition)
 

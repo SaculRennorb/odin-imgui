@@ -70,10 +70,39 @@ ast_parse_filescope_sequence :: proc(ctx : ^AstContext, tokens_ : []Token) -> As
 				}
 
 			case .Namespace, .Identifier:
-				if node_idx, eat_paragraph, err := ast_parse_declaration(ctx, tokens, &sequence); err != nil {
+				parent_type : AstNode = --- // TODO(Rennorb) @cleanup: ast_parse_declaration is not meant to take a pointer to a live ast parent element, so we need to clone the existing one to a stack var and paste it into the correct slot when we get it back.
+				parent_type_ref : ^AstNode; parent_type_idx : AstNodeIndex
+				if token.kind == .Identifier {
+					r := tokens^
+					// detect out of band constructor. likely super brittle
+					// S123::S123(
+					if qname, qerr := ast_parse_qualified_name(tokens); qerr == nil && len(qname) >= 3 && qname[len(qname) - 3].source == qname[len(qname) - 1].source && tokens[0].kind == .BracketRoundOpen {
+
+						// questionable, but we don't have type context in the ast phase.. maybe i should change that 
+						#reverse for node, i in ctx.ast {
+							if node.kind == .Struct && len(node.structure.name) > 0 && last(node.structure.name).source == last(qname).source {
+								parent_type = node
+								parent_type_ref = &parent_type
+								parent_type_idx = transmute(AstNodeIndex) i
+								break
+							}
+						}
+
+						tokens^ = r[len(qname) - 1:] // reset to just after the last :: for proper parsing
+					}
+					else {
+						tokens^ = r
+					}
+				}
+
+				if node_idx, eat_paragraph, err := ast_parse_declaration(ctx, tokens, &sequence, parent_type_ref); err != nil {
 					panic(fmt.tprintf("Failed to parse declaration: %v.", err))
 				}
 				else {
+					if parent_type_ref != nil {
+						ctx.ast[parent_type_idx] = parent_type
+					}
+
 					#partial switch ctx.ast[node_idx].kind {
 						case .FunctionDefinition:
 							ctx.ast[node_idx].function_def.template_spec = template_spec
@@ -1088,6 +1117,12 @@ ast_parse_scoped_sequence_no_open_brace :: proc(ctx: ^AstContext, tokens : ^[]To
 			case .Comment:
 				tokens^ = ns
 				append(sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .Comment, literal = n }))
+				continue
+
+			case .Public, .Protected, .Private:
+				// ignore for now 
+				tokens^ = ns
+				eat_token_expect(tokens, .Colon) or_return
 				continue
 		}
 

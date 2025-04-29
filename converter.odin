@@ -17,6 +17,7 @@ import sa   "core:container/small_array"
 ConverterContext :: struct {
 	result : str.Builder,
 	ast : []AstNode,
+	root_sequence : []AstNodeIndex,
 	context_heap : [dynamic]NameContext,
 	overload_resolver : map[string][dynamic]string,
 }
@@ -25,15 +26,13 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 {
 	ONE_INDENT :: "\t"
 
-	if ctx.ast[0].kind != nil {
+	if len(ctx.root_sequence) != 0 {
 		current_name_context_heap = &ctx.context_heap
 		append(&ctx.context_heap, NameContext{ parent = -1 })
 
 		str.write_string(&ctx.result, "package test\n\n")
-		write_node(ctx, 0, 0, "")
+		write_node_sequence(ctx, ctx.root_sequence, 0, "")
 	}
-
-	
 
 	write_node :: proc(ctx : ^ConverterContext, current_node_index : AstNodeIndex, name_context : NameContextIndex, indent_str := "", definition_prefix := "") -> (requires_termination, requires_new_paragraph, swallow_paragraph : bool)
 	{
@@ -46,7 +45,14 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 				str.write_string(&ctx.result, current_node.literal.source)
 
 			case .Sequence:
-				write_node_sequence(ctx, current_node.sequence[:], name_context, indent_str)
+				if current_node.sequence.braced { str.write_byte(&ctx.result, '{') }
+				write_node_sequence(ctx, current_node.sequence.members[:], name_context, indent_str)
+				if current_node.sequence.braced {
+					if len(current_node.sequence.members) > 0 && ctx.ast[last(current_node.sequence.members[:])^].kind == .NewLine {
+						str.write_string(&ctx.result, indent_str)
+					}
+					str.write_byte(&ctx.result, '}')
+				}
 
 			case .PreprocDefine:
 				define := current_node.preproc_define
@@ -702,6 +708,63 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 
 				requires_termination = true
 
+			case .Switch:
+				switch_ := current_node.switch_
+
+				str.write_string(&ctx.result, "switch ")
+				write_node(ctx, switch_.expression, name_context)
+
+				str.write_string(&ctx.result, " {\n")
+				
+				case_body_indent_str := str.concatenate({ indent_str, ONE_INDENT, ONE_INDENT }, context.temp_allocator)
+				case_indent_str := case_body_indent_str[:len(case_body_indent_str) - len(ONE_INDENT)]
+
+				for case_, case_i in switch_.cases {
+					str.write_string(&ctx.result, case_indent_str)
+					str.write_string(&ctx.result, "case")
+					if case_.match_expression != {} {
+						str.write_byte(&ctx.result, ' ')
+						write_node(ctx, case_.match_expression, name_context)
+					}
+					str.write_byte(&ctx.result, ':')
+
+					write_node_sequence(ctx, case_.body_sequence[:], name_context, case_body_indent_str)
+
+					// Cpp defaults to fallthrough, so try to detect if we should break (or not).
+					// This won't catch cases where the case looks like 
+					// case x: { ..; break; }   case y: ...
+					// but even in that case inserting a fallthrough after the brace does not change the behavior of the resulting code.
+					has_newline_after := false
+					should_break := false
+					#reverse for ix in case_.body_sequence {
+						#partial switch ctx.ast[ix].kind {
+							case .NewLine:
+								has_newline_after = true
+							case .Break:
+								should_break = true
+								fallthrough
+							case:
+								break
+						}
+					}
+
+					if case_i < len(switch_.cases) - 1 {
+						if !should_break {
+							if has_newline_after {
+								str.write_string(&ctx.result, case_body_indent_str)
+							}
+							else {
+								str.write_string(&ctx.result, "; ")
+							}
+							str.write_string(&ctx.result, "fallthrough")
+						}
+						str.write_byte(&ctx.result, '\n')
+					}
+				}
+
+				str.write_string(&ctx.result, indent_str)
+				str.write_byte(&ctx.result, '}')
+
 			case .OperatorDefinition:
 				/* just ignore for now */
 
@@ -832,7 +895,7 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 			initializer := ctx.ast[structure.initializer]
 
 			complete_initializer_name := str.concatenate({ complete_structure_name, "_init" })
-			name_context := insert_new_definition(&ctx.context_heap, name_context, last(initializer.function_def.function_name[:]).source, structure.initializer, complete_initializer_name)
+			name_context := insert_new_definition(&ctx.context_heap, name_context, "init", structure.initializer, complete_initializer_name)
 			insert_new_overload(ctx, "init", complete_initializer_name)
 
 			context_heap_reset := len(&ctx.context_heap) // keep fn as leaf node

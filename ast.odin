@@ -10,10 +10,9 @@ AstContext :: struct {
 	ast: ^[dynamic]AstNode,
 }
 
-ast_parse_filescope_sequence :: proc(ctx : ^AstContext, tokens_ : []Token) -> AstNode
+ast_parse_filescope_sequence :: proc(ctx : ^AstContext, tokens_ : []Token) -> (sequence : [dynamic]AstNodeIndex)
 {
-	root_index := transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .Sequence }) // unfinished node at index 0
-	sequence : [dynamic]AstNodeIndex
+	if len(ctx.ast) == 0 { append_return_index(ctx.ast, AstNode{ }) } // dummy ast0 node
 	template_spec: [dynamic]AstNodeIndex
 
 	tokens_ := tokens_
@@ -136,8 +135,7 @@ ast_parse_filescope_sequence :: proc(ctx : ^AstContext, tokens_ : []Token) -> As
 		}
 	}
 
-	ctx.ast[root_index].sequence = sequence
-	return ctx.ast[root_index]
+	return
 }
 
 ast_try_parse_preproc_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dynamic]AstNodeIndex, token: Token, tokenss: []Token) -> bool
@@ -923,26 +921,20 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 			}
 			parsed_node = transmute(AstNodeIndex) append_return_index(ctx.ast, node)
 			append(sequence, parsed_node)
-
-			err = nil
 			return
 
 		case .Break:
 			tokens^ = nexts
 			
-			parsed_node = transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .Break })
+			parsed_node = transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .Break, literal = next })
 			append(sequence, parsed_node)
-
-			err = nil
 			return
 
 		case .Continue:
 			tokens^ = nexts
 
-			parsed_node = transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .Continue })
+			parsed_node = transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .Continue, literal = next })
 			append(sequence, parsed_node)
-
-			err = nil
 			return
 
 		case .For:
@@ -985,8 +977,6 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 				body_sequence = body_sequence,
 			}})
 			append(sequence, parsed_node)
-
-			err = nil
 			return
 
 		case .While:
@@ -1020,8 +1010,6 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 				body_sequence = body_sequence,
 			}})
 			append(sequence, parsed_node)
-
-			err = nil
 			return
 
 		case .Do:
@@ -1057,8 +1045,6 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 				body_sequence = body_sequence,
 			}})
 			append(sequence, parsed_node)
-
-			err = nil
 			return
 
 		case .If:
@@ -1100,8 +1086,64 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 			}
 
 			parsed_node = transmute(AstNodeIndex) append(sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, node))
+			return
 
-			err = nil
+		case .Switch:
+			tokens^ = nexts
+
+			node := AstNode{ kind = .Switch }
+
+			eat_token_expect(tokens, .BracketRoundOpen) or_return
+			expression_node := ast_parse_expression(ctx, tokens) or_return
+			node.switch_.expression = transmute(AstNodeIndex) append_return_index(ctx.ast, expression_node)
+			eat_token_expect(tokens, .BracketRoundClose) or_return
+			eat_token_expect(tokens, .BracketCurlyOpen) or_return
+
+			cases_loop: for {
+				n, ns := peek_token(tokens)
+				#partial switch n.kind {
+					case .BracketCurlyClose:
+						tokens^ = ns
+						break cases_loop
+
+					case .Case:
+						tokens^ = ns
+						match_expression_node := ast_parse_expression(ctx, tokens) or_return
+						match_expression := transmute(AstNodeIndex) append_return_index(ctx.ast, match_expression_node)
+						eat_token_expect(tokens, .Colon) or_return
+
+						case_body_sequence : [dynamic]AstNodeIndex
+						eate_curly_brace := ast_parse_scoped_sequence_no_open_brace(ctx, tokens, ast_parse_statement, &case_body_sequence) or_return
+
+						append_nothing(&node.switch_.cases)
+						last(node.switch_.cases[:])^ = { match_expression, case_body_sequence }
+
+						if eate_curly_brace { break cases_loop }
+
+					case .Default:
+						tokens^ = ns
+						eat_token_expect(tokens, .Colon) or_return
+
+						case_body_sequence : [dynamic]AstNodeIndex
+						eate_curly_brace := ast_parse_scoped_sequence_no_open_brace(ctx, tokens, ast_parse_statement, &case_body_sequence) or_return
+
+						append_nothing(&node.switch_.cases)
+						last(node.switch_.cases[:])^ = { body_sequence = case_body_sequence }
+
+						if eate_curly_brace { break cases_loop }
+				}
+			}
+
+			parsed_node = transmute(AstNodeIndex) append(sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, node))
+			return
+
+		case .BracketCurlyOpen:
+			tokens^ = nexts
+
+			node := AstNode { kind = .Sequence, sequence = { braced = true } }
+			ast_parse_scoped_sequence_no_open_brace(ctx, tokens, ast_parse_statement, &node.sequence.members) or_return
+
+			parsed_node = transmute(AstNodeIndex) append(sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, node))
 			return
 	}
 	err = AstError_{ actual = next, message = "Expected a type into a var declaration" }
@@ -1125,13 +1167,17 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 	return
 }
 
-ast_parse_scoped_sequence_no_open_brace :: proc(ctx: ^AstContext, tokens : ^[]Token, $fn : $F, sequence : ^[dynamic]AstNodeIndex, parent_node : ^AstNode = nil) -> (err : AstError)
+ast_parse_scoped_sequence_no_open_brace :: proc(ctx: ^AstContext, tokens : ^[]Token, $fn : $F, sequence : ^[dynamic]AstNodeIndex, parent_node : ^AstNode = nil) -> (did_exit_on_curly_brace : bool, err : AstError)
 {
 	loop: for {
 		n, ns := peek_token(tokens, false)
 		#partial switch n.kind {
 			case .BracketCurlyClose:
 				tokens^ = ns
+				did_exit_on_curly_brace = true
+				return
+
+			case .Case, .Default: // for case branches
 				return
 
 			case .NewLine:
@@ -1632,6 +1678,7 @@ OperatorPresedence :: enum {
 	AssignModify     = 16,
 	Comma            = 17,
 }
+
 ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence := max(OperatorPresedence)) -> (node : AstNode, err : AstError)
 {
 	token_reset := tokens^
@@ -1649,7 +1696,7 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 	{
 		if len(sequence) > 0 {
 			append(sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, node^)) // append last elm in sequence
-			node^ = AstNode{ kind = .Sequence, sequence = sequence^ }
+			node^ = AstNode{ kind = .Sequence, sequence = { members = sequence^} }
 		}
 	}
 	
@@ -2170,6 +2217,7 @@ AstNodeKind :: enum {
 	Do,
 	While,
 	Branch,
+	Switch,
 	Typedef,
 	Varargs,
 
@@ -2207,7 +2255,10 @@ AstNode :: struct {
 			type : AstNodeIndex,
 			expression : AstNodeIndex,
 		},
-		sequence : [dynamic]AstNodeIndex,
+		sequence : struct {
+			members : [dynamic]AstNodeIndex,
+			braced : bool, //TODO(Rennorb) @cleanup
+		},
 		token_sequence : [dynamic]Token,
 		namespace : struct {
 			name     : Token,
@@ -2295,6 +2346,14 @@ AstNode :: struct {
 			condition : AstNodeIndex,
 			true_branch_sequence, false_branch_sequence : [dynamic]AstNodeIndex,
 		},
+		switch_ : struct {
+			expression : AstNodeIndex,
+			// default case will have an empty expression
+			cases : [dynamic]struct {
+				match_expression : AstNodeIndex,
+				body_sequence : [dynamic]AstNodeIndex,
+			},
+		},
 		tenary : struct {
 			condition, true_expression, false_expression : AstNodeIndex,
 		},
@@ -2338,12 +2397,12 @@ clone_node :: proc(node : AstNode) -> (clone : AstNode) {
 	clone = node
 	#partial switch node.kind {
 		case .Sequence:
-			clone.sequence = slice.clone_to_dynamic(node.sequence[:])
+			clone.sequence.members = slice.clone_to_dynamic(node.sequence.members[:])
 		case .Type:
 			clone.type = slice.clone_to_dynamic(node.type[:])
 		case .FunctionCall:
 			clone.function_call.arguments  = slice.clone_to_dynamic(node.function_call.arguments[:])
-		// TODO inclomplete
+		// TODO @inclomplete
 	}
 	return
 }
@@ -2413,6 +2472,7 @@ fmt_astnode :: proc(fi: ^fmt.Info, node: ^AstNode, verb: rune) -> bool
 		case .Do                 : fmt.fmt_arg(fi, node.loop, 'v')
 		case .While              : fmt.fmt_arg(fi, node.loop, 'v')
 		case .Branch             : fmt.fmt_arg(fi, node.branch, 'v')
+		case .Switch             : fmt.fmt_arg(fi, node.switch_, 'v')
 		case .Identifier         : fmt.fmt_arg(fi, node.identifier, 'v')
 		case .Sequence           : fmt.fmt_arg(fi, node.sequence, 'v')
 		case .Namespace          : fmt.fmt_arg(fi, node.namespace, 'v')

@@ -39,9 +39,9 @@ main :: proc()
 	preprocess(&{ result = &preprocessed, inputs = input_map, ignored_identifiers = ignored_identifiers }, "imgui.cpp")
 
 	ast  : [dynamic]AstNode
-	ast_parse_filescope_sequence(&{ ast = &ast }, preprocessed[:])
+	root_sequence := ast_parse_filescope_sequence(&{ ast = &ast }, preprocessed[:])
 
-	converter_context : ConverterContext = {ast = ast[:]}
+	converter_context : ConverterContext = { ast = ast[:], root_sequence = root_sequence[:] }
 	convert_and_format(&converter_context)
 	os.write_entire_file("out/imgui_gen.odin", converter_context.result.buf[:])
 

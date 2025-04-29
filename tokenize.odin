@@ -228,6 +228,9 @@ tokenize :: proc(tokens : ^[dynamic]Token, text : string, file_path : string)
 					case "NULL", "nullptr":
 						append(tokens, Token{.LiteralNull, str, loc})
 					case "return":      append(tokens, Token{.Return, str, loc})
+					case "switch":      append(tokens, Token{.Switch, str, loc})
+					case "case":        append(tokens, Token{.Case, str, loc})
+					case "default":     append(tokens, Token{.Default, str, loc})
 					case "break":       append(tokens, Token{.Break, str, loc})
 					case "continue":    append(tokens, Token{.Continue, str, loc})
 					case "for":         append(tokens, Token{.For, str, loc})
@@ -414,6 +417,9 @@ TokenKind :: enum {
 	Do,
 	If,
 	Else,
+	Switch,
+	Case,
+	Default,
 
 	PreprocDefine,
 	PreprocUndefine,

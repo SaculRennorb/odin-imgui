@@ -131,12 +131,12 @@ test :: proc(t : ^testing.T)
 		clear(&ast)
 		loc.procedure = "converter.ast_parse_filescope_sequence"
 		log.debug(len(preprocessed), "tokens, building ast ... ", location = loc)
-		converter.ast_parse_filescope_sequence(&{ast = &ast}, preprocessed[:])
+		root_sequence := converter.ast_parse_filescope_sequence(&{ast = &ast}, preprocessed[:])
 
 		clear(&result.buf)
 		loc.procedure = "converter.convert_and_format"
 		log.debug(len(ast), "ast nodes, converting ... ", location = loc)
-		converter_context : converter.ConverterContext = { result = result, ast = ast[:] }
+		converter_context : converter.ConverterContext = { result = result, ast = ast[:], root_sequence = root_sequence[:] }
 		converter.convert_and_format(&converter_context)
 
 		os.write_entire_file(fmt.tprintf(BASEDIR+"/out/%v.odin", path.stem(file.name)), converter_context.result.buf[:])

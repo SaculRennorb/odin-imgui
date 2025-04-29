@@ -943,12 +943,12 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 			eat_token_expect(tokens, .BracketRoundOpen) or_return
 			initializer : [dynamic]AstNodeIndex
 			defer delete(initializer)
-			ast_parse_statement(ctx, tokens, &initializer) or_return
-			assert_eq(len(initializer), 1)
+			ast_parse_statement(ctx, tokens, &initializer)
+			assert(len(initializer) <= 1)
 			eat_token_expect(tokens, .Semicolon) or_return
-			condition := ast_parse_expression(ctx, tokens) or_return
+			condition, _ := ast_parse_expression(ctx, tokens)
 			eat_token_expect(tokens, .Semicolon) or_return
-			loop_expression := ast_parse_expression(ctx, tokens) or_return
+			loop_expression, _ := ast_parse_expression(ctx, tokens)
 			eat_token_expect(tokens, .BracketRoundClose) or_return
 
 			body_sequence : [dynamic]AstNodeIndex
@@ -971,9 +971,9 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 			}
 
 			parsed_node = transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode { kind = .For, loop = {
-				initializer = initializer[0],
-				condition = transmute(AstNodeIndex) append_return_index(ctx.ast, condition),
-				loop_statement = transmute(AstNodeIndex) append_return_index(ctx.ast, loop_expression),
+				initializer = len(initializer) > 0 ? initializer[0] : 0,
+				condition = condition.kind != {} ? transmute(AstNodeIndex) append_return_index(ctx.ast, condition) : 0,
+				loop_statement = loop_expression.kind != {} ? transmute(AstNodeIndex) append_return_index(ctx.ast, loop_expression) : 0,
 				body_sequence = body_sequence,
 			}})
 			append(sequence, parsed_node)

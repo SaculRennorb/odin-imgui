@@ -416,7 +416,12 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 				requires_termination = true
 
 			case .ExprCast:
-				str.write_string(&ctx.result, "cast(")
+				if current_node.cast_.kind == .Static {
+					str.write_string(&ctx.result, "cast(")
+				}
+				else {
+					str.write_string(&ctx.result, "transmute(")
+				}
 				write_type_node(ctx, ctx.ast[current_node.cast_.type], name_context)
 				str.write_string(&ctx.result, ") ")
 				write_node(ctx, current_node.cast_.expression, name_context)

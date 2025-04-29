@@ -1911,7 +1911,7 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 				err = nil
 				continue
 
-			case .StaticCast: // static_cast<type>(expression)
+			case .StaticCast, .ConstCast, .BitCast: // static_cast<type>(expression)
 				tokens^ = nexts
 
 				eat_token_expect(tokens, .BracketTriangleOpen) or_return
@@ -1924,6 +1924,7 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 				node = AstNode { kind = .ExprCast, cast_ = {
 					type = transmute(AstNodeIndex) append_return_index(ctx.ast, type),
 					expression = transmute(AstNodeIndex) append_return_index(ctx.ast, expression),
+					kind = next.kind == .ConstCast ? .Const : next.kind == .BitCast ? .Bit : .Static,
 				}}
 
 				err = nil
@@ -2254,6 +2255,7 @@ AstNode :: struct {
 		cast_ : struct {
 			type : AstNodeIndex,
 			expression : AstNodeIndex,
+			kind : enum{ Static, Const, Bit }
 		},
 		sequence : struct {
 			members : [dynamic]AstNodeIndex,

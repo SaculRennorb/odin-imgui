@@ -560,17 +560,27 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 				loop := current_node.loop
 
 				str.write_string(&ctx.result, "for")
-				if loop.initializer != {} || loop.loop_statement != {} {
-					str.write_byte(&ctx.result, ' ')
-					if loop.initializer != {} { write_node(ctx, loop.initializer, name_context) }
-					str.write_string(&ctx.result, "; ")
-					if loop.condition != {} { write_node(ctx, loop.condition, name_context) }
-					str.write_string(&ctx.result, "; ")
-					if loop.loop_statement != {} { write_node(ctx, loop.loop_statement, name_context) }
+				if !loop.is_foreach {
+					if loop.initializer != {} || loop.loop_statement != {} {
+						str.write_byte(&ctx.result, ' ')
+						if loop.initializer != {} { write_node(ctx, loop.initializer, name_context) }
+						str.write_string(&ctx.result, "; ")
+						if loop.condition != {} { write_node(ctx, loop.condition, name_context) }
+						str.write_string(&ctx.result, "; ")
+						if loop.loop_statement != {} { write_node(ctx, loop.loop_statement, name_context) }
+					}
+					else if loop.condition != {} && current_node.kind != .Do {
+						str.write_byte(&ctx.result, ' ')
+						write_node(ctx, loop.condition, name_context)
+					}
 				}
-				else if loop.condition != {} && current_node.kind != .Do {
+				else {
 					str.write_byte(&ctx.result, ' ')
-					write_node(ctx, loop.condition, name_context)
+					initializer := ctx.ast[loop.initializer]
+					assert_eq(initializer.kind, AstNodeKind.VariableDeclaration)
+					str.write_string(&ctx.result, initializer.var_declaration.var_name.source)
+					str.write_string(&ctx.result, " in ")
+					write_node(ctx, loop.loop_statement, name_context)
 				}
 
 				body_indent_str := str.concatenate({ indent_str, ONE_INDENT }, context.temp_allocator)

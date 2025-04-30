@@ -72,25 +72,37 @@ ast_parse_filescope_sequence :: proc(ctx : ^AstContext, tokens_ : []Token) -> (s
 				parent_type : AstNode = --- // TODO(Rennorb) @cleanup: ast_parse_declaration is not meant to take a pointer to a live ast parent element, so we need to clone the existing one to a stack var and paste it into the correct slot when we get it back.
 				parent_type_ref : ^AstNode; parent_type_idx : AstNodeIndex
 				if token.kind == .Identifier {
-					r := tokens^
-					// detect out of band constructor. likely super brittle
+					// detect out of band constructor. likely super @brittle
+					detect_ctor_dtor :: proc(ctx : ^AstContext, tokens : ^[]Token) -> (is_ctor_dtor : bool, detected_name : string)
+					{
+						r := tokens^
+						// S123::S123(
+						if qname, qerr := ast_parse_qualified_name(tokens); qerr == nil && len(qname) >= 3 && qname[len(qname) - 3].source == qname[len(qname) - 1].source && tokens[0].kind == .BracketRoundOpen {
+
+							tokens^ = r[len(qname) - 1:] // reset to just after the last :: for proper parsing
+							return true, last(qname).source
+						}
+						else if n, ns := peek_token(tokens); n.kind == .Tilde {
+							// we are at the correct place already, dont reset
+							assert_eq(ns[0].kind, TokenKind.Identifier)
+							return true, ns[0].source
+						}
+
+						tokens^ = r
+						return
+					}
 					// S123::S123(
-					if qname, qerr := ast_parse_qualified_name(tokens); qerr == nil && len(qname) >= 3 && qname[len(qname) - 3].source == qname[len(qname) - 1].source && tokens[0].kind == .BracketRoundOpen {
+					if is_ctor_dtor, detected_name := detect_ctor_dtor(ctx, tokens); is_ctor_dtor {
 
 						// questionable, but we don't have type context in the ast phase.. maybe i should change that 
 						#reverse for node, i in ctx.ast {
-							if node.kind == .Struct && len(node.structure.name) > 0 && last(node.structure.name).source == last(qname).source {
+							if node.kind == .Struct && len(node.structure.name) > 0 && last(node.structure.name).source == detected_name {
 								parent_type = node
 								parent_type_ref = &parent_type
 								parent_type_idx = transmute(AstNodeIndex) i
 								break
 							}
 						}
-
-						tokens^ = r[len(qname) - 1:] // reset to just after the last :: for proper parsing
-					}
-					else {
-						tokens^ = r
 					}
 				}
 

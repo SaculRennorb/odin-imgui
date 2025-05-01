@@ -106,10 +106,7 @@ ast_parse_filescope_sequence :: proc(ctx : ^AstContext, tokens_ : []Token) -> (s
 					}
 				}
 
-				if node_idx, eat_paragraph, err := ast_parse_declaration(ctx, tokens, &sequence, parent_type_ref); err != nil {
-					panic(fmt.tprintf("Failed to parse declaration: %v.", err))
-				}
-				else {
+				if node_idx, eat_paragraph, err := ast_parse_declaration(ctx, tokens, &sequence, parent_type_ref); err == nil {
 					if parent_type_ref != nil {
 						ctx.ast[parent_type_idx] = parent_type
 					}
@@ -137,6 +134,13 @@ ast_parse_filescope_sequence :: proc(ctx : ^AstContext, tokens_ : []Token) -> (s
 						eat_token_expect(tokens, .NewLine, false)
 						eat_token_expect(tokens, .NewLine, false)
 					}
+				}
+				else if call, err := ast_parse_function_call(ctx, tokens); err == nil {
+					append(&sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, call))
+					eat_token_expect(tokens, .Semicolon) // might might exist
+				}
+				else {
+					panic(fmt.tprintf("Failed to parse declaration or function call: %v.", err))
 				}
 
 			case:

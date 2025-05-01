@@ -1103,8 +1103,20 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 				ast_parse_scoped_sequence_no_open_brace(ctx, tokens, ast_parse_statement, &node.branch.true_branch_sequence) or_return
 			}
 			else {
+				n, ns := peek_token(tokens)
+				ast_try_parse_preproc_statement(ctx, tokens, &node.branch.true_branch_sequence, n, ns) // can also exist between branches if its not wrapped in curly braces
+
+				before_statement := len(node.branch.true_branch_sequence)
+
 				ast_parse_statement(ctx, tokens, &node.branch.true_branch_sequence) or_return
 				eat_token_expect(tokens, .Semicolon)
+
+				// @brittle
+				if c, cerr := eat_token_expect(tokens, .Comment, false); cerr == nil {
+					inject_at(&node.branch.true_branch_sequence, before_statement, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .NewLine }))
+					inject_at(&node.branch.true_branch_sequence, before_statement + 1, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .Comment, literal = c }))
+					inject_at(&node.branch.true_branch_sequence, before_statement + 3, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .NewLine }))
+				}
 			}
 
 			if n, ns := peek_token(tokens); n.kind == .Else {
@@ -1114,8 +1126,21 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 				}
 				else {
 					tokens^ = ns // else
+
+					n, ns := peek_token(tokens)
+					ast_try_parse_preproc_statement(ctx, tokens, &node.branch.true_branch_sequence, n, ns) // can also exist between branches if its not wrapped in curly braces
+
+					before_statement := len(node.branch.true_branch_sequence)
+
 					ast_parse_statement(ctx, tokens, &node.branch.false_branch_sequence) or_return
 					eat_token_expect(tokens, .Semicolon) // might have a semicolon from single statement or nothing in case of ifelse chain
+
+					// @brittle
+					if c, cerr := eat_token_expect(tokens, .Comment, false); cerr == nil {
+						inject_at(&node.branch.false_branch_sequence, before_statement, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .NewLine }))
+						inject_at(&node.branch.false_branch_sequence, before_statement + 1, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .Comment, literal = c }))
+						inject_at(&node.branch.false_branch_sequence, before_statement + 3, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .NewLine }))
+					}
 				}
 			}
 

@@ -152,13 +152,13 @@ preprocess :: proc(ctx : ^PreProcContext, entry_file : string)
 					append(ctx.result, Token{ kind = .BracketRoundClose, source = ")", location = ident.location })
 
 				case "else":
-					append(ctx.result, Token{ kind = .PreprocElse })
+					append(ctx.result, Token{ kind = .PreprocElse, location = ident.location })
 
 				case "elif":
-					append(ctx.result, Token{ kind = .PreprocElse })
+					append(ctx.result, Token{ kind = .PreprocElse, location = ident.location })
 
 				case "endif":
-					append(ctx.result, Token{ kind = .PreprocEndif })
+					append(ctx.result, Token{ kind = .PreprocEndif, location = ident.location })
 
 				case "error":
 					args : []Token

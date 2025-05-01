@@ -44,6 +44,13 @@ append_return_ptr :: proc(arr : ^[dynamic]$T, v : T) -> (added : ^T)
 	return &arr[idx]
 }
 
+make_one :: #force_inline proc(e : $E, alloc := context.allocator) -> (arr : [dynamic]E)
+{
+	arr = make([dynamic]E, 1, alloc)
+	arr[0] = e
+	return
+}
+
 
 last :: #force_inline proc "contextless" (arr : []$T) -> ^T
 {

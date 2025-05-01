@@ -454,13 +454,12 @@ ast_parse_declaration :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[
 				tokens^ = ss // eat initializer "name"
 
 				initializer := ast_parse_function_def_no_return_type_and_name(ctx, tokens, true) or_return
-				initializer.function_def.function_name = make([dynamic]Token, 1);
 				initializer.function_def.flags |= transmute(AstFunctionDefFlags) storage;
-				initializer.function_def.function_name[0] = Token {
+				initializer.function_def.function_name = make_one(Token {
 					kind = .Identifier,
 					source = last(parent_type.structure.name).source,
 					location = last(parent_type.structure.name).location,
-				}
+				})
 
 				ast_attach_comments(ctx, sequence, &initializer)
 
@@ -479,13 +478,12 @@ ast_parse_declaration :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[
 					tokens^ = nns // eat deinitializer "~name"
 
 					deinitializer := ast_parse_function_def_no_return_type_and_name(ctx, tokens) or_return
-					deinitializer.function_def.function_name = make([dynamic]Token, 1);
-					deinitializer.function_def.flags |= transmute(AstFunctionDefFlags) storage;
-					deinitializer.function_def.function_name[0] = Token {
+					deinitializer.function_def.flags |= transmute(AstFunctionDefFlags) storage
+					deinitializer.function_def.function_name = make_one(Token {
 						kind = .Identifier,
 						source = last(parent_type.structure.name).source,
 						location = last(parent_type.structure.name).location,
-					}
+					})
 
 					ast_attach_comments(ctx, sequence, &deinitializer)
 
@@ -866,13 +864,15 @@ ast_parse_function_def_no_return_type_and_name :: proc(ctx: ^AstContext, tokens 
 				case .Identifier:
 					node := ast_parse_function_call(ctx, tokens) or_return
 					
-					initialized_member := AstNode{ kind = .Identifier, identifier = node.function_call.qualified_name }
+					initialized_member := node.function_call.expression
 
-					node.function_call.qualified_name = make([dynamic]Token, 1, 1)
-					node.function_call.qualified_name[0] = Token{ kind = .Identifier, source = "init" }
+					node.function_call.expression = transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{
+						kind       = .Identifier,
+						identifier = make_one(Token{ kind = .Identifier, source = "init" }),
+					})
 
 					call := AstNode{ kind = .MemberAccess, member_access = {
-						expression = transmute(AstNodeIndex) append_return_index(ctx.ast, initialized_member),
+						expression = initialized_member,
 						member = transmute(AstNodeIndex) append_return_index(ctx.ast, node)
 					}}
 
@@ -1423,11 +1423,13 @@ ast_parse_var_declaration_no_type :: proc(ctx: ^AstContext, tokens : ^[]Token, p
 		if next.kind == .BracketRoundOpen { //  S123  a(1, 2, 3) type of initializer
 			// dont eat opeing (, it will get eaten by ast_aprse_function_call_arguments
 
-			ident := make([dynamic]Token, 1)
-			ident[0] = name
+			ident := make_one(name)
 
-			call := AstNode{ kind = .FunctionCall, function_call = { qualified_name = make([dynamic]Token, 1) } }
-			call.function_call.qualified_name[0] = Token{ kind = .Identifier, source = "init", location = next.location }
+			fn_identifier := make_one(Token{ kind = .Identifier, source = "init", location = next.location })
+
+			call := AstNode{ kind = .FunctionCall, function_call = {
+				expression = transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .Identifier, identifier = fn_identifier }),
+			}}
 			ast_parse_function_call_arguments(ctx, tokens, &call.function_call.arguments) or_return
 
 			synthesized_initializer := AstNode{ kind = .MemberAccess, member_access = {
@@ -1475,8 +1477,9 @@ ast_parse_function_call :: proc(ctx: ^AstContext, tokens : ^[]Token) -> (node : 
 	else {
 		ast_parse_function_call_arguments(ctx, tokens, &arguments) or_return
 	}
+	expression_node := AstNode{ kind = .Identifier, identifier = ast_filter_qualified_name(qualified_name) }
 	node = AstNode{ kind = .FunctionCall, function_call = {
-		qualified_name = ast_filter_qualified_name(qualified_name),
+		expression = transmute(AstNodeIndex) append_return_index(ctx.ast, expression_node),
 		arguments = arguments,
 	}}
 	return
@@ -1516,8 +1519,7 @@ ast_parse_fnptr_type :: proc(ctx : ^AstContext, tokens : ^[]Token) -> (node : As
 
 	node = ast_parse_function_def_no_return_type_and_name(ctx, tokens) or_return
 	node.function_def.return_type = transmute(AstNodeIndex) append_return_index(ctx.ast, return_type)
-	node.function_def.function_name = make([dynamic]Token, 0, 1)
-	append(&node.function_def.function_name, name)
+	node.function_def.function_name = make_one(name)
 
 	return
 }
@@ -1764,9 +1766,7 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 					else {
 						tokens^ = ns // eat member name
 
-						identifier := make([dynamic]Token, 0, 1)
-						append(&identifier, member_name)
-						member_node = AstNode { kind = .Identifier, identifier = identifier }
+						member_node = AstNode { kind = .Identifier, identifier = make_one(member_name) }
 					}
 
 					node = AstNode{ kind = .MemberAccess, member_access = {
@@ -1852,6 +1852,16 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 						condition        = transmute(AstNodeIndex) append_return_index(ctx.ast, node),
 						true_expression  = transmute(AstNodeIndex) append_return_index(ctx.ast, true_expression),
 						false_expression = transmute(AstNodeIndex) append_return_index(ctx.ast, false_expression),
+					}}
+					continue
+
+				case .BracketRoundOpen: // function call of some sort
+					args : [dynamic]AstNodeIndex
+					ast_parse_function_call_arguments(ctx, tokens, &args) or_return
+
+					node = AstNode{ kind = .FunctionCall, function_call = {
+						expression = transmute(AstNodeIndex) append_return_index(ctx.ast, node),
+						arguments  = args,
 					}}
 					continue
 			}
@@ -2305,8 +2315,8 @@ AstNode :: struct {
 			sequence : [dynamic]AstNodeIndex,
 		},
 		function_call : struct {
-			qualified_name : [dynamic]Token,
-			arguments : [dynamic]AstNodeIndex,
+			expression : AstNodeIndex,
+			arguments  : [dynamic]AstNodeIndex,
 			is_destructor : bool,
 		},
 		operator_call : struct {

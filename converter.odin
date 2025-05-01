@@ -445,7 +445,12 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 						case .VariableDeclaration:
 							structure_name = {expression_type_node.var_declaration.var_name}
 					}
-					if len(structure_name) > 0 && last(structure_name).source == last(member.function_call.qualified_name[:]).source {
+
+					fn_name_expr := ctx.ast[member.function_call.expression]
+					assert_eq(fn_name_expr.kind, AstNodeKind.Identifier)
+					fn_name := last(fn_name_expr.identifier[:]).source
+
+					if len(structure_name) > 0 && last(structure_name).source == fn_name {
 						str.write_string(&ctx.result, member.function_call.is_destructor ? "deinit" : "init")
 					}
 					else {
@@ -456,9 +461,9 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 								str.write_byte(&ctx.result, '_')
 							}
 
-							write_token_range(&ctx.result, fncall.qualified_name[:])
+							write_token_range(&ctx.result, fn_name_expr.identifier[:])
 						}
-						else if fncall.qualified_name[0].source == "init" && len(fncall.arguments) == 1 { // likely a initializer call for a primitive type
+						else if fn_name == "init" && len(fncall.arguments) == 1 { // likely a initializer call for a primitive type
 							write_node(ctx, current_node.member_access.expression, name_context)
 							str.write_string(&ctx.result, " = ")
 							write_node(ctx, fncall.arguments[0], name_context)
@@ -467,7 +472,7 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 							break
 						}
 						else{
-							write_token_range(&ctx.result, fncall.qualified_name[:])
+							write_token_range(&ctx.result, fn_name_expr.identifier[:])
 						}
 					}
 
@@ -526,7 +531,13 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 			case .FunctionCall:
 				fncall := current_node.function_call
 
-				str.write_string(&ctx.result, last(fncall.qualified_name[:]).source)
+				if expr := ctx.ast[fncall.expression]; expr.kind == .Identifier {
+					// @hardcoded: Print indents directly so we don't have to add all std functions to the name resolver.
+					str.write_string(&ctx.result, last(expr.identifier[:]).source)
+				}
+				else {
+					write_node(ctx, fncall.expression, name_context)
+				}
 				str.write_byte(&ctx.result, '(')
 				for aidx, i in fncall.arguments {
 					if i != 0 { str.write_string(&ctx.result, ", ") }
@@ -1634,7 +1645,11 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 						return resolve_type(ctx, member_access.member, expr_type_context_idx)
 
 					case .FunctionCall:
-						fndef_idx := ctx.context_heap[expr_type_context_idx].definitions[last(member.function_call.qualified_name[:]).source]
+						fn_name_node := ctx.ast[member.function_call.expression]
+						assert_eq(fn_name_node.kind, AstNodeKind.Identifier)
+						fn_name := last(fn_name_node.identifier[:]).source
+
+						fndef_idx := ctx.context_heap[expr_type_context_idx].definitions[fn_name]
 						fndef_ctx := ctx.context_heap[fndef_idx]
 
 						assert_eq(ctx.ast[fndef_ctx.node].kind, AstNodeKind.FunctionDefinition)

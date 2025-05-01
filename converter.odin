@@ -533,7 +533,15 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 
 				if expr := ctx.ast[fncall.expression]; expr.kind == .Identifier {
 					// @hardcoded: Print indents directly so we don't have to add all std functions to the name resolver.
-					str.write_string(&ctx.result, last(expr.identifier[:]).source)
+					fn_name := last(expr.identifier[:]).source
+					// convert some top level function names
+					switch fn_name {
+						case "sizeof":
+							str.write_string(&ctx.result, "size_of")
+
+						case:
+							str.write_string(&ctx.result, fn_name)
+					}
 				}
 				else {
 					write_node(ctx, fncall.expression, name_context)

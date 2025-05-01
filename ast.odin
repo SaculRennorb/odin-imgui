@@ -1487,20 +1487,29 @@ ast_parse_function_call :: proc(ctx: ^AstContext, tokens : ^[]Token) -> (node : 
 
 
 	qualified_name := ast_parse_qualified_name(tokens) or_return
-	// Some special parsing for va_arg function...
+	// Some special parsing for specific functions...
 	// Ually this would have to be way more complicated to handle macros, but ill jsut hardcode this.
-	if last(qualified_name).source == "va_arg" {
-		eat_token_expect(tokens, .BracketRoundOpen) or_return
-		resize(&arguments, 2)
-		arguments[0] = transmute(AstNodeIndex) append_return_index(ctx.ast, ast_parse_expression(ctx, tokens, .Comma - ._1) or_return)
-		eat_token_expect(tokens, .Comma) or_return
-		type_node := AstNode{ kind = .Type }
-		ast_parse_type_inner(ctx, tokens, &type_node.type) or_return
-		arguments[1] = transmute(AstNodeIndex) append_return_index(ctx.ast, type_node)
-		eat_token_expect(tokens, .BracketRoundClose) or_return
-	}
-	else {
-		ast_parse_function_call_arguments(ctx, tokens, &arguments) or_return
+	switch last(qualified_name).source {
+		case "va_arg":
+			eat_token_expect(tokens, .BracketRoundOpen) or_return
+			resize(&arguments, 2)
+			arguments[0] = transmute(AstNodeIndex) append_return_index(ctx.ast, ast_parse_expression(ctx, tokens, .Comma - ._1) or_return)
+			eat_token_expect(tokens, .Comma) or_return
+			type_node := AstNode{ kind = .Type }
+			ast_parse_type_inner(ctx, tokens, &type_node.type) or_return
+			arguments[1] = transmute(AstNodeIndex) append_return_index(ctx.ast, type_node)
+			eat_token_expect(tokens, .BracketRoundClose) or_return
+
+		case "sizeof":
+			eat_token_expect(tokens, .BracketRoundOpen) or_return
+			resize(&arguments, 1)
+			type_node := AstNode{ kind = .Type }
+			ast_parse_type_inner(ctx, tokens, &type_node.type) or_return
+			arguments[0] = transmute(AstNodeIndex) append_return_index(ctx.ast, type_node)
+			eat_token_expect(tokens, .BracketRoundClose) or_return
+
+		case:
+			ast_parse_function_call_arguments(ctx, tokens, &arguments) or_return
 	}
 	expression_node := AstNode{ kind = .Identifier, identifier = ast_filter_qualified_name(qualified_name) }
 	node = AstNode{ kind = .FunctionCall, function_call = {

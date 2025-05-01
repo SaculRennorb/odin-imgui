@@ -1502,10 +1502,19 @@ ast_parse_function_call :: proc(ctx: ^AstContext, tokens : ^[]Token) -> (node : 
 
 		case "sizeof":
 			eat_token_expect(tokens, .BracketRoundOpen) or_return
+			tr := tokens^
 			resize(&arguments, 1)
 			type_node := AstNode{ kind = .Type }
-			ast_parse_type_inner(ctx, tokens, &type_node.type) or_return
-			arguments[0] = transmute(AstNodeIndex) append_return_index(ctx.ast, type_node)
+			terr := ast_parse_type_inner(ctx, tokens, &type_node.type)
+			nn, nns := peek_token(tokens)
+			if terr == nil && nn.kind == .BracketRoundClose {
+				arguments[0] = transmute(AstNodeIndex) append_return_index(ctx.ast, type_node)
+			}
+			else {
+				tokens^ = tr
+				expr := ast_parse_expression(ctx, tokens) or_return
+				arguments[0] = transmute(AstNodeIndex) append_return_index(ctx.ast, expr)
+			}
 			eat_token_expect(tokens, .BracketRoundClose) or_return
 
 		case:

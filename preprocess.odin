@@ -20,7 +20,7 @@ preprocess :: proc(ctx : ^PreProcContext, entry_file : string)
 {
 	err := do_preprocess(ctx, &ctx.inputs[entry_file])
 	if(err != nil) { panic(fmt.tprint("Preprocess failed at", err.?)) }
-	do_preprocess :: proc(ctx : ^PreProcContext, input : ^Input) -> AstError
+	do_preprocess :: proc(ctx : ^PreProcContext, input : ^Input) -> Maybe(AstErrorFrame)
 	{
 		tokens := input.tokens
 		reserve(ctx.result, len(tokens))
@@ -138,7 +138,7 @@ preprocess :: proc(ctx : ^PreProcContext, entry_file : string)
 					append(ctx.result, Token{ kind = .PreprocIf, location = ident.location })
 					append(ctx.result, Token{ kind = .Identifier, source = "defined", location = ident.location })
 					append(ctx.result, Token{ kind = .BracketRoundOpen, source = "(", location = ident.location })
-					defined_identifier := eat_token_expect(&tokens, .Identifier, false) or_return
+					defined_identifier := eat_token_expect_direct(&tokens, .Identifier, false) or_return
 					append(ctx.result, defined_identifier)
 					append(ctx.result, Token{ kind = .BracketRoundClose, source = ")", location = ident.location })
 
@@ -147,7 +147,7 @@ preprocess :: proc(ctx : ^PreProcContext, entry_file : string)
 					append(ctx.result, Token{ kind = .Exclamationmark, source = "!", location = ident.location })
 					append(ctx.result, Token{ kind = .Identifier, source = "defined", location = ident.location })
 					append(ctx.result, Token{ kind = .BracketRoundOpen, source = "(", location = ident.location })
-					defined_identifier := eat_token_expect(&tokens, .Identifier, false) or_return
+					defined_identifier := eat_token_expect_direct(&tokens, .Identifier, false) or_return
 					append(ctx.result, defined_identifier)
 					append(ctx.result, Token{ kind = .BracketRoundClose, source = ")", location = ident.location })
 

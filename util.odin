@@ -74,7 +74,8 @@ formatters : map[typeid]fmt.User_Formatter
 @(init)
 _set_user_formatters :: proc()
 {
-	formatters[typeid_of(AstError)] = fmt_ast_err_a
+	formatters[typeid_of(Maybe(AstErrorFrame))] = fmt_ast_err_a
+	formatters[typeid_of(AstErrorFrame)] = fmt_ast_erri_a
 	formatters[typeid_of(Token)] = fmt_token_a
 	formatters[typeid_of(SourceLocation)] = fmt_location_a
 	formatters[typeid_of(AstNodeIndex)] = fmt_astindex_a

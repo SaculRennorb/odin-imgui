@@ -4,10 +4,64 @@ import "core:fmt"
 import "core:slice"
 import "core:io"
 import "base:intrinsics"
+import "base:runtime"
 import str "core:strings"
 
 AstContext :: struct {
 	ast: ^[dynamic]AstNode,
+	error_stack : [dynamic]AstErrorFrame,
+}
+
+@(private)
+push_error :: #force_inline proc(ctx : ^AstContext, err : AstErrorFrame)
+{
+	err := err
+	err.depth = len(ctx.error_stack)
+	append(&ctx.error_stack, err)
+}
+
+@(private)
+reset_error :: #force_inline proc(ctx : ^AstContext)
+{
+	clear(&ctx.error_stack)
+}
+
+@(private)
+has_error :: #force_inline proc(ctx : ^AstContext) -> bool
+{
+	return len(ctx.error_stack) != 0
+}
+
+@(private)
+has_error__reset :: #force_inline proc(ctx : ^AstContext) -> (had_err : bool)
+{
+	had_err = len(ctx.error_stack) != 0
+	reset_error(ctx)
+	return
+}
+@(private)
+has_error__clone_reset :: #force_inline proc(ctx : ^AstContext, clone_target : ^[dynamic]AstErrorFrame) -> (had_err : bool)
+{
+	had_err = len(ctx.error_stack) != 0
+	if had_err {
+		resize(clone_target, len(ctx.error_stack))
+		copy(clone_target[:], ctx.error_stack[:])
+	}
+	reset_error(ctx)
+	return
+}
+
+@(private)
+format_error :: #force_inline proc(ctx : ^AstContext, message : string) -> string
+{
+	s := str.builder_make(context.temp_allocator)
+	str.write_string(&s, message); str.write_string(&s, ":\n")
+	#reverse for err in ctx.error_stack {
+		str.write_byte(&s, '\t');
+		str.write_string(&s, str.repeat("  ", err.depth, context.temp_allocator));
+		fmt.sbprintln(&s, err)
+	}
+	return str.to_string(s)
 }
 
 ast_parse_filescope_sequence :: proc(ctx : ^AstContext, tokens_ : []Token) -> (sequence : [dynamic]AstNodeIndex)
@@ -32,9 +86,9 @@ ast_parse_filescope_sequence :: proc(ctx : ^AstContext, tokens_ : []Token) -> (s
 			case .Typedef:
 				tokens^ = tokenss // eat keyword
 
-				node, err := ast_parse_typedef_no_keyword(ctx, tokens)
-				if err != nil {
-					panic(fmt.tprintf("Failed to parse typedef: %v.", err))
+				node, _ := ast_parse_typedef_no_keyword(ctx, tokens)
+				if has_error(ctx) {
+					panic(format_error(ctx, "Failed to parse typedef"))
 				}
 				append(&sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, node))
 
@@ -43,16 +97,15 @@ ast_parse_filescope_sequence :: proc(ctx : ^AstContext, tokens_ : []Token) -> (s
 			case .Template:
 				tokens^ = tokenss // eat keyword
 
-				err : AstError
-				template_spec, err = ast_parse_template_spec_no_keyword(ctx, tokens)
-				if err != nil {
-					panic(fmt.tprintf("Failed to parse template spec: %v.", err))
+				template_spec, _ = ast_parse_template_spec_no_keyword(ctx, tokens)
+				if has_error(ctx) {
+					panic(format_error(ctx, "Failed to parse template spec"))
 				}
 
-				eat_token_expect(tokens, .NewLine, false)
+				eat_token_expect_direct(tokens, .NewLine, false)
 
 			case .Struct, .Class, .Union, .Enum:
-				if node, node_err := ast_parse_structure(ctx, tokens); node_err == nil {
+				if node, se := ast_parse_structure(ctx, tokens); se == .None {
 					node.structure.template_spec = template_spec
 					template_spec = make([dynamic]AstNodeIndex)
 
@@ -65,7 +118,7 @@ ast_parse_filescope_sequence :: proc(ctx : ^AstContext, tokens_ : []Token) -> (s
 					}
 				}
 				else {
-					panic(fmt.tprintf("Failed to parse %v: %v.", token.source, node_err))
+					panic(format_error(ctx, fmt.tprintf("Failed to parse %v", token.source)))
 				}
 
 			case .Namespace, .Identifier:
@@ -106,7 +159,8 @@ ast_parse_filescope_sequence :: proc(ctx : ^AstContext, tokens_ : []Token) -> (s
 					}
 				}
 
-				if node_idx, eat_paragraph, err := ast_parse_declaration(ctx, tokens, &sequence, parent_type_ref); err == nil {
+				decl_error : [dynamic]AstErrorFrame
+				if node_idx, eat_paragraph, _ := ast_parse_declaration(ctx, tokens, &sequence, parent_type_ref); !has_error__clone_reset(ctx, &decl_error) {
 					if parent_type_ref != nil {
 						ctx.ast[parent_type_idx] = parent_type
 					}
@@ -126,21 +180,23 @@ ast_parse_filescope_sequence :: proc(ctx : ^AstContext, tokens_ : []Token) -> (s
 
 						case:
 							if _, err := eat_token_expect(tokens, .Semicolon); err != nil {
-									panic(fmt.tprintf("Missing semicolon after %v.", ctx.ast[node_idx]))
+								panic(fmt.tprintf("Missing semicolon after %v.", ctx.ast[node_idx]))
 							}
 					}
 
 					if eat_paragraph {
-						eat_token_expect(tokens, .NewLine, false)
-						eat_token_expect(tokens, .NewLine, false)
+						eat_token_expect_direct(tokens, .NewLine, false)
+						eat_token_expect_direct(tokens, .NewLine, false)
 					}
 				}
-				else if call, err := ast_parse_function_call(ctx, tokens); err == nil { // top level macro calls
+				else if call, _ := ast_parse_function_call(ctx, tokens); !has_error(ctx) { // top level macro calls
 					append(&sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, call))
 					eat_token_expect(tokens, .Semicolon) // might might exist
+					delete(decl_error)
 				}
 				else {
-					panic(fmt.tprintf("Failed to parse declaration or function call: %v.", err))
+					inject_at(&ctx.error_stack, 0, ..decl_error[:])
+					panic(format_error(ctx, "Failed to parse declaration or function call"))
 				}
 
 			case:
@@ -204,13 +260,13 @@ ast_try_parse_preproc_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, seq
 	return true
 }
 
-ast_parse_preproc_to_line_end :: proc(tokens : ^[]Token) -> (result : [dynamic]Token, err : AstError)
+ast_parse_preproc_to_line_end :: proc(tokens : ^[]Token) -> (result : [dynamic]Token, err : Maybe(AstErrorFrame))
 {
 	for len(tokens) > 0 {
 		t, ts := peek_token(tokens, false)
 		if t.kind == .BackwardSlash {
 			tokens^ = ts
-			eat_token_expect(tokens, .NewLine, false) or_return
+			eat_token_expect_direct(tokens, .NewLine, false) or_return
 			continue
 		}
 		if t.kind == .NewLine {
@@ -224,7 +280,7 @@ ast_parse_preproc_to_line_end :: proc(tokens : ^[]Token) -> (result : [dynamic]T
 	return
 }
 
-ast_parse_preproc_define :: proc(ctx: ^AstContext, tokens : ^[]Token) -> (node : AstNode, err : AstError)
+ast_parse_preproc_define :: proc(ctx: ^AstContext, tokens : ^[]Token) -> (node : AstNode, err : Maybe(AstErrorFrame))
 {
 	tokens_ := ast_parse_preproc_to_line_end(tokens) or_return
 	tokens__ := tokens_[:]
@@ -267,18 +323,19 @@ ast_parse_preproc_define :: proc(ctx: ^AstContext, tokens : ^[]Token) -> (node :
 	return
 }
 
-ast_parse_template_spec_no_keyword :: proc(ctx : ^AstContext, tokens : ^[]Token) -> (template_spec : [dynamic]AstNodeIndex, err : AstError)
+ast_parse_template_spec_no_keyword :: proc(ctx : ^AstContext, tokens : ^[]Token, loc := #caller_location) -> (template_spec : [dynamic]AstNodeIndex, err : AstError)
 {
 	tokens_reset := tokens^
 	ast_reset := len(ctx.ast)
 
-	defer if err != nil {
+	defer if err != .None {
+		push_error(ctx, { message = "Failed to parse template spec", code_location = loc })
 		delete(template_spec)
 		resize(ctx.ast, ast_reset)
 		tokens^ = tokens_reset
 	}
 
-	eat_token_expect(tokens, .BracketTriangleOpen) or_return
+	eat_token_expect_push_err(ctx, tokens, .BracketTriangleOpen) or_return
 	loop: for {
 		#partial switch n, ns := peek_token(tokens); n.kind {
 			case .BracketTriangleClose:
@@ -321,13 +378,14 @@ ast_parse_template_spec_no_keyword :: proc(ctx : ^AstContext, tokens : ^[]Token)
 	return
 }
 
-ast_parse_structure :: proc(ctx: ^AstContext, tokens : ^[]Token) -> (node : AstNode, err : AstError)
+ast_parse_structure :: proc(ctx: ^AstContext, tokens : ^[]Token, loc := #caller_location) -> (node : AstNode, err : AstError)
 {
 	tokens_reset := tokens^
 	ast_reset := len(ctx.ast)
 	members : [dynamic]AstNodeIndex
 
-	defer if err != nil {
+	defer if err != .None {
+		push_error(ctx, { message = "Failed to parse structure", code_location = loc })
 		delete(members)
 		resize(ctx.ast, ast_reset)
 		tokens^ = tokens_reset
@@ -369,12 +427,12 @@ ast_parse_structure :: proc(ctx: ^AstContext, tokens : ^[]Token) -> (node : AstN
 
 	if next.kind == .Semicolon {
 		node.structure.is_forward_declaration = true
-		err = nil
 		return
 	}
 	
 	if next.kind != .BracketCurlyOpen {
-		err = AstError_{ actual = next, expected = { kind = .BracketCurlyOpen } }
+		err = .Some
+		push_error(ctx, { actual = next, expected = { kind = .BracketCurlyOpen }})
 		return
 	}
 	tokens^ = nexts
@@ -387,7 +445,6 @@ ast_parse_structure :: proc(ctx: ^AstContext, tokens : ^[]Token) -> (node : AstN
 	}
 
 	node.structure.members = members
-	err = nil
 	return
 }
 
@@ -429,13 +486,14 @@ ast_attach_comments :: proc(ctx: ^AstContext, sequence : ^[dynamic]AstNodeIndex,
 	}
 }
 
-ast_parse_declaration :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dynamic]AstNodeIndex, parent_type : ^AstNode = nil, parse_width_expression := false) -> (parsed_node : AstNodeIndex, eat_paragraph : bool, err : AstError)
+ast_parse_declaration :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dynamic]AstNodeIndex, parent_type : ^AstNode = nil, parse_width_expression := false, loc := #caller_location) -> (parsed_node : AstNodeIndex, eat_paragraph : bool, err : AstError)
 {
 	tokens_reset := tokens^
 	ast_reset := len(ctx.ast)
 	sequence_reset := len(sequence)
 
-	defer if err != nil {
+	defer if err != .None {
+		push_error(ctx, { message = "Failed to parse declaration", code_location = loc })
 		resize(ctx.ast, ast_reset)
 		resize(sequence, sequence_reset)
 		tokens^ = tokens_reset
@@ -510,8 +568,6 @@ ast_parse_declaration :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[
 
 			parsed_node = transmute(AstNodeIndex) append_return_index(ctx.ast, node)
 			append(sequence, parsed_node)
-
-			err = nil
 			return
 
 		case .Struct, .Class, .Union:
@@ -521,8 +577,6 @@ ast_parse_declaration :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[
 
 			parsed_node = transmute(AstNodeIndex) append_return_index(ctx.ast, node)
 			append(sequence, parsed_node)
-
-			err = nil
 			return
 
 		case .Namespace:
@@ -536,15 +590,13 @@ ast_parse_declaration :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[
 				tokens^ = names
 			}
 
-			eat_token_expect(tokens, .BracketCurlyOpen) or_return
+			eat_token_expect_push_err(ctx, tokens, .BracketCurlyOpen) or_return
 
-			defer if err != nil && len(node.namespace.sequence) > 0 { delete(node.namespace.sequence) }
+			defer if err != .None && len(node.namespace.sequence) > 0 { delete(node.namespace.sequence) }
 			ast_parse_scoped_sequence_no_open_brace(ctx, tokens, ast_parse_declaration, &node.namespace.sequence) or_return
 
 			parsed_node = transmute(AstNodeIndex) append_return_index(ctx.ast, node)
 			append(sequence, parsed_node)
-
-			err = nil
 			return
 
 		case .Operator: // operator bool() { }    custom call operator comes without return type...
@@ -559,7 +611,6 @@ ast_parse_declaration :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[
 			append(sequence, parsed_node)
 
 			eat_paragraph = true // @hardcoded
-			err = nil
 			return
 	}
 
@@ -592,7 +643,7 @@ ast_parse_declaration :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[
 			case .AssignStar:         tokens^ = nns; node.operator_def.kind = .AssignMultiply
 			case .AssignForwardSlash: tokens^ = nns; node.operator_def.kind = .AssignDivide
 			case .BracketSquareOpen: 
-				eat_token_expect(&nns, .BracketSquareClose) or_return
+				eat_token_expect_push_err(ctx, &nns, .BracketSquareClose) or_return
 				tokens^ = nns
 				node.operator_def.kind = .Index
 
@@ -608,7 +659,8 @@ ast_parse_declaration :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[
 				fallthrough
 
 			case:
-				err = AstError_{ actual = nn, message = "Expected valid operator (one of ~, ++, --, ==, !=, +, -, *, /, &, |, ^, =, +=, -=, *=, /=, [], new, delete)" }
+				err = .Some
+				push_error(ctx, { actual = nn, message = "Expected valid operator (one of ~, ++, --, ==, !=, +, -, *, /, &, |, ^, =, +=, -=, *=, /=, [], new, delete)" })
 				return
 		}
 
@@ -625,7 +677,8 @@ ast_parse_declaration :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[
 				case .Star:      node.operator_def.kind = .Dereference
 				case .Ampersand: node.operator_def.kind = .AddressOf
 				case:
-					err = AstError_{ actual = nn, message = "Expected valid unary operator (one of +, -, *, &)" }
+					err = .Some
+					push_error(ctx, { actual = nn, message = "Expected valid unary operator (one of +, -, *, &)" })
 					return
 			}
 		}
@@ -634,7 +687,6 @@ ast_parse_declaration :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[
 		append(sequence, parsed_node)
 
 		eat_paragraph = true // @hardcoded
-		err = nil
 		return
 	}
 
@@ -666,20 +718,21 @@ ast_parse_declaration :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[
 	return
 }
 
-ast_parse_enum_value_declaration :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dynamic]AstNodeIndex) -> (parsed_node : AstNodeIndex, err : AstError)
+ast_parse_enum_value_declaration :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dynamic]AstNodeIndex, loc := #caller_location) -> (parsed_node : AstNodeIndex, err : AstError)
 {
 	tokens_reset := tokens^
 	ast_reset := len(ctx.ast)
 	sequence_reset := len(sequence)
 
-	defer if err != nil {
+	defer if err != .None {
+		push_error(ctx, { message = "Failed to parse enum value declaration", code_location = loc })
 		resize(ctx.ast, ast_reset)
 		resize(sequence, sequence_reset)
 		tokens^ = tokens_reset
 	}
 
 	node := AstNode{ kind = .VariableDeclaration }
-	node.var_declaration.var_name = eat_token_expect(tokens, .Identifier) or_return
+	node.var_declaration.var_name = eat_token_expect_push_err(ctx, tokens, .Identifier) or_return
 
 	if n, ns := peek_token(tokens); n.kind == .Assign {
 		tokens^ = ns
@@ -724,7 +777,7 @@ ast_parse_function_def :: proc(ctx: ^AstContext, tokens : ^[]Token) -> (node : A
 	storage := ast_parse_storage_modifier(tokens)
 
 	return_type_node := ast_parse_type(ctx, tokens) or_return // int
-	name := ast_parse_qualified_name(tokens) or_return // main
+	name := ast_parse_qualified_name(ctx, tokens) or_return // main
 
 	node = ast_parse_function_def_no_return_type_and_name(ctx, tokens) or_return // (int a[3]) {}
 
@@ -767,7 +820,7 @@ ast_parse_typedef_no_keyword :: proc(ctx : ^AstContext, tokens : ^[]Token) -> (n
 
 ast_parse_function_args_with_brackets :: proc(ctx: ^AstContext, tokens : ^[]Token, arguments : ^[dynamic]AstNodeIndex) -> (has_vararg : bool, err : AstError)
 {
-	eat_token_expect(tokens, .BracketRoundOpen) or_return
+	eat_token_expect_push_err(ctx, tokens, .BracketRoundOpen) or_return
 
 	args_loop: for {
 		next, nexts := peek_token(tokens)
@@ -812,7 +865,7 @@ ast_parse_function_args_with_brackets :: proc(ctx: ^AstContext, tokens : ^[]Toke
 	return
 }
 
-ast_parse_function_def_no_return_type_and_name :: proc(ctx: ^AstContext, tokens : ^[]Token, parse_initializer := false) -> (node : AstNode, err : AstError)
+ast_parse_function_def_no_return_type_and_name :: proc(ctx: ^AstContext, tokens : ^[]Token, parse_initializer := false, loc := #caller_location) -> (node : AstNode, err : AstError)
 {
 	// (int a[3]) {}
 	// (int a[3]) const {}
@@ -824,7 +877,8 @@ ast_parse_function_def_no_return_type_and_name :: proc(ctx: ^AstContext, tokens 
 	arguments : [dynamic]AstNodeIndex
 	body_sequence : [dynamic]AstNodeIndex
 
-	defer if err != nil {
+	defer if err != .None {
+		push_error(ctx, { message = "Failed to parse function def", code_location = loc })
 		delete(arguments)
 		delete(body_sequence)
 		resize(ctx.ast, ast_reset_size)
@@ -903,22 +957,23 @@ ast_parse_function_def_no_return_type_and_name :: proc(ctx: ^AstContext, tokens 
 		node.function_def.body_sequence = body_sequence
 	}
 	else {
-		err = AstError_{ actual = t, message = "Expected either ';' as forward declaration or '{' folowed by funcion body" }
+		err = .Some
+		push_error(ctx, { actual = t, message = "Expected either ';' as forward declaration or '{' folowed by funcion body" })
 		return
 	}
 
 	node.function_def.arguments = arguments
-	err = nil
 	return
 }
 
-ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dynamic]AstNodeIndex, parse_width_expression := false) -> (parsed_node : AstNodeIndex, err : AstError)
+ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dynamic]AstNodeIndex, parse_width_expression := false, loc := #caller_location) -> (parsed_node : AstNodeIndex, err : AstError)
 {
 	token_reset := tokens^
 	ast_reset_size := len(ctx.ast)
 	sequence_reset := len(sequence)
 
-	defer if err != nil {
+	defer if err != .None {
+		push_error(ctx, { message = "Failed to parse statement", code_location = loc })
 		resize(sequence, sequence_reset)
 		resize(ctx.ast, ast_reset_size)
 		tokens^ = token_reset
@@ -932,7 +987,7 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 			tokens^ = nexts
 
 			node := AstNode{ kind = .Return }
-			if return_expr, expr_err := ast_parse_expression(ctx, tokens); expr_err == nil {
+			if return_expr, _ := ast_parse_expression(ctx, tokens); !has_error__reset(ctx) {
 				node.return_.expression = transmute(AstNodeIndex) append_return_index(ctx.ast, return_expr);
 			}
 			parsed_node = transmute(AstNodeIndex) append_return_index(ctx.ast, node)
@@ -956,12 +1011,12 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 		case .For:
 			tokens^ = nexts
 
-			eat_token_expect(tokens, .BracketRoundOpen) or_return
+			eat_token_expect_push_err(ctx, tokens, .BracketRoundOpen) or_return
 
 			node := AstNode { kind = .For }
 
 			initializer := make([dynamic]AstNodeIndex, context.temp_allocator)
-			if _, serr := ast_parse_statement(ctx, tokens, &initializer); serr == nil {
+			if ast_parse_statement(ctx, tokens, &initializer); !has_error__reset(ctx) {
 				assert(len(initializer) == 1)
 				node.loop.initializer = initializer[0]
 			}
@@ -969,13 +1024,13 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 				case .Semicolon: // normal for loop    for(int i = 0; i < 3; i++)
 					tokens^ = ns // eat ;
 
-					if condition, cerr := ast_parse_expression(ctx, tokens); cerr == nil {
+					if condition, _ := ast_parse_expression(ctx, tokens); !has_error__reset(ctx) {
 						node.loop.condition = transmute(AstNodeIndex) append_return_index(ctx.ast, condition)
 					}
 
-					eat_token_expect(tokens, .Semicolon) or_return
+					eat_token_expect_push_err(ctx, tokens, .Semicolon) or_return
 
-					if loop_expression, lerr := ast_parse_expression(ctx, tokens); lerr == nil {
+					if loop_expression, _ := ast_parse_expression(ctx, tokens); !has_error__reset(ctx) {
 						node.loop.loop_statement = transmute(AstNodeIndex) append_return_index(ctx.ast, loop_expression)
 					}
 
@@ -988,16 +1043,17 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 					node.loop.loop_statement = transmute(AstNodeIndex) append_return_index(ctx.ast, iterator)
 
 				case:
-					err = AstError_{ actual = n, message = "Expected colon or semicolon" }
+					err = .Some
+					push_error(ctx, { actual = n, message = "Expected colon or semicolon" })
 					return
 			}
 			
 
-			eat_token_expect(tokens, .BracketRoundClose) or_return
+			eat_token_expect_push_err(ctx, tokens, .BracketRoundClose) or_return
 
-			defer if err != nil { delete(node.loop.body_sequence) }
+			defer if err != .None { delete(node.loop.body_sequence) }
 			// @brittle
-			if c, cerr := eat_token_expect(tokens, .Comment); cerr == nil {
+			if c, _ := eat_token_expect(tokens, .Comment); has_error__reset(ctx) {
 				append(&node.loop.body_sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .NewLine }))
 				append(&node.loop.body_sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .Comment, literal = c }))
 			}
@@ -1020,14 +1076,14 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 		case .While:
 			tokens^ = nexts
 
-			eat_token_expect(tokens, .BracketRoundOpen) or_return
+			eat_token_expect_push_err(ctx, tokens, .BracketRoundOpen) or_return
 			condition := ast_parse_expression(ctx, tokens) or_return
-			eat_token_expect(tokens, .BracketRoundClose) or_return
+			eat_token_expect_push_err(ctx, tokens, .BracketRoundClose) or_return
 
 			body_sequence : [dynamic]AstNodeIndex
-			defer if err != nil { delete(body_sequence) }
+			defer if err != .None { delete(body_sequence) }
 			// @brittle
-			if c, cerr := eat_token_expect(tokens, .Comment); cerr == nil {
+			if c, _ := eat_token_expect(tokens, .Comment); has_error__reset(ctx) {
 				append(&body_sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .NewLine }))
 				append(&body_sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .Comment, literal = c }))
 			}
@@ -1054,10 +1110,10 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 			tokens^ = nexts
 
 			body_sequence : [dynamic]AstNodeIndex
-			defer if err != nil { delete(body_sequence) }
+			defer if err != .None { delete(body_sequence) }
 
 			// @brittle
-			if c, cerr := eat_token_expect(tokens, .Comment); cerr == nil {
+			if c, _ := eat_token_expect(tokens, .Comment); has_error__reset(ctx) {
 				append(&body_sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .NewLine }))
 				append(&body_sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .Comment, literal = c }))
 			}
@@ -1070,13 +1126,13 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 			}
 			else {
 				ast_parse_statement(ctx, tokens, &body_sequence) or_return
-				eat_token_expect(tokens, .Semicolon) or_return
+				eat_token_expect_push_err(ctx, tokens, .Semicolon) or_return
 			}
 
-			eat_token_expect(tokens, .While) or_return
-			eat_token_expect(tokens, .BracketRoundOpen) or_return
+			eat_token_expect_push_err(ctx, tokens, .While) or_return
+			eat_token_expect_push_err(ctx, tokens, .BracketRoundOpen) or_return
 			condition := ast_parse_expression(ctx, tokens) or_return
-			eat_token_expect(tokens, .BracketRoundClose) or_return
+			eat_token_expect_push_err(ctx, tokens, .BracketRoundClose) or_return
 
 			parsed_node = transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode { kind = .Do, loop = {
 				condition = transmute(AstNodeIndex) append_return_index(ctx.ast, condition),
@@ -1090,12 +1146,12 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 
 			node := AstNode { kind = .Branch }
 
-			eat_token_expect(tokens, .BracketRoundOpen) or_return
+			eat_token_expect_push_err(ctx, tokens, .BracketRoundOpen) or_return
 			condition := ast_parse_expression(ctx, tokens) or_return
-			eat_token_expect(tokens, .BracketRoundClose) or_return
+			eat_token_expect_push_err(ctx, tokens, .BracketRoundClose) or_return
 
 			// @brittle
-			if c, cerr := eat_token_expect(tokens, .Comment); cerr == nil {
+			if c, e := eat_token_expect_direct(tokens, .Comment); e == nil  {
 				append(&node.branch.true_branch_sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .NewLine }))
 				append(&node.branch.true_branch_sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .Comment, literal = c }))
 			}
@@ -1116,7 +1172,7 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 				eat_token_expect(tokens, .Semicolon)
 
 				// @brittle
-				if c, cerr := eat_token_expect(tokens, .Comment, false); cerr == nil {
+				if c, e := eat_token_expect_direct(tokens, .Comment, false); e == nil {
 					inject_at(&node.branch.true_branch_sequence, before_statement, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .NewLine }))
 					inject_at(&node.branch.true_branch_sequence, before_statement + 1, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .Comment, literal = c }))
 					inject_at(&node.branch.true_branch_sequence, before_statement + 3, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .NewLine }))
@@ -1140,7 +1196,7 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 					eat_token_expect(tokens, .Semicolon) // might have a semicolon from single statement or nothing in case of ifelse chain
 
 					// @brittle
-					if c, cerr := eat_token_expect(tokens, .Comment, false); cerr == nil {
+					if c, e := eat_token_expect_direct(tokens, .Comment, false); e == nil {
 						inject_at(&node.branch.false_branch_sequence, before_statement, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .NewLine }))
 						inject_at(&node.branch.false_branch_sequence, before_statement + 1, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .Comment, literal = c }))
 						inject_at(&node.branch.false_branch_sequence, before_statement + 3, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .NewLine }))
@@ -1156,11 +1212,11 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 
 			node := AstNode{ kind = .Switch }
 
-			eat_token_expect(tokens, .BracketRoundOpen) or_return
+			eat_token_expect_push_err(ctx, tokens, .BracketRoundOpen) or_return
 			expression_node := ast_parse_expression(ctx, tokens) or_return
 			node.switch_.expression = transmute(AstNodeIndex) append_return_index(ctx.ast, expression_node)
-			eat_token_expect(tokens, .BracketRoundClose) or_return
-			eat_token_expect(tokens, .BracketCurlyOpen) or_return
+			eat_token_expect_push_err(ctx, tokens, .BracketRoundClose) or_return
+			eat_token_expect_push_err(ctx, tokens, .BracketCurlyOpen) or_return
 
 			cases_loop: for {
 				n, ns := peek_token(tokens)
@@ -1173,7 +1229,7 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 						tokens^ = ns
 						match_expression_node := ast_parse_expression(ctx, tokens) or_return
 						match_expression := transmute(AstNodeIndex) append_return_index(ctx.ast, match_expression_node)
-						eat_token_expect(tokens, .Colon) or_return
+						eat_token_expect_push_err(ctx, tokens, .Colon) or_return
 
 						case_body_sequence : [dynamic]AstNodeIndex
 						eate_curly_brace := ast_parse_scoped_sequence_no_open_brace(ctx, tokens, ast_parse_statement, &case_body_sequence) or_return
@@ -1185,7 +1241,7 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 
 					case .Default:
 						tokens^ = ns
-						eat_token_expect(tokens, .Colon) or_return
+						eat_token_expect_push_err(ctx, tokens, .Colon) or_return
 
 						case_body_sequence : [dynamic]AstNodeIndex
 						eate_curly_brace := ast_parse_scoped_sequence_no_open_brace(ctx, tokens, ast_parse_statement, &case_body_sequence) or_return
@@ -1209,15 +1265,16 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 			parsed_node = transmute(AstNodeIndex) append(sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, node))
 			return
 	}
-	err = AstError_{ actual = next, message = "Expected a type into a var declaration" }
 
-	if type_node, type_err := ast_parse_type(ctx, tokens); type_err == nil {
+
+	if type_node, te := ast_parse_type(ctx, tokens); te == .None {
 		err = ast_parse_var_declaration_no_type(ctx, tokens, type_node, sequence, transmute(AstVariableDefFlags) storage, parse_width_expression = parse_width_expression)
-		if err == nil {
+		if err == .None {
 			parsed_node = last(sequence[:])^
 			return
 		}
 	}
+	reset_error(ctx)
 
 	//reset state after we failed to parse an assignment
 	tokens^ = token_reset
@@ -1226,7 +1283,7 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 	parsed_node = transmute(AstNodeIndex) append_return_index(ctx.ast, expression)
 	append(sequence, parsed_node)
 
-	err = nil
+	err = .None
 	return
 }
 
@@ -1256,7 +1313,7 @@ ast_parse_scoped_sequence_no_open_brace :: proc(ctx: ^AstContext, tokens : ^[]To
 			case .Public, .Protected, .Private:
 				// ignore for now 
 				tokens^ = ns
-				eat_token_expect(tokens, .Colon) or_return
+				eat_token_expect_push_err(ctx, tokens, .Colon) or_return
 				continue
 		}
 
@@ -1294,12 +1351,12 @@ ast_parse_scoped_sequence_no_open_brace :: proc(ctx: ^AstContext, tokens : ^[]To
 					}
 					else {
 						// most declarations and statements must end in a semicolon
-						eat_token_expect(tokens, .Semicolon) or_return
+						eat_token_expect_push_err(ctx, tokens, .Semicolon) or_return
 					}
 				}
 				else {
 					// most declarations and statements must end in a semicolon
-					eat_token_expect(tokens, .Semicolon) or_return
+					eat_token_expect_push_err(ctx, tokens, .Semicolon) or_return
 				}
 		}
 
@@ -1326,21 +1383,22 @@ ast_parse_scoped_sequence_no_open_brace :: proc(ctx: ^AstContext, tokens : ^[]To
 		}
 
 		if eat_paragraph {
-			eat_token_expect(tokens, .NewLine, false)
-			eat_token_expect(tokens, .NewLine, false)
+			eat_token_expect_direct(tokens, .NewLine, false)
+			eat_token_expect_direct(tokens, .NewLine, false)
 		}
 	}
 
 	return
 }
 
-ast_parse_var_declaration_no_type :: proc(ctx: ^AstContext, tokens : ^[]Token, preparsed_type : AstNode, sequence : ^[dynamic]AstNodeIndex, storage_flags : AstVariableDefFlags, stop_at_comma := false, parse_width_expression := false) -> (err : AstError)
+ast_parse_var_declaration_no_type :: proc(ctx: ^AstContext, tokens : ^[]Token, preparsed_type : AstNode, sequence : ^[dynamic]AstNodeIndex, storage_flags : AstVariableDefFlags, stop_at_comma := false, parse_width_expression := false, loc := #caller_location) -> (err : AstError)
 {
 	tokens_reset := tokens^
 	ast_reset := len(ctx.ast)
 	sequence_reset := len(sequence)
 
-	defer if err != nil {
+	defer if err != .None {
+		push_error(ctx, { message = "Failed to format variable declaration", code_location = loc })
 		resize(sequence, sequence_reset)
 		resize(ctx.ast, ast_reset)
 		tokens^ = tokens_reset
@@ -1350,7 +1408,7 @@ ast_parse_var_declaration_no_type :: proc(ctx: ^AstContext, tokens : ^[]Token, p
 	if n, ns := peek_token(tokens); n.kind == .BracketRoundOpen {
 		if nn, nns := peek_token(&ns); nn.kind == .Star {
 			tokens^ = nns // skip  (*
-			name := eat_token_expect(tokens, .Identifier) or_return
+			name := eat_token_expect_push_err(ctx, tokens, .Identifier) or_return
 			eat_token_expect(tokens, .BracketRoundClose)
 			arguments : [dynamic]AstNodeIndex
 			ast_parse_function_args_with_brackets(ctx, tokens, &arguments)
@@ -1399,7 +1457,8 @@ ast_parse_var_declaration_no_type :: proc(ctx: ^AstContext, tokens : ^[]Token, p
 					break type_prefix_loop
 
 				case:
-					err = AstError_{ actual = next, message = "Expected type extension" }
+					err = .Some
+					push_error(ctx, { actual = next, message = "Expected type extension", code_location = #location() })
 					return
 			}
 		}
@@ -1411,12 +1470,12 @@ ast_parse_var_declaration_no_type :: proc(ctx: ^AstContext, tokens : ^[]Token, p
 
 			type_extension := Token { kind = .AstNode }
 
-			if length_expression, length_err := ast_parse_expression(ctx, tokens); length_err == nil {
+			if length_expression, _ := ast_parse_expression(ctx, tokens); !has_error__reset(ctx) {
 				//       v
 				// int a[expr];
 				type_extension.location.column = append_return_index(ctx.ast, length_expression)
 			}
-			eat_token_expect(tokens, .BracketSquareClose) or_return
+			eat_token_expect_push_err(ctx, tokens, .BracketSquareClose) or_return
 
 			if current_type.kind == {} { current_type = clone_node(preparsed_type) }
 			append(&current_type.type, type_extension)
@@ -1477,41 +1536,42 @@ ast_parse_var_declaration_no_type :: proc(ctx: ^AstContext, tokens : ^[]Token, p
 	}
 }
 
-ast_parse_function_call :: proc(ctx: ^AstContext, tokens : ^[]Token) -> (node : AstNode, err : AstError)
+ast_parse_function_call :: proc(ctx: ^AstContext, tokens : ^[]Token, loc := #caller_location) -> (node : AstNode, err : AstError)
 {
 	tokens_reset := tokens^
 	ast_reset := len(ctx.ast)
 	arguments : [dynamic]AstNodeIndex
 
-	defer if err != nil {
+	defer if err != .None {
+		push_error(ctx, { message = "Failed to parse fucntion call", code_location = loc })
 		delete(arguments)
 		resize(ctx.ast, ast_reset)
 		tokens^ = tokens_reset
 	}
 
 
-	qualified_name := ast_parse_qualified_name(tokens) or_return
+	qualified_name := ast_parse_qualified_name(ctx, tokens) or_return
 	// Some special parsing for specific functions...
 	// Ually this would have to be way more complicated to handle macros, but ill jsut hardcode this.
 	switch last(qualified_name).source {
 		case "va_arg":
-			eat_token_expect(tokens, .BracketRoundOpen) or_return
+			eat_token_expect_push_err(ctx, tokens, .BracketRoundOpen) or_return
 			resize(&arguments, 2)
 			arguments[0] = transmute(AstNodeIndex) append_return_index(ctx.ast, ast_parse_expression(ctx, tokens, .Comma - ._1) or_return)
-			eat_token_expect(tokens, .Comma) or_return
+			eat_token_expect_push_err(ctx, tokens, .Comma) or_return
 			type_node := AstNode{ kind = .Type }
 			ast_parse_type_inner(ctx, tokens, &type_node.type) or_return
 			arguments[1] = transmute(AstNodeIndex) append_return_index(ctx.ast, type_node)
-			eat_token_expect(tokens, .BracketRoundClose) or_return
+			eat_token_expect_push_err(ctx, tokens, .BracketRoundClose) or_return
 
 		case "sizeof":
-			eat_token_expect(tokens, .BracketRoundOpen) or_return
+			eat_token_expect_push_err(ctx, tokens, .BracketRoundOpen) or_return
 			tr := tokens^
 			resize(&arguments, 1)
 			type_node := AstNode{ kind = .Type }
-			terr := ast_parse_type_inner(ctx, tokens, &type_node.type)
+			terr := ast_parse_type_inner(ctx, tokens, &type_node.type); reset_error(ctx)
 			nn, nns := peek_token(tokens)
-			if terr == nil && nn.kind == .BracketRoundClose {
+			if terr == .None && nn.kind == .BracketRoundClose {
 				arguments[0] = transmute(AstNodeIndex) append_return_index(ctx.ast, type_node)
 			}
 			else {
@@ -1519,7 +1579,7 @@ ast_parse_function_call :: proc(ctx: ^AstContext, tokens : ^[]Token) -> (node : 
 				expr := ast_parse_expression(ctx, tokens) or_return
 				arguments[0] = transmute(AstNodeIndex) append_return_index(ctx.ast, expr)
 			}
-			eat_token_expect(tokens, .BracketRoundClose) or_return
+			eat_token_expect_push_err(ctx, tokens, .BracketRoundClose) or_return
 
 		case:
 			ast_parse_function_call_arguments(ctx, tokens, &arguments) or_return
@@ -1532,9 +1592,13 @@ ast_parse_function_call :: proc(ctx: ^AstContext, tokens : ^[]Token) -> (node : 
 	return
 }
 
-ast_parse_function_call_arguments :: proc(ctx: ^AstContext, tokens : ^[]Token, arguments : ^[dynamic]AstNodeIndex) -> (err : AstError)
+ast_parse_function_call_arguments :: proc(ctx: ^AstContext, tokens : ^[]Token, arguments : ^[dynamic]AstNodeIndex, loc := #caller_location) -> (err : AstError)
 {
-	eat_token_expect(tokens, .BracketRoundOpen) or_return
+	defer if err != .None {
+		push_error(ctx, { message = "Failed to parse function call arguemnts", code_location = loc })
+	}
+
+	eat_token_expect_push_err(ctx, tokens, .BracketRoundOpen) or_return
 	loop: for {
 		n, ns := peek_token(tokens)
 
@@ -1559,10 +1623,10 @@ ast_parse_function_call_arguments :: proc(ctx: ^AstContext, tokens : ^[]Token, a
 ast_parse_fnptr_type :: proc(ctx : ^AstContext, tokens : ^[]Token) -> (node : AstNode, err : AstError) // @cleanup: deduplicate 
 {
 	return_type := ast_parse_type(ctx, tokens) or_return
-	eat_token_expect(tokens, .BracketRoundOpen) or_return
-	eat_token_expect(tokens, .Star) or_return
+	eat_token_expect_push_err(ctx, tokens, .BracketRoundOpen) or_return
+	eat_token_expect_push_err(ctx, tokens, .Star) or_return
 	name, _ := eat_token_expect(tokens, .Identifier)
-	eat_token_expect(tokens, .BracketRoundClose) or_return
+	eat_token_expect_push_err(ctx, tokens, .BracketRoundClose) or_return
 
 	node = ast_parse_function_def_no_return_type_and_name(ctx, tokens) or_return
 	node.function_def.return_type = transmute(AstNodeIndex) append_return_index(ctx.ast, return_type)
@@ -1571,15 +1635,15 @@ ast_parse_fnptr_type :: proc(ctx : ^AstContext, tokens : ^[]Token) -> (node : As
 	return
 }
 
-ast_parse_type :: proc(ctx : ^AstContext, tokens : ^[]Token) -> (node : AstNode, err : AstError)
+ast_parse_type :: proc(ctx : ^AstContext, tokens : ^[]Token, loc := #caller_location) -> (node : AstNode, err : AstError)
 {
 	node = AstNode { kind = .Type }
-	ast_parse_type_inner(ctx, tokens, &node.type) or_return
+	ast_parse_type_inner(ctx, tokens, &node.type, loc) or_return
 
 	return
 }
 
-ast_parse_type_inner :: proc(ctx : ^AstContext, tokens : ^[]Token, type : ^[dynamic]Token) -> (err : AstError)
+ast_parse_type_inner :: proc(ctx : ^AstContext, tokens : ^[]Token, type : ^[dynamic]Token, loc := #caller_location) -> (err : AstError)
 {
 	// int
 	// const int
@@ -1590,7 +1654,8 @@ ast_parse_type_inner :: proc(ctx : ^AstContext, tokens : ^[]Token, type : ^[dyna
 
 	type_reset := len(type)
 	tokens_reset := tokens^
-	defer if err != nil {
+	defer if err != .None {
+		push_error(ctx, { message = "Failed to parse type", code_location = loc })
 		tokens^ = tokens_reset
 		resize(type, type_reset)
 	}
@@ -1616,7 +1681,7 @@ ast_parse_type_inner :: proc(ctx : ^AstContext, tokens : ^[]Token, type : ^[dyna
 				else {
 					tokens^ = ns
 					length_expression := ast_parse_expression(ctx, tokens) or_return
-					eat_token_expect(tokens, .BracketSquareClose) or_return
+					eat_token_expect_push_err(ctx, tokens, .BracketSquareClose) or_return
 
 					append(type, Token{ kind = .AstNode, location = { column = append_return_index(ctx.ast, length_expression) } })
 				}
@@ -1642,7 +1707,7 @@ ast_parse_type_inner :: proc(ctx : ^AstContext, tokens : ^[]Token, type : ^[dyna
 
 						before := tokens^;
 
-						qname := ast_parse_qualified_name(tokens) or_return
+						qname := ast_parse_qualified_name(ctx, tokens) or_return
 						oldl := len(type)
 						non_zero_resize(type, oldl + len(qname))
 						copy(type[oldl:], qname)
@@ -1664,23 +1729,28 @@ ast_parse_type_inner :: proc(ctx : ^AstContext, tokens : ^[]Token, type : ^[dyna
 
 						case:
 							type_err := ast_parse_type_inner(ctx, tokens, type)
-							if type_err == nil { continue }
+							if type_err == .None { continue }
+							reset_error(ctx)
 
-							expr, expr_err := ast_parse_expression(ctx, tokens, .Comparison - ._1)
-							if expr_err == nil {
+							if expr, expr_err := ast_parse_expression(ctx, tokens, .Comparison - ._1); expr_err == .None {
 								append(type, Token{ kind = .AstNode, location = {
 									column = append_return_index(ctx.ast, expr)
 								}});
 								continue
 							}
 							else {
-								return AstError_{ actual = expr_err.?.actual, message = "Expected inner type or expression" }
+								err = .Some
+								push_error(ctx, { message = "Expected inner type or expression" })
+								return
 							}
 					}
 				}
 
 			case:
-				if !has_name && !has_int_modifier { err = AstError_{ actual = n, message = "Expected type" } }
+				if !has_name && !has_int_modifier {
+					err = .Some
+					push_error(ctx, { actual = n, message = "Expected type" })
+				}
 				return
 		}
 	}
@@ -1688,7 +1758,19 @@ ast_parse_type_inner :: proc(ctx : ^AstContext, tokens : ^[]Token, type : ^[dyna
 	return
 }
 
-ast_parse_qualified_name :: proc(tokens : ^[]Token) -> (r : TokenRange, err : AstError)
+ast_parse_qualified_name :: proc{ ast_parse_qualified_name_direct, ast_parse_qualified_name_push_error }
+
+ast_parse_qualified_name_push_error :: proc(ctx : ^AstContext, tokens : ^[]Token, loc := #caller_location) -> (r : TokenRange, err : AstError)
+{
+	err_ : Maybe(AstErrorFrame)
+	r, err_ = ast_parse_qualified_name_direct(tokens, loc)
+	if e, err := err_.?; err {
+		push_error(ctx, e)
+	}
+	return
+}
+
+ast_parse_qualified_name_direct :: proc(tokens : ^[]Token, loc := #caller_location) -> (r : TokenRange, err : Maybe(AstErrorFrame))
 {
 	start := find_next_actual_token(tokens)
 
@@ -1712,12 +1794,12 @@ ast_parse_qualified_name :: proc(tokens : ^[]Token) -> (r : TokenRange, err : As
 
 	end := raw_data(tokens^)
 	if start > end {
-		err = AstError_{ actual = start[0], message = "Expected qualified name" }
+		err = AstErrorFrame{ actual = start[0], message = "Expected qualified name", code_location = loc }
 		return
 	}
 
 	range := slice_from_se(start, end)
-	return range, len(range) > 0 ? nil : AstError_{ actual = start[0], message = "Expected qualified name" }
+	return range, len(range) > 0 ? nil : AstErrorFrame{ actual = start[0], message = "Expected qualified name", code_location = loc }
 }
 
 ast_filter_qualified_name :: proc(tokens : TokenRange) -> (dest : [dynamic]Token)
@@ -1766,13 +1848,14 @@ OperatorPresedence :: enum {
 	Comma            = 17,
 }
 
-ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence := max(OperatorPresedence)) -> (node : AstNode, err : AstError)
+ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence := max(OperatorPresedence), loc := #caller_location) -> (node : AstNode, err : AstError)
 {
 	token_reset := tokens^
 	ast_reset_size := len(ctx.ast)
 	sequence : [dynamic]AstNodeIndex
 
-	defer if err != nil {
+	defer if err != .None {
+		push_error(ctx, { message = "Failed to parse expression", code_location = loc })
 		delete(sequence)
 		resize(ctx.ast, ast_reset_size)
 		tokens^ = token_reset
@@ -1786,15 +1869,20 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 			node^ = AstNode{ kind = .Sequence, sequence = { members = sequence^} }
 		}
 	}
-	
+
+
 	err_, _ := peek_token(tokens)
-	err = AstError_{ actual = err_, message = "Expected valid expression" }
+	err = .Some
+	defer if err == .Some {
+		push_error(ctx, { actual = err_, message = "Expected valid expression", code_location = #location() })
+	}
+
 	for {
 		before_iteration := tokens^
 
 		next, nexts := peek_token(tokens)
 
-		if err == nil { // we already have a "left" and are looking for a binary operator
+		if err == .None { // we already have a "left" and are looking for a binary operator
 			#partial switch next.kind {
 				case .Dot, .DereferenceMember:
 					tokens^ = nexts // eat -> or .
@@ -1851,7 +1939,7 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 					}
 
 					if max_presedence < presedence {
-						if err == nil { fixup_sequence(&node, ctx, &sequence) }
+						fixup_sequence(&node, ctx, &sequence)
 						return
 					}
 
@@ -1871,7 +1959,7 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 					tokens^ = nexts
 
 					index_expression := ast_parse_expression(ctx, tokens) or_return
-					eat_token_expect(tokens, .BracketSquareClose) or_return
+					eat_token_expect_push_err(ctx, tokens, .BracketSquareClose) or_return
 
 					node = AstNode{ kind = .ExprIndex, index = {
 						array_expression = transmute(AstNodeIndex) append_return_index(ctx.ast, node),
@@ -1892,7 +1980,7 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 					tokens^ = nexts
 
 					true_expression := ast_parse_expression(ctx, tokens) or_return
-					eat_token_expect(tokens, .Colon) or_return
+					eat_token_expect_push_err(ctx, tokens, .Colon) or_return
 					false_expression := ast_parse_expression(ctx, tokens, .Comma - ._1) or_return
 
 					node = AstNode{ kind = .ExprTenary, tenary = {
@@ -1930,7 +2018,7 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 				}
 
 				if max_presedence < presedence {
-					if err == nil { fixup_sequence(&node, ctx, &sequence) }
+					if err != .None == false { fixup_sequence(&node, ctx, &sequence) }
 					return
 				}
 
@@ -1941,46 +2029,47 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 					operator = transmute(AstUnaryOp)next.kind,
 					right = transmute(AstNodeIndex) append_return_index(ctx.ast, right_node),
 				}}
-				err = nil
+				err = .None
 				continue
 			
 			case .LiteralFloat:
 				node = AstNode{ kind = .LiteralFloat, literal = next }
-				tokens^ = nexts; err = nil
+				tokens^ = nexts; err = .None
 				continue
 
 			case .LiteralString:
 				node = AstNode{ kind = .LiteralString, literal = next }
-				tokens^ = nexts; err = nil
+				tokens^ = nexts; err = .None
 				continue
 
 			case .LiteralInteger:
 				node = AstNode{ kind = .LiteralInteger, literal = next }
-				tokens^ = nexts; err = nil
+				tokens^ = nexts; err = .None
 				continue
 
 			case .LiteralCharacter:
 				node = AstNode{ kind = .LiteralCharacter, literal = next }
-				tokens^ = nexts; err = nil
+				tokens^ = nexts; err = .None
 				continue
 
 			case .LiteralNull:
 				node = AstNode{ kind = .LiteralNull, literal = next }
-				tokens^ = nexts; err = nil
+				tokens^ = nexts; err = .None
 				continue
 
 			case .LiteralBool:
 				node = AstNode{ kind = .LiteralBool, literal = next }
-				tokens^ = nexts; err = nil
+				tokens^ = nexts; err = .None
 				continue
 
 			case .BracketRoundOpen: // bracketed expression or cast
 				og_nexts := nexts
 
-				if type, type_err := ast_parse_type(ctx, &nexts); type_err == nil && find_next_actual_token(&nexts)[0].kind == .BracketRoundClose { // cast: (type) expression
-					eat_token_expect(&nexts, .BracketRoundClose) or_return
+				err_reset := len(ctx.error_stack)
+				if type, te := ast_parse_type(ctx, &nexts); te == .None && find_next_actual_token(&nexts)[0].kind == .BracketRoundClose { // cast: (type) expression
+					eat_token_expect_push_err(ctx, &nexts, .BracketRoundClose) or_return
 
-					if expression, expr_err := ast_parse_expression(ctx, &nexts, .CCast); expr_err == nil {
+					if expression, ee := ast_parse_expression(ctx, &nexts, .CCast); ee == .None {
 						// next expression parsed properly, this was in fact a cast
 						tokens^ = nexts
 
@@ -1989,32 +2078,33 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 							expression = transmute(AstNodeIndex) append_return_index(ctx.ast, expression),
 						}}
 
-						err = nil
+						err = .None
 						continue
 					}
 					// next expression failed to parse, this was actualyl a bracketed expression that looked like a type
 					//TODO(Rennorb) @perf: Duplicate some work by reparsing, probably doenst matter.
 				}
+				resize(&ctx.error_stack, err_reset)
 				// bracketed expression: (expression)
 				tokens^ = og_nexts
 
 				inner := ast_parse_expression(ctx, tokens) or_return
 				node = AstNode { kind = .ExprBacketed, inner = transmute(AstNodeIndex) append_return_index(ctx.ast, inner)}
 
-				eat_token_expect(tokens, .BracketRoundClose) or_return
+				eat_token_expect_push_err(ctx, tokens, .BracketRoundClose) or_return
 
-				err = nil
+				err = .None
 				continue
 
 			case .StaticCast, .ConstCast, .BitCast: // static_cast<type>(expression)
 				tokens^ = nexts
 
-				eat_token_expect(tokens, .BracketTriangleOpen) or_return
+				eat_token_expect_push_err(ctx, tokens, .BracketTriangleOpen) or_return
 				type := ast_parse_type(ctx, tokens) or_return
-				eat_token_expect(tokens, .BracketTriangleClose) or_return
-				eat_token_expect(tokens, .BracketRoundOpen) or_return
+				eat_token_expect_push_err(ctx, tokens, .BracketTriangleClose) or_return
+				eat_token_expect_push_err(ctx, tokens, .BracketRoundOpen) or_return
 				expression := ast_parse_expression(ctx, tokens) or_return
-				eat_token_expect(tokens, .BracketRoundClose) or_return
+				eat_token_expect_push_err(ctx, tokens, .BracketRoundClose) or_return
 
 				node = AstNode { kind = .ExprCast, cast_ = {
 					type = transmute(AstNodeIndex) append_return_index(ctx.ast, type),
@@ -2022,7 +2112,7 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 					kind = next.kind == .ConstCast ? .Const : next.kind == .BitCast ? .Bit : .Static,
 				}}
 
-				err = nil
+				err = .None
 				continue
 
 			case .Operator: // explicit operator call e.g.   operator=(a)
@@ -2050,17 +2140,18 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 					case .AssignStar        : tokens^ = ns; node.operator_call.kind = .AssignMultiply
 					case .AssignForwardSlash: tokens^ = ns; node.operator_call.kind = .AssignDivide
 					case .BracketSquareOpen:
-						eat_token_expect(&ns, .BracketSquareClose) or_return
+						eat_token_expect_push_err(ctx, &ns, .BracketSquareClose) or_return
 						tokens^ = ns
 						node.operator_call.kind = .Index
 					case: // TODO explicit custom cast call doesnt make much sense
-						err = AstError_{ actual = n, message = "Expected valid operator (one of ~, ++, --, ==, !=, +, -, *, /, &, |, ^, =, +=, -=, *=, /=, [])" }
+						err = .Some
+						push_error(ctx, { actual = n, message = "Expected valid operator (one of ~, ++, --, ==, !=, +, -, *, /, &, |, ^, =, +=, -=, *=, /=, [])" })
 						return
 				}
 
 				ast_parse_function_call_arguments(ctx, tokens, &node.operator_call.parameters) or_return
 
-				err = nil
+				err = .None
 				continue
 
 			case .BracketCurlyOpen: // compound initializer
@@ -2095,29 +2186,30 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 					}
 				}
 
-				err = nil
+				err = .None
 				continue
 
 			case .Comma:
-				if err == nil && max_presedence >= .Comma {
+				if err == .None && max_presedence >= .Comma {
 					tokens^ = nexts // eat the ,
 					append(&sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, node))
-					err = AstError_{ actual = next, message = "Expected preceeding comma to not be freestanding" }
+					err = .Some
+					push_error(ctx, { actual = next, message = "Expected preceeding comma to not be freestanding" })
 					continue
 				}
 				else {
-					if err == nil { fixup_sequence(&node, ctx, &sequence) }
+					if err == .None { fixup_sequence(&node, ctx, &sequence) }
 					return // keep ok state
 				}
 		}
 
 		simple, simple_err := ast_parse_qualified_name(tokens) 
 		if simple_err != nil {
-			if err == nil { fixup_sequence(&node, ctx, &sequence) }
+			if err == .None { fixup_sequence(&node, ctx, &sequence) }
 			return // keep the ok state
 		}
 		node = AstNode{ kind = .Identifier, identifier = ast_filter_qualified_name(simple) }
-		err = nil
+		err = .None
 
 		next, nexts = peek_token(tokens)
 		if next.kind == .BracketRoundOpen { // function call
@@ -2133,7 +2225,19 @@ eat_remaining_line :: proc(tokens : ^[]Token)
 	for len(tokens) > 0 && eat_token(tokens, false).kind != .NewLine { /**/ }
 }
 
-eat_token_expect :: proc(tokens : ^[]Token, expected_type : TokenKind, ignore_newline := true) -> (t : Token, err : AstError)
+eat_token_expect :: proc { eat_token_expect_direct, eat_token_expect_push_err }
+
+eat_token_expect_push_err :: proc(ctx : ^AstContext, tokens : ^[]Token, expected_type : TokenKind, ignore_newline := true, loc := #caller_location) -> (t : Token, err : AstError)
+{
+	err_ : Maybe(AstErrorFrame)
+	t, err_ = eat_token_expect_direct(tokens, expected_type, ignore_newline, loc)
+	if e, err := err_.?; err {
+		push_error(ctx, e)
+	}
+	return
+}
+
+eat_token_expect_direct :: proc(tokens : ^[]Token, expected_type : TokenKind, ignore_newline := true, loc := #caller_location) -> (t : Token, err : Maybe(AstErrorFrame))
 {
 	s : []Token
 	t, s = peek_token(tokens, ignore_newline)
@@ -2142,7 +2246,7 @@ eat_token_expect :: proc(tokens : ^[]Token, expected_type : TokenKind, ignore_ne
 		tokens^ = s
 	}
 	else {
-		err = AstError_{ actual = t, expected = { kind = expected_type } }
+		err = AstErrorFrame{ actual = t, expected = { kind = expected_type }, code_location = loc }
 	}
 
 	return
@@ -2187,12 +2291,13 @@ find_next_actual_token :: proc(tokens : ^[]Token) -> [^]Token #no_bounds_check
 	return raw_data(tokens^)
 }
 
+AstError :: enum { None, Some }
 
-
-AstError :: Maybe(AstError_)
-AstError_ :: struct {
+AstErrorFrame :: struct {
 	actual, expected : Token,
 	message : string,
+	code_location : runtime.Source_Code_Location,
+	depth : int,
 }
 
 // not castable to AstUnaryOp or AstBinaryOp
@@ -2603,18 +2708,29 @@ fmt_astnode :: proc(fi: ^fmt.Info, node: ^AstNode, verb: rune) -> bool
 
 fmt_ast_err_a : fmt.User_Formatter : proc(fi: ^fmt.Info, arg: any, verb: rune) -> bool
 {
-	err := transmute(^AstError_)arg.data
+	err := transmute(^Maybe(AstErrorFrame))arg.data
+	return fmt_ast_err(fi, &err.?, 'v')
+}
+fmt_ast_erri_a : fmt.User_Formatter : proc(fi: ^fmt.Info, arg: any, verb: rune) -> bool
+{
+	err := transmute(^AstErrorFrame)arg.data
 	return fmt_ast_err(fi, err, 'v')
 }
 
-fmt_ast_err :: proc(fi: ^fmt.Info, err: ^AstError_, verb: rune) -> bool
+fmt_ast_err :: proc(fi: ^fmt.Info, err: ^AstErrorFrame, verb: rune) -> bool
 {
+	if err.code_location != {} {
+		fmt.fmt_arg(fi, err.code_location, 'v')
+		fmt.fmt_string(fi, ": ", 'v')
+	}
 	if err.message != "" {
 		fmt.fmt_string(fi, err.message, 'v')
 	}
 	else {
 		fmt.fmt_string(fi, fmt.tprintf("Expected %v", err.expected.kind), 'v')
 	}
-	fmt.fmt_string(fi, fmt.tprintf(" but found %v", err.actual), 'v')
+	if err.actual != {} {
+		fmt.fmt_string(fi, fmt.tprintf(" but found %v", err.actual), 'v')
+	}
 	return true
 }

@@ -855,7 +855,9 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 				should_swallow_paragraph = false
 				if ctx.ast[ci].kind == .NewLine {
 					cii += 1
-					ci = sequence[cii]
+					if cii < len(sequence) {
+						ci = sequence[cii]
+					}
 				}
 				if ctx.ast[ci].kind == .NewLine { continue }
 			}
@@ -1439,7 +1441,6 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 
 		complete_name := fold_token_range(complete_structure_name, fn_node.function_name[:])
 
-		assert_eq(len(fn_node.function_name), 1)
 		// fold attached comments form forward declaration. This also works when chaining forward declarations
 		_, forward_declared_context := try_find_definition_for_name(ctx, name_context, fn_node.function_name[:], { .Function })
 		if forward_declared_context != nil {
@@ -1450,7 +1451,14 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 			inject_at(&fn_node.attached_comments, 0, ..forward_comments[:])
 		}
 
-		name_context := insert_new_definition(&ctx.context_heap, name_context, last(fn_node.function_name[:]).source, function_node_idx, complete_name)
+		name_context := name_context
+		if len(fn_node.function_name) == 1 {
+			name_context = insert_new_definition(&ctx.context_heap, name_context, last(fn_node.function_name[:]).source, function_node_idx, complete_name)
+		}
+		else {
+			assert(forward_declared_context != nil)
+			name_context = transmute(NameContextIndex) mem.ptr_sub(forward_declared_context, &ctx.context_heap[0])
+		}
 
 		if .ForwardDeclaration in fn_node.flags && !write_forward_declared {
 			return // Don't insert forward declarations, only insert the name context leaf node.

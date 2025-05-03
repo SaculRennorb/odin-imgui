@@ -135,7 +135,7 @@ ast_parse_filescope_sequence :: proc(ctx : ^AstContext, tokens_ : []Token) -> (s
 						eat_token_expect(tokens, .NewLine, false)
 					}
 				}
-				else if call, err := ast_parse_function_call(ctx, tokens); err == nil {
+				else if call, err := ast_parse_function_call(ctx, tokens); err == nil { // top level macro calls
 					append(&sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, call))
 					eat_token_expect(tokens, .Semicolon) // might might exist
 				}

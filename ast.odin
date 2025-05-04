@@ -66,6 +66,8 @@ format_error :: #force_inline proc(ctx : ^AstContext, message : string) -> strin
 
 ast_parse_filescope_sequence :: proc(ctx : ^AstContext, tokens_ : []Token) -> (sequence : [dynamic]AstNodeIndex)
 {
+	current_ast = ctx.ast
+
 	if len(ctx.ast) == 0 { append_return_index(ctx.ast, AstNode{ }) } // dummy ast0 node
 	template_spec: [dynamic]AstNodeIndex
 
@@ -180,7 +182,7 @@ ast_parse_filescope_sequence :: proc(ctx : ^AstContext, tokens_ : []Token) -> (s
 
 						case:
 							if _, err := eat_token_expect(tokens, .Semicolon); err != nil {
-								panic(fmt.tprintf("Missing semicolon after %v.", ctx.ast[node_idx]))
+								panic(fmt.tprintf("Missing semicolon after %#v.", ctx.ast[node_idx]))
 							}
 					}
 
@@ -1611,6 +1613,10 @@ ast_parse_function_call_arguments :: proc(ctx: ^AstContext, tokens : ^[]Token, a
 				tokens^ = ns
 				continue
 
+			case .Comment:
+				tokens^ = ns
+				//TODO
+
 			case:
 				arg := ast_parse_expression(ctx, tokens, .Comma - ._1) or_return
 				append(arguments, transmute(AstNodeIndex) append_return_index(ctx.ast, arg))
@@ -2189,6 +2195,11 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 				err = .None
 				continue
 
+			case .BracketSquareOpen:
+				node = ast_parse_lambda_declaration(ctx, tokens) or_return
+				err = .None
+				continue
+
 			case .Comma:
 				if err == .None && max_presedence >= .Comma {
 					tokens^ = nexts // eat the ,
@@ -2218,6 +2229,43 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 			continue
 		}
 	}
+}
+
+//TODO(Rennorb): Regression test
+ast_parse_lambda_declaration :: proc(ctx : ^AstContext, tokens : ^[]Token, loc := #caller_location) -> (node : AstNode, err : AstError)
+{
+	node.kind = .LambdaDefinition
+
+	defer if err == .Some {
+		push_error(ctx, { message = "Failed to parse lambda deffinition", code_location = loc })
+	}
+
+	eat_token_expect_push_err(ctx, tokens, .BracketSquareOpen) or_return
+	capture_loop: for {
+		n, ns := peek_token(tokens)
+		#partial switch n.kind {
+			case .BracketSquareClose:
+				tokens^ = ns
+				break capture_loop
+
+			case .Comma:
+				tokens^ = ns
+
+			case .Ampersand, .Identifier:
+				expression := ast_parse_expression(ctx, tokens, .Comma - ._1) or_return
+				append(&node.lambda_def.captures, transmute(AstNodeIndex) append_return_index(ctx.ast, expression))
+
+			case:
+				push_error(ctx, { actual = n, message = "Expected valid lambda capture set", code_location = loc })
+				err = .Some
+				return
+		}
+	}
+
+	fn_def := ast_parse_function_def_no_return_type_and_name(ctx, tokens) or_return
+	node.lambda_def.underlying_function = transmute(AstNodeIndex) append_return_index(ctx.ast, fn_def)
+
+	return
 }
 
 eat_remaining_line :: proc(tokens : ^[]Token)
@@ -2405,6 +2453,7 @@ AstNodeKind :: enum {
 	CompoundInitializer,
 	FunctionDefinition,
 	OperatorDefinition,
+	LambdaDefinition,
 	Type,
 	VariableDeclaration,
 	Assert,
@@ -2504,6 +2553,10 @@ AstNode :: struct {
 			kind : AstOverloadedOp,
 			underlying_function : AstNodeIndex,
 			is_explicit : bool,
+		},
+		lambda_def : struct {
+			captures : [dynamic]AstNodeIndex,
+			underlying_function : AstNodeIndex,
 		},
 		index : struct {
 			array_expression : AstNodeIndex,
@@ -2692,6 +2745,7 @@ fmt_astnode :: proc(fi: ^fmt.Info, node: ^AstNode, verb: rune) -> bool
 		case .CompoundInitializer: fmt.fmt_arg(fi, node.compound_initializer, 'v')
 		case .FunctionDefinition : fmt.fmt_arg(fi, node.function_def, 'v')
 		case .OperatorDefinition : fmt.fmt_arg(fi, node.operator_def, 'v')
+		case .LambdaDefinition  : fmt.fmt_arg(fi, node.lambda_def, 'v')
 		case .Type               : fmt.fmt_arg(fi, node.type, 'v')
 		case .VariableDeclaration: fmt.fmt_arg(fi, node.var_declaration, 'v')
 		case .Assert             : fmt.fmt_arg(fi, node.assert, 'v')

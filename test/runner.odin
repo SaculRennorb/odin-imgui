@@ -49,6 +49,10 @@ test :: proc(t : ^testing.T)
 	threads : [dynamic]^thread.Thread
 
 	for &file in files_in {
+		if str.contains(file.name, ".disabled") {
+			log.warn("Disabled", location = { file_path = file.name })
+			continue
+		}
 		context.user_index = transmute(int) &file
 
 		when !SEQUENTIAL {
@@ -96,9 +100,6 @@ test :: proc(t : ^testing.T)
 		ast  : [dynamic]converter.AstNode
 		result : str.Builder
 
-		converter.current_ast = &ast
-
-		
 		ref, err2 := os.read_entire_file(fmt.tprintf(BASEDIR+"/ref/%v.odin", path.stem(file.name)))
 		assert(err2, "Missing ref file?", loc)
 

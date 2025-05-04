@@ -275,19 +275,180 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 				insert_new_definition(&ctx.context_heap, name_context, vardef.var_name.source, current_node_index, complete_name)
 
 				str.write_string(&ctx.result, complete_name);
-				str.write_string(&ctx.result, " : ")
-				write_type_node(ctx, ctx.ast[vardef.type], name_context)
 
-				if vardef.width_expression != {} {
-					str.write_string(&ctx.result, " | ")
-					write_node(ctx, vardef.width_expression, name_context)
-				}
-
-				if vardef.initializer_expression != {} {
-					str.write_string(&ctx.result, " = ")
+				if ctx.ast[vardef.type].kind == .Type && ctx.ast[vardef.type].type[0].source == "auto" {
+					assert(vardef.initializer_expression != {})
+					
+					str.write_string(&ctx.result, " := ")
 					write_node(ctx, vardef.initializer_expression, name_context, indent_str)
 				}
+				else {
+					str.write_string(&ctx.result, " : ")
+					write_type_node(ctx, ctx.ast[vardef.type], name_context)
 
+					if vardef.width_expression != {} {
+						str.write_string(&ctx.result, " | ")
+						write_node(ctx, vardef.width_expression, name_context)
+					}
+
+					if vardef.initializer_expression != {} {
+						str.write_string(&ctx.result, " = ")
+						write_node(ctx, vardef.initializer_expression, name_context, indent_str)
+					}
+				}
+
+				requires_termination = true
+
+			case .LambdaDefinition:
+				lambda := current_node.lambda_def
+				function_ := &ctx.ast[lambda.underlying_function]
+				function := &function_.function_def
+
+				if len(lambda.captures) == 0 {
+					name_reset := len(ctx.context_heap)
+					name_context := insert_new_definition(&ctx.context_heap, name_context, "__", current_node_index, "__")
+					defer resize(&ctx.context_heap, name_reset)
+
+					write_function_type(ctx, name_context, function_^, "", nil)
+
+					switch len(function.body_sequence) {
+						case 0:
+							str.write_string(&ctx.result, " { }");
+
+						case 1:
+							str.write_string(&ctx.result, " { ");
+							write_node(ctx, function.body_sequence[0], name_context)
+							str.write_string(&ctx.result, " }");
+
+						case:
+							str.write_byte(&ctx.result, '\n')
+
+							str.write_string(&ctx.result, indent_str); str.write_string(&ctx.result, "{")
+							body_indent_str := str.concatenate({ indent_str, ONE_INDENT }, context.temp_allocator)
+							write_node_sequence(ctx, function.body_sequence[:], name_context, body_indent_str)
+							str.write_string(&ctx.result, indent_str); str.write_byte(&ctx.result, '}')
+					}
+				}
+				else {
+					member_indent_str := str.concatenate({ indent_str, ONE_INDENT }, context.temp_allocator)
+
+					captures_struct_name := "__l_0_captures" // TODO
+					function_name := "__l_0_function" // TODO
+
+					// initialize
+					str.write_string(&ctx.result, captures_struct_name)
+					str.write_string(&ctx.result, " {\n")
+
+					str.write_string(&ctx.result, member_indent_str)
+					str.write_string(&ctx.result, function_name)
+					str.write_string(&ctx.result, ",\n")
+
+					str.write_string(&ctx.result, member_indent_str)
+					for ci in lambda.captures {
+						c := ctx.ast[ci]
+						#partial switch c.kind {
+							case .ExprUnaryLeft:
+								assert_eq(c.unary_left.operator, AstUnaryOp.AddressOf)
+								str.write_byte(&ctx.result, '&')
+								fallthrough
+							case .Identifier:
+								str.write_string(&ctx.result, last(c.identifier).source)
+								str.write_string(&ctx.result, ", ")
+						}
+						str.write_string(&ctx.result, ", ")
+					}
+					str.write_byte(&ctx.result, '\n')
+
+					str.write_string(&ctx.result, indent_str)
+					str.write_string(&ctx.result, "}\n")
+
+
+					// captures struct
+					str.write_string(&ctx.result, indent_str)
+					str.write_string(&ctx.result, captures_struct_name)
+					str.write_string(&ctx.result, " :: struct {\n")
+
+					str.write_string(&ctx.result, member_indent_str)
+					str.write_string(&ctx.result, "__invoke : typeof(")
+					str.write_string(&ctx.result, function_name)
+					str.write_string(&ctx.result, "),\n")
+
+					str.write_string(&ctx.result, member_indent_str)
+					for ci in lambda.captures {
+						c := ctx.ast[ci]
+						#partial switch c.kind {
+							case .Identifier:
+								str.write_string(&ctx.result, last(c.identifier).source)
+								str.write_string(&ctx.result, " : ")
+								
+								capture_type, _ := resolve_type(ctx, ci, name_context)
+								type := make([dynamic]TypeSegment, 0, len(capture_type), context.temp_allocator)
+								capture_type_ := capture_type[:]
+								translate_type(&type, ctx.ast, &capture_type_)
+								write_type_inner(ctx, type[:], name_context)
+								
+								str.write_string(&ctx.result, ", ")
+
+							case .ExprUnaryLeft:
+								assert_eq(c.unary_left.operator, AstUnaryOp.AddressOf)
+								
+								c := ctx.ast[c.unary_left.right]
+								str.write_string(&ctx.result, last(c.identifier).source)
+								str.write_string(&ctx.result, " : ")
+								
+								capture_type, _ := resolve_type(ctx, c.unary_left.right, name_context)
+								type := make([dynamic]TypeSegment, 0, len(capture_type), context.temp_allocator)
+								capture_type_ := capture_type[:]
+								translate_type(&type, ctx.ast, &capture_type_)
+								str.write_byte(&ctx.result, '^')
+								write_type_inner(ctx, type[:], name_context)
+
+								str.write_string(&ctx.result, ", ")
+						}
+					}
+
+					str.write_string(&ctx.result, indent_str)
+					str.write_string(&ctx.result, "}\n")
+
+
+					// function def
+					name_reset := len(ctx.context_heap)
+					name_context := insert_new_definition(&ctx.context_heap, name_context, function_name, current_node_index, function_name)
+					defer resize(&ctx.context_heap, name_reset)
+
+					str.write_string(&ctx.result, indent_str)
+					str.write_string(&ctx.result, function_name)
+					str.write_string(&ctx.result, " :: proc(")
+					str.write_string(&ctx.result, "__l : ^")
+					str.write_string(&ctx.result, captures_struct_name)
+					for ai in function.arguments {
+						str.write_string(&ctx.result, ", ")
+						write_node(ctx, ai, name_context)
+					}
+					str.write_byte(&ctx.result, ')')
+
+					switch len(function.body_sequence) {
+						case 0:
+							str.write_string(&ctx.result, " { }")
+
+						case 1:
+							str.write_string(&ctx.result, " { using __l; ")
+							write_node(ctx, function.body_sequence[0], name_context)
+							str.write_string(&ctx.result, " }\n")
+
+						case:
+							str.write_byte(&ctx.result, '\n')
+							str.write_string(&ctx.result, indent_str)
+							str.write_string(&ctx.result, "{\n")
+							str.write_string(&ctx.result, member_indent_str)
+							str.write_string(&ctx.result, "using __l")
+							write_node_sequence(ctx, function.body_sequence[:], name_context, member_indent_str)
+
+							if ctx.ast[last(function.body_sequence)^].kind == .NewLine { str.write_string(&ctx.result, indent_str) }
+							str.write_string(&ctx.result, "}\n")
+					}
+
+				}
 				requires_termination = true
 
 			case .Return:
@@ -1478,7 +1639,7 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 		str.write_string(&ctx.result, indent_str);
 		str.write_string(&ctx.result, complete_name);
 		str.write_string(&ctx.result, " :: ");
-		arg_count := write_function_type(ctx, name_context, fn_node_^, complete_structure_name, parent_type)
+		write_function_type(ctx, name_context, fn_node_^, complete_structure_name, parent_type)
 
 		if .ForwardDeclaration in fn_node.flags {
 			return
@@ -1610,7 +1771,7 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 		return
 	}
 
-	resolve_type :: proc(ctx : ^ConverterContext, current_node_index : AstNodeIndex, name_context : NameContextIndex) -> (TokenRange, NameContextIndex)
+	resolve_type :: proc(ctx : ^ConverterContext, current_node_index : AstNodeIndex, name_context : NameContextIndex) -> (raw_type : TokenRange, type_context : NameContextIndex)
 	{
 		current_node := ctx.ast[current_node_index]
 		#partial switch current_node.kind {
@@ -1696,7 +1857,7 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 				return type, type_context != nil ? transmute(NameContextIndex) mem.ptr_sub(type_context, &ctx.context_heap[0]) : 0
 
 			case:
-				panic(fmt.tprintf("Not implemented %v", current_node))
+				panic(fmt.tprintf("Not implemented %#v", current_node))
 		}
 
 		unreachable();

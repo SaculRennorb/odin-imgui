@@ -6,7 +6,7 @@ A1014 :: struct {
 
 A1014_init :: proc(this : ^A1014)
 {
-
+	
 	this.a = 2
 	this.b = 1
 }

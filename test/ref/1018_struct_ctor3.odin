@@ -14,6 +14,6 @@ B1018 :: struct {
 
 B1018_init :: proc(this : ^B1018)
 {
-
+	
 	init(&this.a, 1, 2)
 }

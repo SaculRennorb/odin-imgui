@@ -1162,6 +1162,7 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 				str.write_byte(&ctx.result, '\n')
 			}
 			if initializer.kind == .FunctionDefinition && .ForwardDeclaration not_in initializer.function_def.flags && len(initializer.function_def.body_sequence) > 0 {
+				str.write_string(&ctx.result, member_indent_str)
 				write_node_sequence(ctx, initializer.function_def.body_sequence[:], name_context, member_indent_str)
 				if ctx.ast[last(initializer.function_def.body_sequence[:])^].kind != .NewLine { str.write_byte(&ctx.result, '\n') }
 			}

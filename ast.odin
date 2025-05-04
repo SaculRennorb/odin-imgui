@@ -1155,10 +1155,13 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 			eat_token_expect_push_err(ctx, tokens, .BracketRoundClose) or_return
 
 			// @brittle
-			if c, e := eat_token_expect_direct(tokens, .Comment); e == nil  {
+			eol_comment, eol_comment_err := eat_token_expect_direct(tokens, .Comment)
+			if eol_comment_err == nil  {
 				append(&node.branch.true_branch_sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .NewLine }))
-				append(&node.branch.true_branch_sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .Comment, literal = c }))
+				append(&node.branch.true_branch_sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .Comment, literal = eol_comment }))
 			}
+
+			eol_coment_insertion_point := len(node.branch.true_branch_sequence)
 			
 			node.branch.condition = transmute(AstNodeIndex) append_return_index(ctx.ast, condition)
 
@@ -1170,42 +1173,77 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 				n, ns := peek_token(tokens)
 				ast_try_parse_preproc_statement(ctx, tokens, &node.branch.true_branch_sequence, n, ns) // can also exist between branches if its not wrapped in curly braces
 
-				before_statement := len(node.branch.true_branch_sequence)
-
 				ast_parse_statement(ctx, tokens, &node.branch.true_branch_sequence) or_return
 				eat_token_expect(tokens, .Semicolon)
-
-				// @brittle
-				if c, e := eat_token_expect_direct(tokens, .Comment, false); e == nil {
-					inject_at(&node.branch.true_branch_sequence, before_statement, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .NewLine }))
-					inject_at(&node.branch.true_branch_sequence, before_statement + 1, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .Comment, literal = c }))
-					inject_at(&node.branch.true_branch_sequence, before_statement + 3, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .NewLine }))
-				}
 			}
 
+			// @brittle
+			eol_comment, eol_comment_err = eat_token_expect_direct(tokens, .Comment, false)
+			if eol_comment_err == nil {
+				inject_at(&node.branch.true_branch_sequence, eol_coment_insertion_point + 0, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .NewLine }))
+				inject_at(&node.branch.true_branch_sequence, eol_coment_insertion_point + 1, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .Comment, literal = eol_comment }))
+				inject_at(&node.branch.true_branch_sequence, eol_coment_insertion_point + 2, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .NewLine }))
+			}
+			if len(node.branch.true_branch_sequence) > 1 && ctx.ast[last(node.branch.true_branch_sequence)^].kind != .NewLine {
+				append(&node.branch.true_branch_sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .NewLine }))
+			}
+
+			// @brittle
+			before_comment := tokens^
+			comment_above_else, else_comment_err := eat_token_expect_direct(tokens, .Comment)
+
 			if n, ns := peek_token(tokens); n.kind == .Else {
+				false_branch_sequence := &node.branch.false_branch_sequence
 				if nn, nns := peek_token(&ns); nn.kind == .BracketCurlyOpen {
 					tokens^ = nns // {
+
+					eol_coment_insertion_point = len(node.branch.false_branch_sequence)
+
 					ast_parse_scoped_sequence_no_open_brace(ctx, tokens, ast_parse_statement, &node.branch.false_branch_sequence) or_return
 				}
 				else {
 					tokens^ = ns // else
 
 					n, ns := peek_token(tokens)
-					ast_try_parse_preproc_statement(ctx, tokens, &node.branch.true_branch_sequence, n, ns) // can also exist between branches if its not wrapped in curly braces
-
-					before_statement := len(node.branch.true_branch_sequence)
+					ast_try_parse_preproc_statement(ctx, tokens, &node.branch.false_branch_sequence, n, ns) // can also exist between branches if its not wrapped in curly braces
 
 					ast_parse_statement(ctx, tokens, &node.branch.false_branch_sequence) or_return
 					eat_token_expect(tokens, .Semicolon) // might have a semicolon from single statement or nothing in case of ifelse chain
 
-					// @brittle
-					if c, e := eat_token_expect_direct(tokens, .Comment, false); e == nil {
-						inject_at(&node.branch.false_branch_sequence, before_statement, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .NewLine }))
-						inject_at(&node.branch.false_branch_sequence, before_statement + 1, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .Comment, literal = c }))
-						inject_at(&node.branch.false_branch_sequence, before_statement + 3, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .NewLine }))
+					eol_coment_insertion_point = 0
+					skip_preproc_loop: for fi in node.branch.false_branch_sequence {
+						#partial switch ctx.ast[fi].kind {
+							case .PreprocDefine, .PreprocElse, .PreprocEndif, .PreprocIf, .PreprocMacro:
+								/**/
+							case .Branch:
+								false_branch_sequence = &ctx.ast[fi].branch.true_branch_sequence
+								break skip_preproc_loop
+							case:
+								break skip_preproc_loop
+						}
 					}
 				}
+
+				if else_comment_err == nil {
+					inject_at(false_branch_sequence, eol_coment_insertion_point + 0, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .NewLine }))
+					inject_at(false_branch_sequence, eol_coment_insertion_point + 1, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .Comment, literal = comment_above_else }))
+					eol_coment_insertion_point += 2
+				}
+
+				// @brittle
+				eol_comment, eol_comment_err = eat_token_expect_direct(tokens, .Comment, false)
+				if eol_comment_err == nil {
+					inject_at(false_branch_sequence, eol_coment_insertion_point + 0, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .NewLine }))
+					inject_at(false_branch_sequence, eol_coment_insertion_point + 1, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .Comment, literal = eol_comment }))
+					inject_at(false_branch_sequence, eol_coment_insertion_point + 2, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .NewLine }))
+				}
+				if len(false_branch_sequence) > 1 && ctx.ast[last(false_branch_sequence^)^].kind != .NewLine {
+					append(false_branch_sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .NewLine }))
+				}
+			}
+			else {
+				// reset before eaten comment
+				tokens^ = before_comment
 			}
 
 			parsed_node = transmute(AstNodeIndex) append(sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, node))

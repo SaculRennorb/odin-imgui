@@ -2012,7 +2012,6 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 
 		#partial switch next.kind {
 			case .Star, .Ampersand, .Plus, .Minus, .Exclamationmark, .Tilde, .PrefixDecrement, .PrefixIncrement:
-
 				presedence : OperatorPresedence
 				#partial switch next.kind {
 					case .Star           : presedence = .Dereference
@@ -2214,6 +2213,11 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 					if err == .None { fixup_sequence(&node, ctx, &sequence) }
 					return // keep ok state
 				}
+
+			case .Comment:
+				// ignore for now
+				tokens^ = nexts
+				continue
 		}
 
 		simple, simple_err := ast_parse_qualified_name(tokens) 

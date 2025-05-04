@@ -1347,16 +1347,10 @@ ast_parse_scoped_sequence_no_open_brace :: proc(ctx: ^AstContext, tokens : ^[]To
 				if .ForwardDeclaration not_in ctx.ast[member_node].function_def.flags { break }
 				fallthrough
 				
-			case .VariableDeclaration, .Typedef, .Sequence, .Struct, .Union, .Do, .ExprBinary, .ExprUnaryLeft, .ExprUnaryRight, .MemberAccess, .FunctionCall, .OperatorCall, .Return, .Break, .Continue:
+			case .VariableDeclaration, .Typedef, .Sequence, .Struct, .Union, .Do, .ExprBinary, .ExprUnaryLeft, .ExprUnaryRight, .ExprCast, .MemberAccess, .FunctionCall, .OperatorCall, .Return, .Break, .Continue:
 				when F == type_of(ast_parse_enum_value_declaration) {
-					if fn == ast_parse_enum_value_declaration { // static check only tests for teh shape of the fn
-						// enum value declarations (may) end in a comma
-						eat_token_expect(tokens, .Comma)
-					}
-					else {
-						// most declarations and statements must end in a semicolon
-						eat_token_expect_push_err(ctx, tokens, .Semicolon) or_return
-					}
+					// enum value declarations (may) end in a comma
+					eat_token_expect(tokens, .Comma)
 				}
 				else {
 					// most declarations and statements must end in a semicolon
@@ -1856,7 +1850,7 @@ OperatorPresedence :: enum {
 	Comma            = 17,
 }
 
-ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence := max(OperatorPresedence), loc := #caller_location) -> (node : AstNode, err : AstError)
+ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence := max(OperatorPresedence), comment_storage : ^[dynamic]Token = nil, loc := #caller_location) -> (node : AstNode, err : AstError)
 {
 	token_reset := tokens^
 	ast_reset_size := len(ctx.ast)
@@ -2185,10 +2179,14 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 
 						case:
 							was_preproc := ast_try_parse_preproc_statement(ctx, tokens, &node.compound_initializer.values, n, ns)
+							if was_preproc { break }
 
-							if !was_preproc {
-								expression := ast_parse_expression(ctx, tokens, .Comma - ._1) or_return
-								append(&node.compound_initializer.values, transmute(AstNodeIndex) append_return_index(ctx.ast, expression))
+							comments := make([dynamic]Token, context.temp_allocator)
+							expression := ast_parse_expression(ctx, tokens, .Comma - ._1, &comments) or_return
+							append(&node.compound_initializer.values, transmute(AstNodeIndex) append_return_index(ctx.ast, expression))
+
+							for c in comments {
+								append(&node.compound_initializer.values, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .Comment, literal = c }))
 							}
 					}
 				}
@@ -2215,7 +2213,7 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 				}
 
 			case .Comment:
-				// ignore for now
+				if comment_storage != nil { append(comment_storage, next) }
 				tokens^ = nexts
 				continue
 		}

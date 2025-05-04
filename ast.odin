@@ -619,6 +619,8 @@ ast_parse_declaration :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[
 	// var or fn def must have return type
 	type_node := ast_parse_type(ctx, tokens) or_return
 
+	storage |= ast_parse_storage_modifier(tokens) // mods after return type   static void inline fn()
+
 	if next, ns := peek_token(tokens); next.kind == .Operator { // operator [](args) { ... }  might be member or static call
 		tokens^ = ns
 

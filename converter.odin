@@ -747,36 +747,50 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 			case .For, .While, .Do:
 				loop := current_node.loop
 
+				context_reset := len(ctx.context_heap)
+				name_context := insert_new_definition(&ctx.context_heap, name_context, "__", current_node_index, "__")
+				defer resize(&ctx.context_heap, context_reset)
+
 				str.write_string(&ctx.result, "for")
 				if !loop.is_foreach {
-					if loop.initializer != {} || loop.loop_statement != {} {
+					if len(loop.initializer) != 0 || len(loop.loop_statement) != 0 {
 						str.write_byte(&ctx.result, ' ')
-						if loop.initializer != {} { write_node(ctx, loop.initializer, name_context) }
+						if len(loop.initializer) != 0 { write_node_sequence_merged(ctx, loop.initializer[:], name_context) }
 						str.write_string(&ctx.result, "; ")
-						if loop.condition != {} { write_node(ctx, loop.condition, name_context) }
+						if len(loop.condition) != 0 {
+							assert_eq(len(loop.condition), 1)
+							write_node(ctx, loop.condition[0], name_context)
+						}
 						str.write_string(&ctx.result, "; ")
-						if loop.loop_statement != {} { write_node(ctx, loop.loop_statement, name_context) }
+						if len(loop.loop_statement) != 0 { write_node_sequence_merged(ctx, loop.loop_statement[:], name_context) }
 					}
-					else if loop.condition != {} && current_node.kind != .Do {
+					else if len(loop.condition) != 0 && current_node.kind != .Do {
 						str.write_byte(&ctx.result, ' ')
-						write_node(ctx, loop.condition, name_context)
+						assert_eq(len(loop.condition), 1)
+						write_node(ctx, loop.condition[0], name_context)
 					}
 				}
 				else {
 					str.write_byte(&ctx.result, ' ')
-					initializer := ctx.ast[loop.initializer]
+					
+					assert_eq(len(loop.initializer), 1)
+					initializer := ctx.ast[loop.initializer[0]]
 					assert_eq(initializer.kind, AstNodeKind.VariableDeclaration)
 					str.write_string(&ctx.result, initializer.var_declaration.var_name.source)
+					
 					str.write_string(&ctx.result, " in ")
-					write_node(ctx, loop.loop_statement, name_context)
+					
+					assert_eq(len(loop.loop_statement), 1)
+					write_node(ctx, loop.loop_statement[0], name_context)
 				}
 
 				body_indent_str := str.concatenate({ indent_str, ONE_INDENT }, context.temp_allocator)
-				if loop.condition != {} && current_node.kind == .Do {
+				if len(loop.condition) != 0 && current_node.kind == .Do {
+					assert_eq(len(loop.condition), 1)
 					switch len(loop.body_sequence) {
 						case 0:
 							str.write_string(&ctx.result, " { if !(")
-							write_node(ctx, loop.condition, name_context)
+							write_node(ctx, loop.condition[0], name_context)
 							str.write_string(&ctx.result, ") { break } }")
 	
 						case 1:
@@ -788,7 +802,7 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 							str.write_byte(&ctx.result, '\n')
 							str.write_string(&ctx.result, body_indent_str)
 							str.write_string(&ctx.result, "if !(")
-							write_node(ctx, loop.condition, name_context)
+							write_node(ctx, loop.condition[0], name_context)
 							str.write_string(&ctx.result, ") { break }\n")
 
 							str.write_string(&ctx.result, indent_str)
@@ -802,7 +816,7 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 							str.write_byte(&ctx.result, '\n')
 							str.write_string(&ctx.result, body_indent_str)
 							str.write_string(&ctx.result, "if !(")
-							write_node(ctx, loop.condition, name_context)
+							write_node(ctx, loop.condition[0], name_context)
 							str.write_string(&ctx.result, ") { break }\n")
 
 							str.write_string(&ctx.result, indent_str)
@@ -995,6 +1009,174 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 				runtime.trap();
 		}
 		return
+	}
+
+	write_node_sequence_merged :: proc(ctx : ^ConverterContext, sequence : []AstNodeIndex, name_context : NameContextIndex)
+	{
+		if len(sequence) < 2 {
+			write_node(ctx, sequence[0], name_context)
+			return
+		}
+
+		kind : AstNodeKind
+		for si in sequence {
+			nk := ctx.ast[si].kind
+			if kind == {} { kind = nk }
+			else {
+				#partial switch kind {
+					case .VariableDeclaration:
+						assert_eq(nk, AstNodeKind.VariableDeclaration)
+					case .ExprBinary, .ExprUnaryLeft, .ExprUnaryRight:
+						#partial switch nk {
+							case .ExprBinary, .ExprUnaryLeft, .ExprUnaryRight:
+								/* ok */
+							case:
+								panic(fmt.tprintf("Invalid node kind to merge into sequence (last: %v, next: %v)", kind, nk))
+						}
+					case:
+						panic(fmt.tprintf("Invalid node for sequence merge (last: %v, next: %v)", kind, nk))
+				}
+			}
+		}
+
+		#partial switch kind {
+			case .VariableDeclaration:
+				type : TokenRange
+				for si, i in sequence {
+					decl := &ctx.ast[si].var_declaration
+					if len(type) == 0 { type = ctx.ast[decl.type].type[:] }
+					else {
+						for s, i in ctx.ast[decl.type].type {
+							assert_eq(s.source, type[i].source)
+						}
+					}
+
+					if i > 0 { str.write_string(&ctx.result, ", ") }
+					str.write_string(&ctx.result, decl.var_name.source)
+					insert_new_definition(&ctx.context_heap, name_context, decl.var_name.source, si, decl.var_name.source)
+				}
+
+				str.write_string(&ctx.result, " : ")
+
+				translated_type : [dynamic]TypeSegment
+				translate_type(&translated_type, ctx.ast, &type)
+				write_type_inner(ctx, translated_type[:], name_context)
+
+				str.write_string(&ctx.result, " = ")
+
+				for si, i in sequence {
+					decl := &ctx.ast[si].var_declaration
+					if i > 0 { str.write_string(&ctx.result, ", ") }
+					if decl.initializer_expression != {} {
+						write_node(ctx, decl.initializer_expression, name_context)
+					}
+					else {
+						str.write_string(&ctx.result, "{}")
+					}
+				}
+
+			case .ExprUnaryLeft, .ExprUnaryRight, .ExprBinary:
+				for si, i in sequence {
+					if i > 0 { str.write_string(&ctx.result, ", ") }
+					#partial switch ctx.ast[si].kind {
+						case .ExprBinary:
+							binary := &ctx.ast[si].binary
+							#partial switch binary.operator {
+								case .Assign:
+									fallthrough
+								case .AssignAdd, .AssignSubtract, .AssignDivide, .AssignModulo, .AssignBitAnd, .AssignBitOr, .AssignBitXor, .AssignMultiply:
+									fallthrough
+								case .AssignShiftLeft, .AssignShiftRight:
+									write_node(ctx, binary.left, name_context)
+
+								case:
+									panic(fmt.tprintf("Invalid binary operator for sequence merge: ", binary.operator))
+							}
+
+						case .ExprUnaryLeft:
+							unary := &ctx.ast[si].unary_left
+							#partial switch unary.operator {
+								case .Decrement:
+									fallthrough
+								case .Increment:
+									write_node(ctx, unary.right, name_context)
+								case:
+									panic(fmt.tprintf("Invalid unary left operator for sequence merge: ", unary.operator))
+							}
+
+						case .ExprUnaryRight:
+							unary := &ctx.ast[si].unary_right
+							#partial switch unary.operator {
+								case .Decrement:
+									fallthrough
+								case .Increment:
+									write_node(ctx, unary.left, name_context)
+								case:
+									panic(fmt.tprintf("Invalid unary left operator for sequence merge: ", unary.operator))
+							}
+					}
+				}
+
+				str.write_string(&ctx.result, " = ")
+
+				for si, i in sequence {
+					if i > 0 { str.write_string(&ctx.result, ", ") }
+					#partial switch ctx.ast[si].kind {
+						case .ExprBinary:
+							binary := &ctx.ast[si].binary
+							#partial switch binary.operator {
+								case .Assign:
+									write_node(ctx, binary.right, name_context)
+
+								case .AssignAdd, .AssignSubtract, .AssignDivide, .AssignModulo, .AssignBitAnd, .AssignBitOr, .AssignBitXor, .AssignMultiply:
+									write_node(ctx, binary.left, name_context)
+									str.write_byte(&ctx.result, ' '); str.write_byte(&ctx.result, cast(byte) (binary.operator - cast(AstBinaryOp) TokenKind._MirroredBinaryOperators)); str.write_byte(&ctx.result, ' ')
+									write_node(ctx, binary.right, name_context)
+
+								case .AssignShiftLeft, .AssignShiftRight:
+									write_node(ctx, binary.left, name_context)
+									str.write_string(&ctx.result, binary.operator == .AssignShiftLeft ? " << " : " >> ")
+									write_node(ctx, binary.right, name_context)
+
+								case:
+									panic(fmt.tprintf("Invalid binary operator for sequence merge: ", binary.operator))
+							}
+
+						case .ExprUnaryLeft:
+							unary := &ctx.ast[si].unary_left
+							#partial switch unary.operator {
+								case .Decrement:
+									write_node(ctx, unary.right, name_context)
+									str.write_string(&ctx.result, " - 1")
+
+								case .Increment:
+									write_node(ctx, unary.right, name_context)
+									str.write_string(&ctx.result, " + 1")
+
+								case:
+									panic(fmt.tprintf("Invalid unary left operator for sequence merge: ", unary.operator))
+							}
+
+						case .ExprUnaryRight:
+							unary := &ctx.ast[si].unary_right
+							#partial switch unary.operator {
+								case .Decrement:
+									write_node(ctx, unary.left, name_context)
+									str.write_string(&ctx.result, " - 1")
+
+								case .Increment:
+									write_node(ctx, unary.left, name_context)
+									str.write_string(&ctx.result, " + 1")
+
+								case:
+									panic(fmt.tprintf("Invalid unary left operator for sequence merge: ", unary.operator))
+							}
+					}
+				}
+
+			case:
+				panic(fmt.tprintf("Invalid node kind for sequence merge: ", kind))
+		}
 	}
 
 	write_node_sequence :: proc(ctx : ^ConverterContext, sequence : []AstNodeIndex, name_context : NameContextIndex, indent_str : string, definition_prefix := "", termination := ";", always_terminate := false)

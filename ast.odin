@@ -1019,23 +1019,26 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 
 			node := AstNode { kind = .For }
 
-			initializer := make([dynamic]AstNodeIndex, context.temp_allocator)
-			if ast_parse_statement(ctx, tokens, &initializer); !has_error__reset(ctx) {
-				assert(len(initializer) == 1)
-				node.loop.initializer = initializer[0]
-			}
+			ast_parse_statement(ctx, tokens, &node.loop.initializer)
+			reset_error(ctx)
+
 			#partial switch n, ns := peek_token(tokens); n.kind {
 				case .Semicolon: // normal for loop    for(int i = 0; i < 3; i++)
 					tokens^ = ns // eat ;
 
 					if condition, _ := ast_parse_expression(ctx, tokens); !has_error__reset(ctx) {
-						node.loop.condition = transmute(AstNodeIndex) append_return_index(ctx.ast, condition)
+						node.loop.condition = make_one(transmute(AstNodeIndex) append_return_index(ctx.ast, condition))
 					}
 
 					eat_token_expect_push_err(ctx, tokens, .Semicolon) or_return
 
 					if loop_expression, _ := ast_parse_expression(ctx, tokens); !has_error__reset(ctx) {
-						node.loop.loop_statement = transmute(AstNodeIndex) append_return_index(ctx.ast, loop_expression)
+						if loop_expression.kind == .Sequence {
+							node.loop.loop_statement = loop_expression.sequence.members
+						}
+						else {
+							node.loop.loop_statement = make_one(transmute(AstNodeIndex) append_return_index(ctx.ast, loop_expression))
+						}
 					}
 
 				case .Colon: // foreach loop   for(auto& a : b)
@@ -1044,7 +1047,7 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 					node.loop.is_foreach = true
 
 					iterator := ast_parse_expression(ctx, tokens) or_return
-					node.loop.loop_statement = transmute(AstNodeIndex) append_return_index(ctx.ast, iterator)
+					node.loop.loop_statement = make_one(transmute(AstNodeIndex) append_return_index(ctx.ast, iterator))
 
 				case:
 					err = .Some
@@ -1104,7 +1107,7 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 			}
 
 			parsed_node = transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode { kind = .While, loop = {
-				condition = transmute(AstNodeIndex) append_return_index(ctx.ast, condition),
+				condition = make_one(transmute(AstNodeIndex) append_return_index(ctx.ast, condition)),
 				body_sequence = body_sequence,
 			}})
 			append(sequence, parsed_node)
@@ -1139,7 +1142,7 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 			eat_token_expect_push_err(ctx, tokens, .BracketRoundClose) or_return
 
 			parsed_node = transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode { kind = .Do, loop = {
-				condition = transmute(AstNodeIndex) append_return_index(ctx.ast, condition),
+				condition = make_one(transmute(AstNodeIndex) append_return_index(ctx.ast, condition)),
 				body_sequence = body_sequence,
 			}})
 			append(sequence, parsed_node)
@@ -1913,6 +1916,7 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 	// have to add this before every ok return, defer cannot modify return values
 	fixup_sequence :: proc(node : ^AstNode, ctx: ^AstContext, sequence : ^[dynamic]AstNodeIndex)
 	{
+		reset_error(ctx)
 		if len(sequence) > 0 {
 			append(sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, node^)) // append last elm in sequence
 			node^ = AstNode{ kind = .Sequence, sequence = { members = sequence^} }
@@ -2645,7 +2649,7 @@ AstNode :: struct {
 			expansion_tokens : []Token,
 		},
 		loop : struct {
-			initializer, condition, loop_statement : AstNodeIndex,
+			initializer, condition, loop_statement : [dynamic]AstNodeIndex,
 			body_sequence : [dynamic]AstNodeIndex,
 			is_foreach : bool,
 		},

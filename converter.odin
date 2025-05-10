@@ -20,6 +20,7 @@ ConverterContext :: struct {
 	root_sequence : []AstNodeIndex,
 	context_heap : [dynamic]NameContext,
 	overload_resolver : map[string][dynamic]string,
+	next_anonymous_struct_index : i32,
 }
 
 convert_and_format :: proc(ctx : ^ConverterContext)
@@ -72,7 +73,7 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 				if type_node := ctx.ast[define.type]; type_node.kind == .Type {
 					str.write_string(&ctx.result, define.name.source)
 					str.write_string(&ctx.result, " :: ")
-					write_type_node(ctx, type_node, name_context)
+					write_type_node(ctx, define.type, name_context, indent_str, indent_str)
 
 					insert_new_definition(&ctx.context_heap, 0, define.name.source, current_node_index, define.name.source)
 				}
@@ -274,9 +275,11 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 				complete_name := fold_token_range(definition_prefix, { vardef.var_name })
 				insert_new_definition(&ctx.context_heap, name_context, vardef.var_name.source, current_node_index, complete_name)
 
+				type_node := &ctx.ast[vardef.type];
+
 				str.write_string(&ctx.result, complete_name);
 
-				if ctx.ast[vardef.type].kind == .Type && ctx.ast[vardef.type].type[0].source == "auto" {
+				if type_node.kind == .Type && type_node.type[0].source == "auto" {
 					assert(vardef.initializer_expression != {})
 					
 					str.write_string(&ctx.result, " := ")
@@ -284,7 +287,16 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 				}
 				else {
 					str.write_string(&ctx.result, " : ")
-					write_type_node(ctx, ctx.ast[vardef.type], name_context)
+
+					#partial switch type_node.kind {
+						case .Struct, .Union, .Enum:
+							// Anonymous structure context. It's added after the var name which is wired, but that doesn't matter as its stored in a map.
+							synthetic_name := fmt.tprintf(ANONYMOUS_STRUCT_NAME_FORMAT, ctx.next_anonymous_struct_index)
+							insert_new_definition(&ctx.context_heap, name_context, synthetic_name, vardef.type, synthetic_name)
+							ctx.next_anonymous_struct_index += 1
+					}
+
+					write_type_node(ctx, vardef.type, name_context, indent_str, indent_str)
 
 					if vardef.width_expression != {} {
 						str.write_string(&ctx.result, " | ")
@@ -589,7 +601,7 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 					else {
 						str.write_string(&ctx.result, "transmute(")
 					}
-					write_type_node(ctx, target_type_node, name_context)
+					write_type_node(ctx, current_node.cast_.type, name_context, indent_str, indent_str)
 					str.write_string(&ctx.result, ") ")
 				}
 
@@ -1271,7 +1283,7 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 				str.write_string(&ctx.result, indent_str);
 				str.write_string(&ctx.result, complete_member_name);
 				str.write_string(&ctx.result, " : ")
-				write_type_node(ctx, ctx.ast[member.type], name_context)
+				write_type_node(ctx, member.type, name_context, indent_str, indent_str)
 
 				if member.initializer_expression != {} {
 					str.write_string(&ctx.result, " = ");
@@ -1322,7 +1334,7 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 
 					str.write_string(&ctx.result, arg.var_name.source)
 					str.write_string(&ctx.result, " : ")
-					write_type_node(ctx, ctx.ast[arg.type], name_context)
+					write_type_node(ctx, arg.type, name_context, indent_str, member_indent_str)
 
 					if arg.initializer_expression != {} {
 						str.write_string(&ctx.result, " = ")
@@ -1549,7 +1561,7 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 					else { str.write_byte(&ctx.result, ' ') }
 					str.write_string(&ctx.result, member.var_name.source);
 					str.write_string(&ctx.result, " : ")
-					write_type_node(ctx, ctx.ast[member.type], name_context)
+					write_type_node(ctx, member.type, name_context, indent_str, member_indent_str)
 					str.write_byte(&ctx.result, ',')
 
 					last_was_newline = false
@@ -1761,7 +1773,7 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 						str.write_byte(&ctx.result, '_') // fn args might not have a name
 					}
 					str.write_string(&ctx.result, " : ")
-					write_type_node(ctx, ctx.ast[arg.type], name_context)
+					write_type_node(ctx, arg.type, name_context, "", "")
 	
 					if arg.initializer_expression != {} {
 						str.write_string(&ctx.result, " = ")
@@ -1781,7 +1793,7 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 			return_type := ctx.ast[fn_node.return_type].type
 			if len(return_type) > 1 || return_type[0].source != "void" {
 				str.write_string(&ctx.result, " -> ")
-				write_type_node(ctx, ctx.ast[fn_node.return_type], name_context)
+				write_type_node(ctx, fn_node.return_type, name_context, "", "")
 			}
 		}
 
@@ -1879,14 +1891,19 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 		return complete_name
 	}
 
-	write_type_node :: proc(ctx : ^ConverterContext, r : AstNode, name_context : NameContextIndex)
+	write_type_node :: proc(ctx : ^ConverterContext, ri : AstNodeIndex, name_context : NameContextIndex, indent_str, member_indent_str : string)
 	{
+		r := ctx.ast[ri]
 		#partial switch r.kind {
 			case .Type:
 				write_type(ctx, r.type[:], name_context)
 
 			case .FunctionDefinition:
-				write_function_type(ctx, 0 /*hopefully not relevant*/, r, "", nil)
+				write_function_type(ctx, name_context, r, "", nil)
+
+			case .Struct, .Union:
+				r := r
+				write_struct_union_type(ctx, &r, ri, name_context, name_context, indent_str, member_indent_str, "")
 		}
 	}
 
@@ -2038,8 +2055,16 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 			case .VariableDeclaration:
 				def_node := current_node.var_declaration
 
-				type := ctx.ast[def_node.type].type[:]
+				type_node := ctx.ast[def_node.type]
 
+				#partial switch type_node.kind {
+					case .Struct, .Enum, .Union: // struct { int a } b;
+						synthetic_struct_name := Token{ kind = .Identifier, source = fmt.tprintf(ANONYMOUS_STRUCT_NAME_FORMAT, ctx.next_anonymous_struct_index - 1) }
+						_, type_context := try_find_definition_for_name(ctx, name_context, {synthetic_struct_name}, {.Type})
+						return {}, type_context != nil ? transmute(NameContextIndex) mem.ptr_sub(type_context, &ctx.context_heap[0]) : 0
+				}
+
+				type := type_node.type[:]
 				if type[0].source == "auto" {
 					panic("auto resolver not implemented");
 				}
@@ -2443,3 +2468,5 @@ _TypeFragment :: struct {
 
 TypeSegment :: union #no_nil { _TypePtr, _TypeMultiptr, _TypeArray, _TypeFragment }
 Type :: []TypeSegment
+
+ANONYMOUS_STRUCT_NAME_FORMAT :: "<AnonymousStructure%v>"

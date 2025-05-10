@@ -577,8 +577,15 @@ ast_parse_declaration :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[
 
 			ast_attach_comments(ctx, sequence, &node)
 
-			parsed_node = transmute(AstNodeIndex) append_return_index(ctx.ast, node)
-			append(sequence, parsed_node)
+			
+			if n, _ := peek_token(tokens); n.kind == .Semicolon { // simple declaration
+				parsed_node = transmute(AstNodeIndex) append_return_index(ctx.ast, node)
+				append(sequence, parsed_node)
+				return	
+			}
+
+			ast_parse_var_declaration_no_type(ctx, tokens, node, sequence, {}) or_return
+			parsed_node = last(sequence^)^ // @hack
 			return
 
 		case .Namespace:
@@ -1315,8 +1322,14 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 
 			ast_attach_comments(ctx, sequence, &node)
 
-			parsed_node = transmute(AstNodeIndex) append_return_index(ctx.ast, node)
-			append(sequence, parsed_node)
+			if n, _ := peek_token(tokens); n.kind == .Semicolon { // normal declaration
+				parsed_node = transmute(AstNodeIndex) append_return_index(ctx.ast, node)
+				append(sequence, parsed_node)
+				return
+			}
+
+			ast_parse_var_declaration_no_type(ctx, tokens, node, sequence, {}) or_return
+			parsed_node = last(sequence^)^ // @hack
 			return
 	}
 

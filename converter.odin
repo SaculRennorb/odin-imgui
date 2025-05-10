@@ -697,6 +697,8 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 
 				write_token_range(&ctx.result, current_node.identifier[:])
 
+				requires_termination = true
+
 			case .FunctionCall:
 				fncall := current_node.function_call
 

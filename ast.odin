@@ -1546,6 +1546,13 @@ ast_parse_var_declaration_no_type :: proc(ctx: ^AstContext, tokens : ^[]Token, p
 
 			next, ns = peek_token(tokens)
 		}
+		else if next.kind == .BracketCurlyOpen { //  int a[3] { 1, 2, 3};
+			tokens^ = ns
+
+			initializer_expression = ast_parse_compound_initializer_no_start_curly_brace(ctx, tokens) or_return
+
+			next, ns = peek_token(tokens)
+		}
 
 		node := AstNode { kind = .VariableDeclaration, var_declaration = {
 			flags = storage_flags,
@@ -2208,39 +2215,7 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 
 			case .BracketCurlyOpen: // compound initializer
 				tokens^ = nexts // eat the {
-				node = AstNode{ kind = .CompoundInitializer }
-
-				member_loop: for {
-					n, ns := peek_token(tokens, false)
-					#partial switch n.kind {
-						case .BracketCurlyClose:
-							tokens^ = ns // eat the }
-							break member_loop
-
-						case .Comma:
-							tokens^ = ns // eat the ,
-
-						case .Comment:
-							tokens^ = ns
-							append(&node.compound_initializer.values, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .Comment, literal = n }))
-
-						case .NewLine:
-							tokens^ = ns
-							append(&node.compound_initializer.values, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .NewLine }))
-
-						case:
-							was_preproc := ast_try_parse_preproc_statement(ctx, tokens, &node.compound_initializer.values, n, ns)
-							if was_preproc { break }
-
-							comments := make([dynamic]Token, context.temp_allocator)
-							expression := ast_parse_expression(ctx, tokens, .Comma - ._1, &comments) or_return
-							append(&node.compound_initializer.values, transmute(AstNodeIndex) append_return_index(ctx.ast, expression))
-
-							for c in comments {
-								append(&node.compound_initializer.values, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .Comment, literal = c }))
-							}
-					}
-				}
+				node = ast_parse_compound_initializer_no_start_curly_brace(ctx, tokens) or_return
 
 				err = .None
 				continue
@@ -2284,6 +2259,44 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 			continue
 		}
 	}
+}
+
+ast_parse_compound_initializer_no_start_curly_brace :: proc(ctx : ^AstContext, tokens: ^[]Token) -> (node : AstNode, err : AstError)
+{
+	node = AstNode{ kind = .CompoundInitializer }
+
+	member_loop: for {
+		n, ns := peek_token(tokens, false)
+		#partial switch n.kind {
+			case .BracketCurlyClose:
+				tokens^ = ns // eat the }
+				break member_loop
+
+			case .Comma:
+				tokens^ = ns // eat the ,
+
+			case .Comment:
+				tokens^ = ns
+				append(&node.compound_initializer.values, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .Comment, literal = n }))
+
+			case .NewLine:
+				tokens^ = ns
+				append(&node.compound_initializer.values, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .NewLine }))
+
+			case:
+				was_preproc := ast_try_parse_preproc_statement(ctx, tokens, &node.compound_initializer.values, n, ns)
+				if was_preproc { break }
+
+				comments := make([dynamic]Token, context.temp_allocator)
+				expression := ast_parse_expression(ctx, tokens, .Comma - ._1, &comments) or_return
+				append(&node.compound_initializer.values, transmute(AstNodeIndex) append_return_index(ctx.ast, expression))
+
+				for c in comments {
+					append(&node.compound_initializer.values, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .Comment, literal = c }))
+				}
+		}
+	}
+	return
 }
 
 //TODO(Rennorb): Regression test

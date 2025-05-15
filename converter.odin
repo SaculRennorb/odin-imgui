@@ -193,18 +193,18 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 				og_name_context := name_context
 				name_context := name_context
 
-				_, forward_declared_context := try_find_definition_for_name(ctx, name_context, structure.name)
+				_, forward_declared_context := try_find_definition_for_name(ctx, name_context, structure.name, {.Type})
 				if forward_declared_context != nil {
 					forward_declaration := ctx.ast[forward_declared_context.node]
-					assert_eq(forward_declaration.kind, AstNodeKind.Enum)
+					assert_node_kind(forward_declaration, .Enum)
 	
 					forward_comments := forward_declaration.structure.attached_comments
 					inject_at(&structure.attached_comments, 0, ..forward_comments[:])
 				}
 
-				// enums spill out members into parent context, don'T replace the name_context for members
-				structure_name_context := transmute(NameContextIndex) append_return_index(&ctx.context_heap, NameContext{ node = current_node_index, parent = name_context, complete_name = complete_structure_name })
-				ctx.context_heap[og_name_context].definitions[last(structure.name).source] = structure_name_context
+				// enums spill out members into parent context, don't replace the name_context for members
+				name_context = transmute(NameContextIndex) append_return_index(&ctx.context_heap, NameContext{ node = current_node_index, parent = name_context, complete_name = complete_structure_name })
+				ctx.context_heap[og_name_context].definitions[last(structure.name).source] = name_context
 
 				if structure.is_forward_declaration {
 					swallow_paragraph = true
@@ -213,14 +213,14 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 
 				// write directly, they are marked for skipping in write_sequence
 				for aid in structure.attached_comments {
-					write_node(ctx, aid, name_context)
+					write_node(ctx, aid, og_name_context)
 				}
 
 				str.write_string(&ctx.result, complete_structure_name);
 				str.write_string(&ctx.result, " :: enum ")
 
 				if structure.base_type != nil {
-					write_type(ctx, structure.base_type, name_context)
+					write_type(ctx, structure.base_type, og_name_context)
 				}
 				else {
 					str.write_string(&ctx.result, "i32")
@@ -236,7 +236,8 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 						case .VariableDeclaration:
 							member := ctx.ast[ci].var_declaration
 
-							d := insert_new_definition(&ctx.context_heap, name_context, member.var_name.source, ci, member.var_name.source)
+							emember_context := insert_new_definition(&ctx.context_heap, name_context, member.var_name.source, ci, fmt.aprint(complete_structure_name, member.var_name.source, sep = "."))
+							ctx.context_heap[og_name_context].definitions[member.var_name.source] = emember_context
 
 							if last_was_newline { str.write_string(&ctx.result, member_indent_str) }
 							else { str.write_byte(&ctx.result, ' ') }
@@ -267,7 +268,9 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 					}
 				}
 
-				str.write_string(&ctx.result, indent_str); str.write_byte(&ctx.result, '}')
+				if len(structure.members) > 0 && ctx.ast[last(structure.members)^].kind == .NewLine { str.write_string(&ctx.result, indent_str) }
+				else { str.write_byte(&ctx.result, ' ') }
+				str.write_byte(&ctx.result, '}')
 
 			case .VariableDeclaration:
 				vardef := current_node.var_declaration
@@ -705,6 +708,14 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 
 				if ((parent.kind == .Struct || parent.kind == .Union) && .Static not_in ctx.ast[def.node].var_declaration.flags) {
 					str.write_string(&ctx.result, "this.")
+				}
+				else if parent.kind == .Enum && ctx.ast[ctx.context_heap[name_context].node].kind != .Enum {
+					write_token_range(&ctx.result, parent.structure.name)
+					str.write_byte(&ctx.result, '.')
+					str.write_string(&ctx.result, last(current_node.identifier).source)
+
+					requires_termination = true
+					break	
 				}
 
 				write_token_range(&ctx.result, current_node.identifier[:])
@@ -1392,6 +1403,7 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 			str.write_string(&ctx.result, indent_str); str.write_byte(&ctx.result, '}')
 		}
 
+		synthetic_enum_index := 0
 		for midx in structure.members {
 			#partial switch ctx.ast[midx].kind {
 				case .FunctionDefinition:
@@ -1406,6 +1418,18 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 					str.write_string(&ctx.result, "\n\n")
 					ctx.ast[midx].structure.name = slice.concatenate([][]Token{structure.name, ctx.ast[midx].structure.name})
 					write_node(ctx, midx, name_context, indent_str)
+
+					requires_new_paragraph = true
+
+				case .Enum:
+					str.write_string(&ctx.result, "\n\n")
+
+					if len(ctx.ast[midx].structure.name) == 0 {
+						ctx.ast[midx].structure.name = slice.concatenate([][]Token{structure.name, {Token{kind = .Identifier, source = fmt.tprintf("E%v", synthetic_enum_index)}}})
+						synthetic_enum_index += 1
+					}
+					write_node(ctx, midx, name_context, indent_str)
+
 
 					requires_new_paragraph = true
 			}
@@ -1527,6 +1551,7 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 			sa.clear(&subsection_data.member_stack)
 		}
 
+		synthetic_enum_index := 0
 		last_was_transfered := true
 		loop: for cii := 0; cii < len(structure.members); cii += 1 {
 			ci := structure.members[cii]
@@ -1566,8 +1591,41 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 
 					last_was_newline = false
 
-				case .Enum, .FunctionDefinition, .OperatorDefinition:
+				case .FunctionDefinition, .OperatorDefinition:
 					// dont write
+
+					last_was_transfered = false
+
+				case .Enum:
+					// Don't write but insert deffinitions since they spill out into the parent scope...
+
+					enum_name : string
+					if len(member.structure.name) > 0 {
+						assert_eq(len(member.structure.name), 1)
+						enum_name = fmt.tprintf("%v_%v", complete_structure_name, last(member.structure.name).source)
+					}
+					else{
+						enum_name = fmt.tprintf("%v_E%v", complete_structure_name, synthetic_enum_index)
+						synthetic_enum_index += 1
+
+						member.structure.name = make_one(Token{kind = .Identifier, source = enum_name})[:]
+					}
+
+					// We need to create the enum scope aswell, to be able to add members to it. it can later on be referenced.
+					ename_context := transmute(NameContextIndex) append_return_index(&ctx.context_heap, NameContext{ node = ci, parent = name_context_, complete_name = enum_name})
+					ctx.context_heap[name_context_].definitions[enum_name] = ename_context
+
+					for eid in member.structure.members {
+						enum_member := ctx.ast[eid]
+						#partial switch enum_member.kind {
+							case .VariableDeclaration:
+								emember_name := enum_member.var_declaration.var_name.source
+								synthetic_name := fmt.aprintf("%v.%v", enum_name, emember_name)
+
+								emember_ctx := insert_new_definition(&ctx.context_heap, ename_context, emember_name, eid, synthetic_name)
+								ctx.context_heap[name_context].definitions[emember_name] = emember_ctx // add the member into the encompasing context aswell, enums bleed
+						}
+					}
 
 					last_was_transfered = false
 
@@ -1625,10 +1683,8 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 								/**/
 							case .FunctionDefinition:
 								/**/
-							case .Struct, .Union:
+							case .Struct, .Union, .Enum:
 								if len(node.structure.name) == 0 { continue loop }
-							case .Enum:
-								if len(node.enum_.name) == 0 { continue loop }
 							case .VariableDeclaration:
 								continue loop
 							case:
@@ -2003,7 +2059,7 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 					// ptr index
 					return indexed_type[:len(indexed_type) - 1], expression_context // slice of one layer of 
 				}
-				else { // assume the type is indexable and look for a matchin operator
+				else { // assume the type is indexable and look for a matching operator
 					indexed_type_stripped := strip_type(indexed_type)
 					_, structure_def := find_definition_for_name(ctx, name_context, indexed_type_stripped[:])
 					structure_node := ctx.ast[structure_def.node]
@@ -2329,11 +2385,13 @@ find_definition_for_name :: proc(ctx : ^ConverterContext, current_index : NameCo
 	if name_context != nil { return }
 
 	dump_context_stack(ctx, current_index, ctx.context_heap[current_index].complete_name)
-	panic(fmt.tprintf("%v : %v '%v' was not found in context", compound_identifier[0].location, filter, compound_identifier), loc)
+	panic(fmt.tprintf("%v : %v '%v' was not found in context", len(compound_identifier) > 0 ? compound_identifier[0].location : SourceLocation{}, filter, compound_identifier), loc)
 }
 
 try_find_definition_for_name :: proc(ctx : ^ConverterContext, current_index : NameContextIndex, compound_identifier : TokenRange, filter := DeffinitionFilterAll) -> (root_context, name_context : ^NameContext)
 {
+	if len(compound_identifier) == 0 { return nil, nil }
+
 	im_root_context := &ctx.context_heap[current_index]
 
 	ctx_stack: for {
@@ -2430,7 +2488,7 @@ fmt_name_ctx_idx :: proc(fi: ^fmt.Info, idx: ^NameContextIndex, verb: rune) -> b
 
 
 
-dump_context_stack :: proc(ctx : ^ConverterContext, name_context_idx : NameContextIndex, name := "", indent := " ", return_at : NameContextIndex = -1)
+dump_context_stack :: proc(ctx : ^ConverterContext, name_context_idx : NameContextIndex, name := "", indent := " ", return_at : NameContextIndex = -1, forward_only := false)
 {
 	name_context := ctx.context_heap[name_context_idx]
 	
@@ -2444,14 +2502,14 @@ dump_context_stack :: proc(ctx : ^ConverterContext, name_context_idx : NameConte
 
 		indent := str.concatenate({ indent, "  " }, context.temp_allocator)
 		for name, didx in name_context.definitions {
-			dump_context_stack(ctx, didx, name, indent, name_context_idx)
+			dump_context_stack(ctx, didx, name, indent, name_context_idx, forward_only)
 		}
 	}
 
-	if name_context.parent == -1 || name_context.parent == return_at { return }
+	if name_context.parent == -1 || name_context.parent == return_at || forward_only { return }
 
 	indent := str.concatenate({ indent, "  " }, context.temp_allocator)
-	dump_context_stack(ctx, name_context.parent, "<parent>", indent, name_context_idx)
+	dump_context_stack(ctx, name_context.parent, "<parent>", indent, name_context_idx, forward_only)
 }
 
 
@@ -2470,3 +2528,11 @@ TypeSegment :: union #no_nil { _TypePtr, _TypeMultiptr, _TypeArray, _TypeFragmen
 Type :: []TypeSegment
 
 ANONYMOUS_STRUCT_NAME_FORMAT :: "<AnonymousStructure%v>"
+
+
+assert_node_kind :: proc(node : AstNode, kind : AstNodeKind, loc := #caller_location)
+{
+	if node.kind != kind {
+		panic(fmt.tprintf("Expected %v, but got %#v.\n", kind, node), loc)
+	}
+}

@@ -588,6 +588,35 @@ ast_parse_declaration :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[
 			parsed_node = last(sequence^)^ // @hack
 			return
 
+		case .Enum:
+			tokens^ = nexts
+
+			node := AstNode { kind = .Enum }
+
+			if n, ns := peek_token(tokens); n.kind == .Identifier {
+				tokens^ = ns
+
+				node.structure.name = make(TokenRange, 1)
+				node.structure.name[0] = n
+			}
+
+			eat_token_expect_push_err(ctx, tokens, .BracketCurlyOpen) or_return
+
+			ast_parse_scoped_sequence_no_open_brace(ctx, tokens, ast_parse_enum_value_declaration, &node.structure.members, &node) or_return
+
+			ast_attach_comments(ctx, sequence, &node)
+
+			
+			if n, _ := peek_token(tokens); n.kind == .Semicolon { // simple declaration
+				parsed_node = transmute(AstNodeIndex) append_return_index(ctx.ast, node)
+				append(sequence, parsed_node)
+				return	
+			}
+
+			ast_parse_var_declaration_no_type(ctx, tokens, node, sequence, {}) or_return
+			parsed_node = last(sequence^)^ // @hack
+			return
+
 		case .Namespace:
 			tokens^ = nexts
 
@@ -676,6 +705,7 @@ ast_parse_declaration :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[
 		}
 
 		fn_node := ast_parse_function_def_no_return_type_and_name(ctx, tokens) or_return
+		fn_node.function_def.return_type = transmute(AstNodeIndex) append_return_index(ctx.ast, type_node)
 		node.operator_def.underlying_function = transmute(AstNodeIndex) append_return_index(ctx.ast, fn_node)
 
 		arg_count := parent_type != nil ? 1 : 0
@@ -1410,7 +1440,7 @@ ast_parse_scoped_sequence_no_open_brace :: proc(ctx: ^AstContext, tokens : ^[]To
 				if .ForwardDeclaration not_in ctx.ast[member_node].function_def.flags { break }
 				fallthrough
 				
-			case .VariableDeclaration, .Typedef, .Sequence, .Struct, .Union, .Do, .ExprBinary, .ExprUnaryLeft, .ExprUnaryRight, .ExprCast, .MemberAccess, .FunctionCall, .OperatorCall, .Return, .Break, .Continue:
+			case .VariableDeclaration, .Typedef, .Sequence, .Struct, .Union, .Enum, .Do, .ExprBinary, .ExprUnaryLeft, .ExprUnaryRight, .ExprCast, .MemberAccess, .FunctionCall, .OperatorCall, .Return, .Break, .Continue:
 				when F == type_of(ast_parse_enum_value_declaration) {
 					// enum value declarations (may) end in a comma
 					eat_token_expect(tokens, .Comma)
@@ -2360,8 +2390,9 @@ eat_token_expect_push_err :: proc(ctx : ^AstContext, tokens : ^[]Token, expected
 {
 	err_ : Maybe(AstErrorFrame)
 	t, err_ = eat_token_expect_direct(tokens, expected_type, ignore_newline, loc)
-	if e, err := err_.?; err {
+	if e, er := err_.?; er {
 		push_error(ctx, e)
+		err = .Some
 	}
 	return
 }
@@ -2656,11 +2687,6 @@ AstNode :: struct {
 			template_spec : [dynamic]AstNodeIndex,
 			is_forward_declaration : bool,
 		},
-		enum_ : struct {
-			name : TokenRange,
-			base_type : TokenRange,
-			members : [dynamic]AstNodeIndex,
-		},
 		member_access : struct {
 			expression, member : AstNodeIndex,
 			through_pointer : bool,
@@ -2835,7 +2861,7 @@ fmt_astnode :: proc(fi: ^fmt.Info, node: ^AstNode, verb: rune) -> bool
 		case .Continue           : fmt.fmt_arg(fi, node.identifier, 'v')
 		case .Struct             : fmt.fmt_arg(fi, node.structure, 'v')
 		case .Union              : fmt.fmt_arg(fi, node.structure, 'v')
-		case .Enum               : fmt.fmt_arg(fi, node.enum_, 'v')
+		case .Enum               : fmt.fmt_arg(fi, node.structure, 'v')
 		case .Varargs            :
 	}
 	return true

@@ -188,6 +188,10 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 			case .Enum:
 				structure := &current_node.structure
 
+				if len(structure.name) == 0 {
+					structure.name = make_one(Token{ kind = .Identifier, source = fmt.aprintf("E%v", ctx.next_anonymous_struct_index) })[:]
+					ctx.next_anonymous_struct_index += 1
+				}
 				complete_structure_name := fold_token_range(definition_prefix, structure.name)
 
 				og_name_context := name_context

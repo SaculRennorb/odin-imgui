@@ -1347,7 +1347,7 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 			parsed_node = transmute(AstNodeIndex) append(sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, node))
 			return
 
-		case .Struct, .Class, .Union:
+		case .Struct, .Class, .Union, .Enum:
 			node := ast_parse_structure(ctx, tokens) or_return
 
 			ast_attach_comments(ctx, sequence, &node)

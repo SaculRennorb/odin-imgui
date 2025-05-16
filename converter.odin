@@ -2426,8 +2426,10 @@ find_definition_for_name :: proc(ctx : ^ConverterContext, current_index : NameCo
 	root_context, name_context = try_find_definition_for_name(ctx, current_index, compound_identifier, filter)
 	if name_context != nil { return }
 
+	err := fmt.tprintf("%v : %v '%v' was not found in context", len(compound_identifier) > 0 ? compound_identifier[0].location : SourceLocation{}, filter, compound_identifier)
+	log.error(err)
 	dump_context_stack(ctx, current_index, ctx.context_heap[current_index].complete_name)
-	panic(fmt.tprintf("%v : %v '%v' was not found in context", len(compound_identifier) > 0 ? compound_identifier[0].location : SourceLocation{}, filter, compound_identifier), loc)
+	panic(err, loc)
 }
 
 try_find_definition_for_name :: proc(ctx : ^ConverterContext, current_index : NameContextIndex, compound_identifier : TokenRange, filter := DeffinitionFilterAll) -> (root_context, name_context : ^NameContext)

@@ -174,14 +174,14 @@ tokenize :: proc(tokens : ^[dynamic]Token, text : string, file_path : string)
 				start := remaining
 				for remaining = remaining[1:] ; remaining < end; remaining = remaining[1:] {
 					if remaining[0] == '\n' { row += 1; row_start = remaining }
-					if remaining[0] == '"' && remaining[-1] != '\\' { remaining = remaining[1:]; break }
+					if remaining[0] == '"' && (remaining[-1] != '\\' || remaining[-2] == '\\') { remaining = remaining[1:]; break }
 				}
 				append(tokens, Token{.LiteralString, str_from_se(start, remaining), loc})
 
 			case '\'':
 				start := remaining
 				for remaining = remaining[1:] ; remaining < end; remaining = remaining[1:] {
-					if remaining[0] == '\'' && remaining[-1] != '\\' { remaining = remaining[1:]; break }
+					if remaining[0] == '\'' && (remaining[-1] != '\\' || remaining[-2] == '\\') { remaining = remaining[1:]; break }
 				}
 				append(tokens, Token{.LiteralCharacter, str_from_se(start, remaining), loc})
 

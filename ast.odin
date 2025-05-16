@@ -1361,6 +1361,17 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 			ast_parse_var_declaration_no_type(ctx, tokens, node, sequence, {}) or_return
 			parsed_node = last(sequence^)^ // @hack
 			return
+
+		case .Using:
+			tokens^ = nexts
+
+			eat_token_expect_push_err(ctx, tokens, .Namespace) or_return
+
+			namespace := ast_parse_qualified_name(ctx, tokens) or_return
+
+			parsed_node = transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .UsingNamespace, using_namespace = { namespace } })
+			append(sequence, parsed_node)
+			return
 	}
 
 
@@ -1440,7 +1451,7 @@ ast_parse_scoped_sequence_no_open_brace :: proc(ctx: ^AstContext, tokens : ^[]To
 				if .ForwardDeclaration not_in ctx.ast[member_node].function_def.flags { break }
 				fallthrough
 				
-			case .VariableDeclaration, .Typedef, .Sequence, .Struct, .Union, .Enum, .Do, .ExprBinary, .ExprUnaryLeft, .ExprUnaryRight, .ExprCast, .MemberAccess, .FunctionCall, .OperatorCall, .Return, .Break, .Continue:
+			case .VariableDeclaration, .Typedef, .Sequence, .Struct, .Union, .Enum, .Do, .ExprBinary, .ExprUnaryLeft, .ExprUnaryRight, .ExprCast, .MemberAccess, .FunctionCall, .OperatorCall, .Return, .Break, .Continue, .UsingNamespace:
 				when F == type_of(ast_parse_enum_value_declaration) {
 					// enum value declarations (may) end in a comma
 					eat_token_expect(tokens, .Comma)
@@ -2552,6 +2563,7 @@ AstNodeKind :: enum {
 	Identifier,
 	Sequence,
 	Namespace,
+	UsingNamespace,
 	ExprUnaryLeft,
 	ExprUnaryRight,
 	ExprBinary,
@@ -2626,6 +2638,9 @@ AstNode :: struct {
 		namespace : struct {
 			name     : Token,
 			sequence : [dynamic]AstNodeIndex,
+		},
+		using_namespace : struct {
+			namespace : TokenRange,
 		},
 		function_call : struct {
 			expression : AstNodeIndex,
@@ -2839,6 +2854,7 @@ fmt_astnode :: proc(fi: ^fmt.Info, node: ^AstNode, verb: rune) -> bool
 		case .Identifier         : fmt.fmt_arg(fi, node.identifier, 'v')
 		case .Sequence           : fmt.fmt_arg(fi, node.sequence, 'v')
 		case .Namespace          : fmt.fmt_arg(fi, node.namespace, 'v')
+		case .UsingNamespace     : fmt.fmt_arg(fi, node.using_namespace, 'v')
 		case .ExprUnaryLeft      : fmt.fmt_arg(fi, node.unary_left, 'v')
 		case .ExprUnaryRight     : fmt.fmt_arg(fi, node.unary_right, 'v')
 		case .ExprBinary         : fmt.fmt_arg(fi, node.binary, 'v')

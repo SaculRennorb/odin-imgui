@@ -633,6 +633,15 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 						case .VariableDeclaration:
 							structure_name = {expression_type_node.var_declaration.var_name}
 					}
+					// @hack for macro dtor calls
+					if len(structure_name) == 0 && ctx.ast[current_node.member_access.expression].kind == .Identifier {
+						_, vctx := find_definition_for_name(ctx, name_context, ctx.ast[current_node.member_access.expression].identifier[:], {.Variable})
+						ti := ctx.ast[vctx.node].var_declaration.type
+						#partial switch ctx.ast[ti].kind {
+							case .Type:
+								structure_name = strip_type(ctx.ast[ti].type[:])[:]
+						}
+					}
 
 					fn_name_expr := ctx.ast[member.function_call.expression]
 					assert_eq(fn_name_expr.kind, AstNodeKind.Identifier)
@@ -1027,6 +1036,17 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 				str.write_byte(&ctx.result, ')')
 
 				requires_termination = true
+
+			case .UsingNamespace:
+				// assume we are already in a scope, its time to pull in namespace members
+
+				_, namespace_context := find_definition_for_name(ctx, name_context, current_node.using_namespace.namespace, {.Type})
+
+				for def_name, def in namespace_context.definitions {
+					ctx.context_heap[name_context].definitions[def_name] = def
+				}
+
+				swallow_paragraph = true
 
 			case:
 				was_preproc := #force_inline write_preproc_node(&ctx.result, current_node^)
@@ -1978,28 +1998,30 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 	write_type_inner :: proc(ctx : ^ConverterContext, type_segemnts : []TypeSegment, name_context : NameContextIndex)
 	{
 		last_type_was_ident := false
-		for _ti := 0; _ti < len(type_segemnts); _ti += 1 {
-			_t := type_segemnts[_ti]
+		for _t in type_segemnts {
 			switch t in _t {
 				case _TypePtr:
-					if _ti + 1 < len(type_segemnts) {
-						next := type_segemnts[_ti + 1]
-						if next, ok := next.(_TypeFragment); ok && next.identifier.source == "void" {
-							str.write_string(&ctx.result, "uintptr")
-							_ti += 1
-							break
-						}
-					}
-
-					// else
 					str.write_byte(&ctx.result, '^')
 
 				case _TypeMultiptr:
 					str.write_string(&ctx.result, "[^]")
 
+				case _TypePrimitive:
+					str.write_string(&ctx.result, t.identifier)
+
 				case _TypeFragment:
 					if last_type_was_ident { str.write_byte(&ctx.result, '_') }
-					str.write_string(&ctx.result, t.identifier.source)
+
+					if _, type_ctx := try_find_definition_for_name(ctx, name_context, {t.identifier}, {.Type}); type_ctx != nil {
+						str.write_string(&ctx.result, type_ctx.complete_name)
+					}
+					else {
+						log.warn("Failed to find type", t.identifier.source)
+
+						str.write_string(&ctx.result, t.identifier.source)
+					}
+
+
 					if len(t.generic_arguments) > 0 {
 						str.write_byte(&ctx.result, '(')
 						for g, i in t.generic_arguments {
@@ -2010,6 +2032,9 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 					}
 
 					last_type_was_ident = true
+
+				case _TypeSlice:
+					str.write_string(&ctx.result, "[]")
 
 				case _TypeArray:
 					str.write_byte(&ctx.result, '[')
@@ -2148,11 +2173,11 @@ translate_type :: proc(output : ^[dynamic]TypeSegment, ast : []AstNode, input : 
 	{
 		if len(input) == 0 || input[0].kind != .Identifier { // short, short*
 			remaining_input = input
-			append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = prefix+"16" } })
+			append(output, _TypePrimitive{ identifier = prefix+"16" })
 		}
 		else if input[0].source == "int" { // short int
 			remaining_input = input[1:]
-			append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = prefix+"16" } })
+			append(output, _TypePrimitive{ identifier = prefix+"16" })
 		}
 		else {
 			panic("Failed to transform "+prefix+" short");
@@ -2165,20 +2190,20 @@ translate_type :: proc(output : ^[dynamic]TypeSegment, ast : []AstNode, input : 
 	{
 		if len(input) == 0 || input[0].kind != .Identifier { // long, long*
 			remaining_input = input
-			append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = prefix+"32" } })
+			append(output, _TypePrimitive{ identifier = prefix+"32" })
 		}
 		else if input[0].source == "int" { // long int
 			remaining_input = input[1:]
-			append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = prefix+"32" } })
+			append(output, _TypePrimitive{ identifier = prefix+"32" })
 		}
 		else if input[0].source == "long" { // long long
 			if len(input) == 1 || input[1].kind != .Identifier { // long long, long long*
 				remaining_input = input[1:]
-				append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = prefix+"64" } })
+				append(output, _TypePrimitive{ identifier = prefix+"64" })
 			}
 			else if input[1].source == "int" { // long long int
 				remaining_input = input[2:]
-				append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = prefix+"64" } })
+				append(output, _TypePrimitive{ identifier = prefix+"64" })
 			}
 		}
 		else {
@@ -2223,11 +2248,11 @@ translate_type :: proc(output : ^[dynamic]TypeSegment, ast : []AstNode, input : 
 						switch input[1].source {
 							case "char":
 								input^ = input[2:]
-								append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = "i8" } })
+								append(output, _TypePrimitive{ identifier = "i8" })
 
 							case "int":
 								input^ = input[2:]
-								append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = "i32" } })
+								append(output, _TypePrimitive{ identifier = "i32" })
 
 							case "short":
 								input^ = transform_from_short(output, input[2:], "i")
@@ -2240,11 +2265,11 @@ translate_type :: proc(output : ^[dynamic]TypeSegment, ast : []AstNode, input : 
 						switch input[1].source {
 							case "char":
 								input^ = input[2:]
-								append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = "u8" } })
+								append(output, _TypePrimitive{ identifier = "u8" })
 
 							case "int":
 								input^ = input[2:]
-								append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = "u32" } })
+								append(output, _TypePrimitive{ identifier = "u32" })
 
 							case "short":
 								input^ = transform_from_short(output, input[2:], "u")
@@ -2255,11 +2280,11 @@ translate_type :: proc(output : ^[dynamic]TypeSegment, ast : []AstNode, input : 
 
 					case "char":
 						input^ = input[1:]
-						append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = "u8" } }) // funny implementation defined singnedness, interpret as unsigned
+						append(output, _TypePrimitive{ identifier = "u8" }) // funny implementation defined singnedness, interpret as unsigned
 
 					case "int":
 						input^ = input[1:]
-						append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = "i32" } })
+						append(output, _TypePrimitive{ identifier = "i32" })
 
 					case "short":
 						input^ = transform_from_short(output, input[1:], "i")
@@ -2269,27 +2294,40 @@ translate_type :: proc(output : ^[dynamic]TypeSegment, ast : []AstNode, input : 
 
 					case "float":
 						input^ = input[1:]
-						append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = "f32" } })
+						append(output, _TypePrimitive{ identifier = "f32" })
 
 					case "double":
 						input^ = input[1:]
-						append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = "f64" } })
+						append(output, _TypePrimitive{ identifier = "f64" })
+
+					case "bool":
+						input^ = input[1:]
+						append(output, _TypePrimitive{ identifier = "bool" })
 
 					case "size_t":
 						input^ = input[1:]
-						append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = "uint" } })
+						append(output, _TypePrimitive{ identifier = "uint" })
 
 					case "ptrdiff_t":
 						input^ = input[1:]
-						append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = "int" } })
+						append(output, _TypePrimitive{ identifier = "int" })
 
 					case "typename", "class":
 						input^ = input[1:]
-						append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = "typeid" } })
+						append(output, _TypePrimitive{ identifier = "typeid" })
 
 					case "va_list":
 						input^ = input[1:]
-						append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = "[]any" } })
+						append(output, _TypeSlice{ }, _TypePrimitive{ identifier = "any" })
+
+					case "void":
+						if len(input) > 1{
+							if input[1].kind == .Star {
+								append(output, _TypePrimitive{ identifier = "uintptr" })
+								input^ = input[2:]
+								break
+							}
+						}
 
 					case:
 						frag := _TypeFragment{ identifier = input[0] }
@@ -2300,7 +2338,7 @@ translate_type :: proc(output : ^[dynamic]TypeSegment, ast : []AstNode, input : 
 
 			case .Class:
 				input^ = input[1:]
-				append(output, _TypeFragment{ identifier = Token{ kind = .Identifier, source = "typeid" } })
+				append(output, _TypePrimitive{ identifier = "typeid" })
 
 			case .Star, .Ampersand:
 				input^ = input[1:]
@@ -2522,13 +2560,16 @@ _TypeMultiptr :: struct {}
 _TypeArray :: struct {
 	length_expression : AstNodeIndex,
 }
-
+_TypeSlice :: struct {}
 _TypeFragment :: struct {
 	identifier : Token,
 	generic_arguments : [dynamic][dynamic]TypeSegment,
 }
+_TypePrimitive :: struct {
+	identifier : string,
+}
 
-TypeSegment :: union #no_nil { _TypePtr, _TypeMultiptr, _TypeArray, _TypeFragment }
+TypeSegment :: union #no_nil { _TypePtr, _TypeMultiptr, _TypeArray, _TypeSlice, _TypeFragment, _TypePrimitive }
 Type :: []TypeSegment
 
 ANONYMOUS_STRUCT_NAME_FORMAT :: "<AnonymousStructure%v>"

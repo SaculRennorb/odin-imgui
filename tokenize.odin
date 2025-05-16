@@ -222,39 +222,42 @@ tokenize :: proc(tokens : ^[dynamic]Token, text : string, file_path : string)
 					}
 				}
 				str := str_from_se(start, remaining)
+				kind : TokenKind
 				switch str {
 					case "true", "false":
-						append(tokens, Token{.LiteralBool, str, loc})
+						kind = .LiteralBool
 					case "NULL", "nullptr":
-						append(tokens, Token{.LiteralNull, str, loc})
-					case "return":      append(tokens, Token{.Return, str, loc})
-					case "switch":      append(tokens, Token{.Switch, str, loc})
-					case "case":        append(tokens, Token{.Case, str, loc})
-					case "default":     append(tokens, Token{.Default, str, loc})
-					case "break":       append(tokens, Token{.Break, str, loc})
-					case "continue":    append(tokens, Token{.Continue, str, loc})
-					case "for":         append(tokens, Token{.For, str, loc})
-					case "do":          append(tokens, Token{.Do, str, loc})
-					case "while":       append(tokens, Token{.While, str, loc})
-					case "if":          append(tokens, Token{.If, str, loc})
-					case "else":        append(tokens, Token{.Else, str, loc})
-					case "typedef":     append(tokens, Token{.Typedef, str, loc})
-					case "struct":      append(tokens, Token{.Struct, str, loc})
-					case "class":       append(tokens, Token{.Class, str, loc})
-					case "union":       append(tokens, Token{.Union, str, loc})
-					case "enum":        append(tokens, Token{.Enum, str, loc})
-					case "template":    append(tokens, Token{.Template, str, loc})
-					case "namespace":   append(tokens, Token{.Namespace, str, loc})
-					case "operator":    append(tokens, Token{.Operator, str, loc})
-					case "static_cast": append(tokens, Token{.StaticCast, str, loc})
-					case "const_cast":  append(tokens, Token{.ConstCast, str, loc})
-					case "bit_cast":    append(tokens, Token{.BitCast, str, loc})
-					case "public":      append(tokens, Token{.Public, str, loc})
-					case "protected":   append(tokens, Token{.Protected, str, loc})
-					case "private":     append(tokens, Token{.Private, str, loc})
+						kind = .LiteralNull
+					case "return":      kind = .Return
+					case "switch":      kind = .Switch
+					case "case":        kind = .Case
+					case "default":     kind = .Default
+					case "break":       kind = .Break
+					case "continue":    kind = .Continue
+					case "for":         kind = .For
+					case "do":          kind = .Do
+					case "while":       kind = .While
+					case "if":          kind = .If
+					case "else":        kind = .Else
+					case "typedef":     kind = .Typedef
+					case "struct":      kind = .Struct
+					case "class":       kind = .Class
+					case "union":       kind = .Union
+					case "enum":        kind = .Enum
+					case "template":    kind = .Template
+					case "namespace":   kind = .Namespace
+					case "operator":    kind = .Operator
+					case "static_cast": kind = .StaticCast
+					case "const_cast":  kind = .ConstCast
+					case "bit_cast":    kind = .BitCast
+					case "public":      kind = .Public
+					case "protected":   kind = .Protected
+					case "private":     kind = .Private
+					case "using":       kind = .Using
 					case:
-						append(tokens, Token{.Identifier, str, loc})
+						kind = .Identifier
 				}
+				append(tokens, Token{kind, str, loc})
 
 			case '.':
 				if remaining < end[-2:] && remaining[1] == '.' && remaining[2] == '.' {
@@ -402,6 +405,7 @@ TokenKind :: enum {
 	Private,
 	Protected,
 
+	Using,
 	Typedef,
 	Struct,
 	Class,

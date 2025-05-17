@@ -2,11 +2,14 @@ package program
 
 import "core:os"
 import "core:fmt"
+import "core:log"
 import str "core:strings"
 
 
 main :: proc()
 {
+	context.logger = log.create_console_logger()
+
 	input_map : map[string]Input
 	tokenize_file :: proc(map_ :  ^map[string]Input, path : string)
 	{

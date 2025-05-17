@@ -3,6 +3,7 @@ package program
 import "core:mem"
 import "core:fmt"
 import "core:strings"
+import "core:log"
 
 Input :: struct {
 	tokens : []Token,
@@ -78,7 +79,10 @@ preprocess :: proc(ctx : ^PreProcContext, entry_file : string)
 
 
 					included, found := &ctx.inputs[include_path]
-					if !found {
+					if found {
+						log.info("Including token stream from", include_path, "invoked at", ident.location)
+					}
+					else {
 						str := fmt.tprintf("%v\nFailed to find include %v for %v in", args, include_path, ident.location)
 						for k, v in ctx.inputs {
 							str = fmt.tprintf("  %v\n%v => [%v]Token", str, k, len(v.tokens))

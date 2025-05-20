@@ -710,14 +710,22 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 					write_node(ctx, current_node.member_access.expression, name_context)
 					str.write_byte(&ctx.result, '.')
 
-					_, actual_member_context := find_definition_for_name(ctx, expression_type_context_idx, member.identifier[:])
+					_, actual_member_context := try_find_definition_for_name(ctx, expression_type_context_idx, member.identifier[:])
 
 					this_type := ctx.ast[expression_type_context.node]
-					if this_type.kind != .Struct && this_type.kind != .Union && this_type.kind != .Enum {
+					if this_type.kind != .Struct && this_type.kind != .Union && this_type.kind != .Enum \
+						&& this_type.kind != .VariableDeclaration /* generic args */ {
 						panic(fmt.tprintf("Unexpected expression type %#v for %v", this_type, member.identifier))
 					}
 
-					str.write_string(&ctx.result, actual_member_context.complete_name)
+
+					if actual_member_context != nil {
+						str.write_string(&ctx.result, actual_member_context.complete_name)
+					}
+					else {
+						log.warn("failed to resolve type for", member.identifier)
+						write_token_range(&ctx.result, member.identifier[:])
+					}
 				}
 
 				requires_termination = true
@@ -2353,13 +2361,22 @@ translate_type :: proc(output : ^[dynamic]TypeSegment, ast : []AstNode, input : 
 						append(output, _TypeSlice{ }, _TypePrimitive{ identifier = "any" })
 
 					case "void":
-						if len(input) > 1{
+						if len(input) > 2 {
+							if input[1].kind == .Identifier && input[1].source == "const" && input[2].kind == .Star {
+								append(output, _TypePrimitive{ identifier = "uintptr" })
+								input^ = input[3:]
+								break
+							}
+						}
+						if len(input) > 1 {
 							if input[1].kind == .Star {
 								append(output, _TypePrimitive{ identifier = "uintptr" })
 								input^ = input[2:]
 								break
 							}
 						}
+
+						fallthrough
 
 					case:
 						frag := _TypeFragment{ identifier = input[0] }
@@ -2459,7 +2476,7 @@ find_definition_for_name :: proc(ctx : ^ConverterContext, current_index : NameCo
 	if name_context != nil { return }
 
 	err := fmt.tprintf("%v : %v '%v' was not found in context", len(compound_identifier) > 0 ? compound_identifier[0].location : SourceLocation{}, filter, compound_identifier)
-	log.error(err)
+	log.error(err, location = loc)
 	dump_context_stack(ctx, current_index, ctx.context_heap[current_index].complete_name)
 	panic(err, loc)
 }
@@ -2574,10 +2591,10 @@ dump_context_stack :: proc(ctx : ^ConverterContext, name_context_idx : NameConte
 	context.logger.options ~= {.Line, .Procedure}
 	
 	if len(name_context.definitions) == 0 {
-		log.infof("#%3v %v%v\t\t-> %v | <leaf>", transmute(int)name_context_idx, indent, name, name_context.node >= 0 ? ctx.ast[name_context.node].kind : AstNodeKind{});
+		log.infof("#%3v %v%v   -> %v | <leaf>", transmute(int)name_context_idx, indent, name, name_context.node >= 0 ? ctx.ast[name_context.node].kind : AstNodeKind{});
 	}
 	else {
-		log.infof("#%3v %v%v\t\t-> %v | %v children:", transmute(int)name_context_idx, indent, name, name_context.node >= 0 ? ctx.ast[name_context.node].kind : AstNodeKind{}, len(name_context.definitions));
+		log.infof("#%3v %v%v   -> %v | %v children:", transmute(int)name_context_idx, indent, name, name_context.node >= 0 ? ctx.ast[name_context.node].kind : AstNodeKind{}, len(name_context.definitions));
 
 		indent := str.concatenate({ indent, "  " }, context.temp_allocator)
 		i := 0

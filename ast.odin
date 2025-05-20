@@ -3,6 +3,7 @@ package program
 import "core:fmt"
 import "core:slice"
 import "core:io"
+import "core:log"
 import "base:intrinsics"
 import "base:runtime"
 import str "core:strings"
@@ -164,7 +165,7 @@ ast_parse_filescope_sequence :: proc(ctx : ^AstContext, tokens_ : []Token) -> (s
 				decl_error : [dynamic]AstErrorFrame
 				if node_idx, eat_paragraph, _ := ast_parse_declaration(ctx, tokens, &sequence, parent_type_ref); !has_error__clone_reset(ctx, &decl_error) {
 					if parent_type_ref != nil {
-						ctx.ast[parent_type_idx] = parent_type
+						append(&sequence, node_idx) // Freestanding initializers need to be appended manually.
 					}
 
 					#partial switch ctx.ast[node_idx].kind {
@@ -428,7 +429,7 @@ ast_parse_structure :: proc(ctx: ^AstContext, tokens : ^[]Token, loc := #caller_
 	}
 
 	if next.kind == .Semicolon {
-		node.structure.is_forward_declaration = true
+		node.structure.flags |= {.IsForwardDeclared}
 		return
 	}
 	
@@ -518,19 +519,12 @@ ast_parse_declaration :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[
 				tokens^ = ss // eat initializer "name"
 
 				initializer := ast_parse_function_def_no_return_type_and_name(ctx, tokens, true) or_return
-				initializer.function_def.flags |= transmute(AstFunctionDefFlags) storage;
-				initializer.function_def.function_name = make_one(Token {
-					kind = .Identifier,
-					source = last(parent_type.structure.name).source,
-					location = last(parent_type.structure.name).location,
-				})
+				initializer.function_def.flags |= transmute(AstFunctionDefFlags) storage  | {.IsCtor}
+				initializer.function_def.function_name = make_one(n)
 
 				ast_attach_comments(ctx, sequence, &initializer)
 
-				parent_type.structure.initializer = transmute(AstNodeIndex) append_return_index(ctx.ast, initializer)
-
-				eat_paragraph = true
-				parsed_node = parent_type.structure.initializer
+				parsed_node = transmute(AstNodeIndex) append_return_index(ctx.ast, initializer)
 				return
 			}
 		}
@@ -542,19 +536,12 @@ ast_parse_declaration :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[
 					tokens^ = nns // eat deinitializer "~name"
 
 					deinitializer := ast_parse_function_def_no_return_type_and_name(ctx, tokens) or_return
-					deinitializer.function_def.flags |= transmute(AstFunctionDefFlags) storage
-					deinitializer.function_def.function_name = make_one(Token {
-						kind = .Identifier,
-						source = last(parent_type.structure.name).source,
-						location = last(parent_type.structure.name).location,
-					})
+					deinitializer.function_def.flags |= transmute(AstFunctionDefFlags) storage | {.IsDtor}
+					deinitializer.function_def.function_name = make_one(nn)
 
 					ast_attach_comments(ctx, sequence, &deinitializer)
 
-					parent_type.structure.deinitializer = transmute(AstNodeIndex) append_return_index(ctx.ast, deinitializer)
-
-					eat_paragraph = true
-					parsed_node = parent_type.structure.deinitializer
+					parsed_node = transmute(AstNodeIndex) append_return_index(ctx.ast, deinitializer)
 					return
 				}
 			}
@@ -988,7 +975,7 @@ ast_parse_function_def_no_return_type_and_name :: proc(ctx: ^AstContext, tokens 
 	}
 
 	if t.kind == .Semicolon {
-		node.function_def.flags |= { .ForwardDeclaration }
+		node.function_def.flags |= { .IsForwardDeclared }
 	}
 	else if t.kind == .BracketCurlyOpen {
 		tokens^ = sss // eat {
@@ -1431,27 +1418,44 @@ ast_parse_scoped_sequence_no_open_brace :: proc(ctx: ^AstContext, tokens : ^[]To
 		}
 
 		when F == type_of(ast_parse_statement) {
-			member_node := ast_parse_statement(ctx, tokens, sequence, parse_width_expression) or_return
+			member_index := ast_parse_statement(ctx, tokens, sequence, parse_width_expression) or_return
 			eat_paragraph := false
 		}
 		else when F == type_of(ast_parse_enum_value_declaration) {
-			member_node := ast_parse_enum_value_declaration(ctx, tokens, sequence) or_return
+			member_index := ast_parse_enum_value_declaration(ctx, tokens, sequence) or_return
 			eat_paragraph := false
 		}
 		else when F == type_of(ast_parse_declaration) {
-			member_node, eat_paragraph := ast_parse_declaration(ctx, tokens, sequence, parent_node, parse_width_expression) or_return
+			member_index, eat_paragraph := ast_parse_declaration(ctx, tokens, sequence, parent_node, parse_width_expression) or_return
 		}
 		else {
 			#panic("wrong fn type")
 		}
 
-		member_kind := ctx.ast[member_node].kind
-		#partial switch member_kind {
-			case .FunctionDefinition: //TODO(Rennorb) @explain
-				if .ForwardDeclaration not_in ctx.ast[member_node].function_def.flags { break }
+		member := &ctx.ast[member_index]
+		#partial switch member.kind {
+			case .FunctionDefinition:
+				if parent_node != nil {
+					if .IsCtor in member.function_def.flags {
+						append(sequence, member_index)
+					}
+					else if .IsDtor in member.function_def.flags {
+						parent_node.structure.deinitializer = member_index
+					}
+				}
+
+				if .IsForwardDeclared in member.function_def.flags{
+					eat_token_expect_push_err(ctx, tokens, .Semicolon) or_return
+				}
+
+			case .VariableDeclaration:
+				if parent_node != nil && member.var_declaration.initializer_expression != {} {
+					parent_node.structure.flags |= { .HasImplicitCtor }
+				}
+
 				fallthrough
 				
-			case .VariableDeclaration, .Typedef, .Sequence, .Struct, .Union, .Enum, .Do, .ExprBinary, .ExprUnaryLeft, .ExprUnaryRight, .ExprCast, .MemberAccess, .FunctionCall, .OperatorCall, .Return, .Break, .Continue, .UsingNamespace:
+			case .Typedef, .Sequence, .Struct, .Union, .Enum, .Do, .ExprBinary, .ExprUnaryLeft, .ExprUnaryRight, .ExprCast, .MemberAccess, .FunctionCall, .OperatorCall, .Return, .Break, .Continue, .UsingNamespace:
 				when F == type_of(ast_parse_enum_value_declaration) {
 					// enum value declarations (may) end in a comma
 					eat_token_expect(tokens, .Comma)
@@ -1462,14 +1466,14 @@ ast_parse_scoped_sequence_no_open_brace :: proc(ctx: ^AstContext, tokens : ^[]To
 				}
 		}
 
-		#partial switch member_kind {
+		#partial switch member.kind {
 			case .FunctionDefinition:
 				// attach comments after the declaration in the same line
 				if n, ns := peek_token(tokens, false); n.kind == .Comment {
 					tokens^ = ns
 
-					append(&ctx.ast[member_node].function_def.attached_comments, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode { kind = .Comment, attached = true, literal = n }))
-					append(&ctx.ast[member_node].function_def.attached_comments, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode { kind = .NewLine, attached = true }))
+					append(&member.function_def.attached_comments, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode { kind = .Comment, attached = true, literal = n }))
+					append(&member.function_def.attached_comments, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode { kind = .NewLine, attached = true }))
 				}
 
 			case .OperatorDefinition:
@@ -1477,8 +1481,7 @@ ast_parse_scoped_sequence_no_open_brace :: proc(ctx: ^AstContext, tokens : ^[]To
 				if n, ns := peek_token(tokens, false); n.kind == .Comment {
 					tokens^ = ns
 
-					op_def := ctx.ast[member_node]
-					fn_def := &ctx.ast[op_def.operator_def.underlying_function]
+					fn_def := &ctx.ast[member.operator_def.underlying_function]
 					append(&fn_def.function_def.attached_comments, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode { kind = .Comment, attached = true, literal = n }))
 					append(&fn_def.function_def.attached_comments, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode { kind = .NewLine, attached = true }))
 				}
@@ -2696,11 +2699,10 @@ AstNode :: struct {
 			name : TokenRange,
 			base_type : TokenRange,
 			members : [dynamic]AstNodeIndex,
-			initializer : AstNodeIndex,
 			deinitializer : AstNodeIndex,
 			attached_comments : [dynamic]AstNodeIndex,
 			template_spec : [dynamic]AstNodeIndex,
-			is_forward_declaration : bool,
+			flags : AstStructureFlags,
 		},
 		member_access : struct {
 			expression, member : AstNodeIndex,
@@ -2767,8 +2769,15 @@ AstFunctionDefFlags :: bit_set[enum{
 	Static = cast(int) AstStorageModifier.Static,
 	Extern = cast(int) AstStorageModifier.Extern,
 	Inline = cast(int) AstStorageModifier.Inline,
-	ForwardDeclaration = cast(int) max(AstStorageModifierFlag) + 1,
+	IsForwardDeclared = cast(int) max(AstStorageModifierFlag) + 1,
 	Const,
+	IsCtor,
+	IsDtor,
+}]
+
+AstStructureFlags :: bit_set[enum {
+	IsForwardDeclared,
+	HasImplicitCtor,
 }]
 
 clone_node :: proc(node : AstNode) -> (clone : AstNode) {
@@ -2868,13 +2877,13 @@ fmt_astnode :: proc(fi: ^fmt.Info, node: ^AstNode, verb: rune) -> bool
 		case .CompoundInitializer: fmt.fmt_arg(fi, node.compound_initializer, 'v')
 		case .FunctionDefinition : fmt.fmt_arg(fi, node.function_def, 'v')
 		case .OperatorDefinition : fmt.fmt_arg(fi, node.operator_def, 'v')
-		case .LambdaDefinition  : fmt.fmt_arg(fi, node.lambda_def, 'v')
+		case .LambdaDefinition   : fmt.fmt_arg(fi, node.lambda_def, 'v')
 		case .Type               : fmt.fmt_arg(fi, node.type, 'v')
 		case .VariableDeclaration: fmt.fmt_arg(fi, node.var_declaration, 'v')
 		case .Assert             : fmt.fmt_arg(fi, node.assert, 'v')
 		case .Return             : fmt.fmt_arg(fi, node.return_, 'v')
-		case .Break              : fmt.fmt_arg(fi, node.identifier, 'v')
-		case .Continue           : fmt.fmt_arg(fi, node.identifier, 'v')
+		case .Break              : fmt.fmt_arg(fi, node.literal, 'v')
+		case .Continue           : fmt.fmt_arg(fi, node.literal, 'v')
 		case .Struct             : fmt.fmt_arg(fi, node.structure, 'v')
 		case .Union              : fmt.fmt_arg(fi, node.structure, 'v')
 		case .Enum               : fmt.fmt_arg(fi, node.structure, 'v')

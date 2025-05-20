@@ -12,7 +12,5 @@ A3003 :: struct {
 
 A3003_init :: proc(this : ^A3003)
 {
-	
 	this.b = 2 * (PI / 4)
 }
-

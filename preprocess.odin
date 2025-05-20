@@ -79,10 +79,7 @@ preprocess :: proc(ctx : ^PreProcContext, entry_file : string)
 
 
 					included, found := &ctx.inputs[include_path]
-					if found {
-						log.info("Including token stream from", include_path, "invoked at", ident.location)
-					}
-					else {
+					if !found {
 						str := fmt.tprintf("%v\nFailed to find include %v for %v in", args, include_path, ident.location)
 						for k, v in ctx.inputs {
 							str = fmt.tprintf("  %v\n%v => [%v]Token", str, k, len(v.tokens))
@@ -91,7 +88,8 @@ preprocess :: proc(ctx : ^PreProcContext, entry_file : string)
 					}
 
 					if !included.used {
-						do_preprocess(ctx, included)
+						log.info("Including token stream from", include_path, "invoked at", ident.location)
+						do_preprocess(ctx, included) or_return
 					}
 					continue loop
 

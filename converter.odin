@@ -60,10 +60,34 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 
 				str.write_string(&ctx.result, define.name.source)
 				str.write_string(&ctx.result, " :: ")
-				if len(define.expansion_tokens) == 0 || define.expansion_tokens[0].kind == .Comment  {
-					str.write_string(&ctx.result, "true")
+
+				contentTokensCount := 0
+				lastContentTokenKind : TokenKind
+				for t in define.expansion_tokens {
+					#partial switch t.kind {
+						case .Comment, .NewLine:
+							/**/
+						case:
+							contentTokensCount += 1
+							lastContentTokenKind = t.kind
+					}
 				}
-				write_token_range(&ctx.result, define.expansion_tokens, "")
+				
+				switch contentTokensCount {
+					case 0:
+						str.write_string(&ctx.result, "true")
+						write_token_range(&ctx.result, define.expansion_tokens, "") // still print in case there are comments
+
+					case 1:
+						write_token_range(&ctx.result, define.expansion_tokens, "")
+						#partial switch lastContentTokenKind {
+							case .LiteralBool, .LiteralCharacter, .LiteralFloat, .LiteralInteger, .LiteralNull, .LiteralString:
+								insert_new_definition(&ctx.context_heap, name_context, define.name.source, current_node_index, define.name.source)
+						}
+
+					case:
+						write_token_range(&ctx.result, define.expansion_tokens, "")
+				}
 
 				insert_new_definition(&ctx.context_heap, 0, define.name.source, current_node_index, define.name.source)
 
@@ -177,7 +201,7 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 			case .FunctionDefinition:
 				write_function(ctx, name_context, current_node_index, definition_prefix, nil, indent_str)
 
-				swallow_paragraph = .ForwardDeclaration in current_node.function_def.flags 
+				swallow_paragraph = .IsForwardDeclared in current_node.function_def.flags 
 
 			case .Struct, .Union:
 				member_indent_str := str.concatenate({ indent_str, ONE_INDENT }, context.temp_allocator)
@@ -210,7 +234,7 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 				name_context = transmute(NameContextIndex) append_return_index(&ctx.context_heap, NameContext{ node = current_node_index, parent = name_context, complete_name = complete_structure_name })
 				ctx.context_heap[og_name_context].definitions[last(structure.name).source] = name_context
 
-				if structure.is_forward_declaration {
+				if .IsForwardDeclared in structure.flags {
 					swallow_paragraph = true
 					return
 				}
@@ -1285,12 +1309,11 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 			inject_at(&structure.attached_comments, 0, ..forward_comments[:])
 		}
 
-		if structure.is_forward_declaration {
+		if .IsForwardDeclared in structure.flags {
 			name_context = transmute(NameContextIndex) append_return_index(&ctx.context_heap, NameContext{ node = structure_node_index, parent = name_context, complete_name = complete_structure_name })
 			ctx.context_heap[og_name_context].definitions[last(structure.name).source] = name_context
 
 			swallow_paragraph = true
-
 			return
 		}
 
@@ -1302,7 +1325,7 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 		str.write_string(&ctx.result, complete_structure_name);
 		str.write_string(&ctx.result, " :: ")
 
-		has_static_var_members, has_inplicit_initializer, nc := write_struct_union_type(ctx, structure_node, structure_node_index, name_context, og_name_context, indent_str, member_indent_str, complete_structure_name)
+		has_static_var_members, nc := write_struct_union_type(ctx, structure_node, structure_node_index, name_context, og_name_context, indent_str, member_indent_str, complete_structure_name)
 		name_context = nc
 
 		if has_static_var_members {
@@ -1327,80 +1350,7 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 			}
 		}
 
-		if has_inplicit_initializer || (structure.initializer != {} && .ForwardDeclaration not_in ctx.ast[structure.initializer].function_def.flags) {
-			initializer := ctx.ast[structure.initializer]
-
-			complete_initializer_name := str.concatenate({ complete_structure_name, "_init" })
-			name_context := insert_new_definition(&ctx.context_heap, name_context, "init", structure.initializer, complete_initializer_name)
-			insert_new_overload(ctx, "init", complete_initializer_name)
-
-			context_heap_reset := len(&ctx.context_heap) // keep fn as leaf node
-			defer {
-				clear(&ctx.context_heap[name_context].definitions)
-				resize(&ctx.context_heap, context_heap_reset)
-			}
-
-			insert_new_definition(&ctx.context_heap, name_context, "this", -1, "this")
-
-			str.write_string(&ctx.result, "\n\n")
-			str.write_string(&ctx.result, indent_str);
-			str.write_string(&ctx.result, complete_initializer_name);
-			str.write_string(&ctx.result, " :: proc(this : ^")
-			str.write_string(&ctx.result, complete_structure_name);
-			if len(structure.template_spec) > 0 {
-				str.write_byte(&ctx.result, '(')
-				for ti, i in structure.template_spec {
-					if i > 0 { str.write_string(&ctx.result, ", ") }
-
-					type_var := ctx.ast[ti]
-					assert_eq(type_var.kind, AstNodeKind.VariableDeclaration)
-
-					str.write_byte(&ctx.result, '$')
-					str.write_string(&ctx.result, type_var.var_declaration.var_name.source)
-				}
-				str.write_byte(&ctx.result, ')')
-			}
-			if initializer.kind == .FunctionDefinition && .ForwardDeclaration not_in initializer.function_def.flags {
-				for nidx, i in initializer.function_def.arguments {
-					str.write_string(&ctx.result, ", ")
-					arg := ctx.ast[nidx].var_declaration
-
-					insert_new_definition(&ctx.context_heap, name_context, arg.var_name.source, nidx, arg.var_name.source)
-
-					str.write_string(&ctx.result, arg.var_name.source)
-					str.write_string(&ctx.result, " : ")
-					write_type_node(ctx, arg.type, name_context, indent_str, member_indent_str)
-
-					if arg.initializer_expression != {} {
-						str.write_string(&ctx.result, " = ")
-						write_node(ctx, arg.initializer_expression, name_context)
-					}
-				}
-			}
-			str.write_string(&ctx.result, ")\n")
-
-			str.write_string(&ctx.result, indent_str); str.write_string(&ctx.result, "{\n")
-			for ci in structure.members {
-				if ctx.ast[ci].kind != .VariableDeclaration { continue }
-				member := ctx.ast[ci].var_declaration
-				if member.initializer_expression == {} { continue }
-
-				str.write_string(&ctx.result, member_indent_str);
-				str.write_string(&ctx.result, "this.")
-				str.write_string(&ctx.result, member.var_name.source)
-				str.write_string(&ctx.result, " = ")
-				write_node(ctx, member.initializer_expression, name_context)
-				str.write_byte(&ctx.result, '\n')
-			}
-			if initializer.kind == .FunctionDefinition && .ForwardDeclaration not_in initializer.function_def.flags && len(initializer.function_def.body_sequence) > 0 {
-				str.write_string(&ctx.result, member_indent_str)
-				write_node_sequence(ctx, initializer.function_def.body_sequence[:], name_context, member_indent_str)
-				if ctx.ast[last(initializer.function_def.body_sequence[:])^].kind != .NewLine { str.write_byte(&ctx.result, '\n') }
-			}
-			str.write_string(&ctx.result, indent_str); str.write_byte(&ctx.result, '}')
-		}
-
-		if (structure.deinitializer != {} && .ForwardDeclaration not_in ctx.ast[structure.deinitializer].function_def.flags) {
+		if (structure.deinitializer != {} && .IsForwardDeclared not_in ctx.ast[structure.deinitializer].function_def.flags) {
 			deinitializer := ctx.ast[structure.deinitializer]
 
 			complete_deinitializer_name := str.concatenate({ complete_structure_name, "_deinit" })
@@ -1427,13 +1377,15 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 			str.write_string(&ctx.result, indent_str); str.write_byte(&ctx.result, '}')
 		}
 
+		written_initializer := false
 		synthetic_enum_index := 0
 		for midx in structure.members {
 			#partial switch ctx.ast[midx].kind {
 				case .FunctionDefinition:
-					str.write_string(&ctx.result, "\n\n")
+					if .IsForwardDeclared not_in ctx.ast[midx].function_def.flags { str.write_string(&ctx.result, "\n\n") }
 					write_function(ctx, name_context, midx, complete_structure_name, structure_node, indent_str)
 
+					written_initializer |= .IsCtor in ctx.ast[midx].function_def.flags
 					requires_new_paragraph = true
 
 				case .Struct, .Union:
@@ -1459,10 +1411,17 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 			}
 		}
 
+		if .HasImplicitCtor in structure.flags && ! written_initializer {
+			str.write_string(&ctx.result, "\n\n")
+
+			synth := AstNode{ kind = .FunctionDefinition, function_def = { flags = { .IsCtor } } }
+			write_function_inner(ctx, name_context, &synth, 0, complete_structure_name, structure_node, indent_str)
+		}
+
 		return
 	}
 
-	write_struct_union_type :: proc(ctx : ^ConverterContext, structure_node : ^AstNode, structure_node_index : AstNodeIndex, name_context_ : NameContextIndex, og_name_context : NameContextIndex, indent_str, member_indent_str : string, complete_structure_name : string) -> (has_static_var_members, has_inplicit_initializer : bool, name_context : NameContextIndex)
+	write_struct_union_type :: proc(ctx : ^ConverterContext, structure_node : ^AstNode, structure_node_index : AstNodeIndex, name_context_ : NameContextIndex, og_name_context : NameContextIndex, indent_str, member_indent_str : string, complete_structure_name : string) -> (has_static_var_members : bool, name_context : NameContextIndex)
 	{
 		structure := &structure_node.structure
 		str.write_string(&ctx.result, "struct")
@@ -1595,7 +1554,6 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 					last_was_transfered = true
 
 					d := insert_new_definition(&ctx.context_heap, name_context, member.var_name.source, ci, member.var_name.source)
-					has_inplicit_initializer |= member.initializer_expression != {}
 
 					if member.width_expression != {} {
 						sa.append(&subsection_data.member_stack, ci)
@@ -1843,7 +1801,7 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 					arg := ctx.ast[nidx].var_declaration
 
 					if arg.var_name.source != "" {
-						if .ForwardDeclaration not_in fn_node.flags {
+						if .IsForwardDeclared not_in fn_node.flags {
 							insert_new_definition(&ctx.context_heap, name_context, arg.var_name.source, nidx, arg.var_name.source)
 						}
 		
@@ -1882,13 +1840,40 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 
 	write_function :: proc(ctx : ^ConverterContext, name_context : NameContextIndex, function_node_idx : AstNodeIndex, complete_structure_name : string, parent_type : ^AstNode, indent_str : string, write_forward_declared := false)
 	{
-		fn_node_ := &ctx.ast[function_node_idx]
-		fn_node := &fn_node_.function_def
+		parent_type := parent_type
+		complete_structure_name := complete_structure_name
+		name_context := name_context
 
-		complete_name := fold_token_range(complete_structure_name, fn_node.function_name[:])
+		fn_node_ := &ctx.ast[function_node_idx]
+		if (fn_node_.function_def.flags & {.IsCtor, .IsDtor}) != {} && parent_type == nil {
+			_, type_context := find_definition_for_name(ctx, name_context, fn_node_.function_def.function_name[:], { .Type })
+			assert(type_context != nil)
+
+			parent_type = &ctx.ast[type_context.node]
+			complete_structure_name = type_context.complete_name
+			name_context = transmute(NameContextIndex) mem.ptr_sub(type_context, &ctx.context_heap[0])
+		}
+
+		write_function_inner(ctx, name_context, fn_node_, function_node_idx, complete_structure_name, parent_type, indent_str, write_forward_declared)
+	}
+	write_function_inner :: proc(ctx : ^ConverterContext, name_context : NameContextIndex, function_node_ : ^AstNode, function_node_idx : AstNodeIndex, complete_structure_name : string, parent_type : ^AstNode, indent_str : string, write_forward_declared := false)
+	{
+		fn_node := &function_node_.function_def
+
+		function_name : TokenRange
+		switch {
+			case .IsCtor in fn_node.flags:
+				function_name = { Token{ kind = .Identifier, source = "init" } }
+			case .IsDtor in fn_node.flags:
+				function_name = { Token{ kind = .Identifier, source = "deinit" } }
+			case:
+				function_name = fn_node.function_name[:]
+		}
+
+		complete_name := fold_token_range(complete_structure_name, function_name)
 
 		// fold attached comments form forward declaration. This also works when chaining forward declarations
-		_, forward_declared_context := try_find_definition_for_name(ctx, name_context, fn_node.function_name[:], { .Function })
+		_, forward_declared_context := try_find_definition_for_name(ctx, name_context, function_name, { .Function })
 		if forward_declared_context != nil {
 			forward_declaration := ctx.ast[forward_declared_context.node]
 			assert_eq(forward_declaration.kind, AstNodeKind.FunctionDefinition)
@@ -1898,15 +1883,15 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 		}
 
 		name_context := name_context
-		if len(fn_node.function_name) == 1 {
-			name_context = insert_new_definition(&ctx.context_heap, name_context, last(fn_node.function_name[:]).source, function_node_idx, complete_name)
+		if len(function_name) == 1 {
+			name_context = insert_new_definition(&ctx.context_heap, name_context, function_name[0].source, function_node_idx, complete_name)
 		}
 		else {
 			assert(forward_declared_context != nil)
 			name_context = transmute(NameContextIndex) mem.ptr_sub(forward_declared_context, &ctx.context_heap[0])
 		}
 
-		if .ForwardDeclaration in fn_node.flags && !write_forward_declared {
+		if .IsForwardDeclared in fn_node.flags && !write_forward_declared {
 			return // Don't insert forward declarations, only insert the name context leaf node.
 		}
 
@@ -1924,19 +1909,42 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 		str.write_string(&ctx.result, indent_str);
 		str.write_string(&ctx.result, complete_name);
 		str.write_string(&ctx.result, " :: ");
-		write_function_type(ctx, name_context, fn_node_^, complete_structure_name, parent_type)
+		write_function_type(ctx, name_context, function_node_^, complete_structure_name, parent_type)
 
-		if .ForwardDeclaration in fn_node.flags {
+		if .IsForwardDeclared in fn_node.flags {
 			return
 		}
 
-		switch len(fn_node.body_sequence) {
+		body_sequence_count := len(fn_node.body_sequence)
+
+		implicit_initializaitons : [dynamic]AstNodeIndex
+		if .IsCtor in fn_node.flags && .HasImplicitCtor in parent_type.structure.flags {
+			implicit_initializaitons = make([dynamic]AstNodeIndex, 0, 64, context.temp_allocator)
+			for mi in parent_type.structure.members {
+				member := ctx.ast[mi]
+				if member.kind == .VariableDeclaration && member.var_declaration.initializer_expression != {} {
+					append(&implicit_initializaitons, mi)
+					body_sequence_count += 1
+				}
+			}
+		}
+
+		switch body_sequence_count {
 			case 0:
 				str.write_string(&ctx.result, " { }");
 
 			case 1:
 				str.write_string(&ctx.result, " { ");
-				write_node(ctx, fn_node.body_sequence[0], name_context)
+				if len(implicit_initializaitons) != 0 {
+					member := ctx.ast[implicit_initializaitons[0]].var_declaration
+					str.write_string(&ctx.result, "this.")
+					str.write_string(&ctx.result, member.var_name.source)
+					str.write_string(&ctx.result, " = ")
+					write_node(ctx, member.initializer_expression, name_context, indent_str)
+				}
+				else {
+					write_node(ctx, fn_node.body_sequence[0], name_context, indent_str)
+				}
 				str.write_string(&ctx.result, " }");
 
 			case:
@@ -1944,8 +1952,32 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 
 				str.write_string(&ctx.result, indent_str); str.write_string(&ctx.result, "{")
 				body_indent_str := str.concatenate({ indent_str, ONE_INDENT }, context.temp_allocator)
+
+				if len(implicit_initializaitons) != 0 {
+					str.write_byte(&ctx.result, '\n')
+
+					for mi in implicit_initializaitons {
+						member := ctx.ast[mi].var_declaration
+
+						str.write_string(&ctx.result, "this.")
+						str.write_string(&ctx.result, member.var_name.source)
+						str.write_string(&ctx.result, " = ")
+						write_node(ctx, member.initializer_expression, name_context)
+
+						str.write_byte(&ctx.result, '\n')
+					}
+				}
+				else if len(fn_node.body_sequence) > 0 && ctx.ast[fn_node.body_sequence[0]].kind != .NewLine {
+					str.write_byte(&ctx.result, '\n')
+					str.write_string(&ctx.result, body_indent_str);
+				}
 				write_node_sequence(ctx, fn_node.body_sequence[:], name_context, body_indent_str)
-				str.write_string(&ctx.result, indent_str); str.write_byte(&ctx.result, '}')
+
+				if ctx.ast[last_or_nil(fn_node.body_sequence)].kind != .NewLine {
+					str.write_byte(&ctx.result, '\n');
+				}
+				str.write_string(&ctx.result, indent_str);
+				str.write_byte(&ctx.result, '}')
 		}
 	}
 
@@ -2536,17 +2568,26 @@ dump_context_stack :: proc(ctx : ^ConverterContext, name_context_idx : NameConte
 {
 	name_context := ctx.context_heap[name_context_idx]
 	
-	fmt.eprintf("#%3v %v%v\t\t-> %v | ", transmute(int)name_context_idx, indent, name, name_context.node >= 0 ? ctx.ast[name_context.node].kind : AstNodeKind{});
+	old_opt := context.logger.options
+	defer context.logger.options = old_opt 
 
+	context.logger.options ~= {.Line, .Procedure}
+	
 	if len(name_context.definitions) == 0 {
-		fmt.eprintf("<leaf>\n");
+		log.infof("#%3v %v%v\t\t-> %v | <leaf>", transmute(int)name_context_idx, indent, name, name_context.node >= 0 ? ctx.ast[name_context.node].kind : AstNodeKind{});
 	}
 	else {
-		fmt.eprintf("%v children:\n", len(name_context.definitions))
+		log.infof("#%3v %v%v\t\t-> %v | %v children:", transmute(int)name_context_idx, indent, name, name_context.node >= 0 ? ctx.ast[name_context.node].kind : AstNodeKind{}, len(name_context.definitions));
 
 		indent := str.concatenate({ indent, "  " }, context.temp_allocator)
+		i := 0
 		for name, didx in name_context.definitions {
+			if i > 20 {
+				log.infof("<STOP !>")
+				return
+			}
 			dump_context_stack(ctx, didx, name, indent, name_context_idx, forward_only)
+			i += 1
 		}
 	}
 

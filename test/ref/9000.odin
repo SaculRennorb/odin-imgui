@@ -130,6 +130,8 @@ ImGuiDockNode_IsEmpty :: proc(this : ^ImGuiDockNode) -> bool { return this.Child
 ImGuiDockNode_Rect :: proc(this : ^ImGuiDockNode) -> ImRect { return ImRect(this.Pos.x, this.Pos.y, this.Pos.x + this.Size.x, this.Pos.y + this.Size.y) }
 
 ImGuiDockNode_SetLocalFlags :: proc(this : ^ImGuiDockNode, flags : ImGuiDockNodeFlags)
-{this.LocalFlags = flags; UpdateMergedFlags()}
+{
+	this.LocalFlags = flags; UpdateMergedFlags()
+}
 
 ImGuiDockNode_UpdateMergedFlags :: proc(this : ^ImGuiDockNode) { this.MergedFlags = this.SharedFlags | this.LocalFlags | this.LocalFlagsInWindows }

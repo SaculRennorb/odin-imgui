@@ -6,6 +6,5 @@ A05 :: struct {
 
 A05_init :: proc(this : ^A05)
 {
-	
 	this.a = 0
 }

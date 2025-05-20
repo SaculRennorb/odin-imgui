@@ -6,10 +6,7 @@ fn1600 :: proc()
 		a : i32,
 	}
 
-	A1600_init :: proc(this : ^A1600, a_ : i32)
-	{
-		this.a = a_
-	}
+	A1600_init :: proc(this : ^A1600, a_ : i32) { this.a = a_ }
 
 	a : A1600; init(&a, 1)
 }

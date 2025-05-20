@@ -53,8 +53,13 @@ make_one :: #force_inline proc(e : $E, alloc := context.allocator) -> (arr : [dy
 
 
 last :: proc { last_slice, last_array }
-last_slice :: #force_inline proc "contextless" (arr : []$T) -> ^T { return &arr[len(arr) - 1] }
+last_slice :: #force_inline proc "contextless" (arr : []$T)        -> ^T { return &arr[len(arr) - 1] }
 last_array :: #force_inline proc "contextless" (arr : [dynamic]$T) -> ^T { return &arr[len(arr) - 1] }
+
+
+last_or_nil :: proc { last_or_nil_slice, last_or_nil_array }
+last_or_nil_slice :: #force_inline proc "contextless" (arr : []$T)        -> T { return len(arr) != 0 ? arr[len(arr) - 1] : {} }
+last_or_nil_array :: #force_inline proc "contextless" (arr : [dynamic]$T) -> T { return len(arr) != 0 ? arr[len(arr) - 1] : {} }
 
 all :: #force_inline proc "contextless" ($E : typeid) -> E
 {

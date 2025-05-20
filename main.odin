@@ -45,7 +45,11 @@ main :: proc()
 	root_sequence := ast_parse_filescope_sequence(&{ ast = &ast }, preprocessed[:])
 
 	converter_context : ConverterContext = { ast = ast[:], root_sequence = root_sequence[:] }
-	convert_and_format(&converter_context)
+	replaced_names := [][2]string {
+		{ "FLT_MAX", "max(f32)" },
+		{ "FLT_MIN", "min(f32)" },
+	}
+	convert_and_format(&converter_context, replaced_names)
 	os.write_entire_file("out/imgui_gen.odin", converter_context.result.buf[:])
 
 	str.builder_reset(&converter_context.result)

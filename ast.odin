@@ -420,9 +420,8 @@ ast_parse_structure :: proc(ctx: ^AstContext, tokens : ^[]Token, loc := #caller_
 					tokens^ = ns
 			}
 
-			bt : [dynamic]Token
-			ast_parse_type_inner(ctx, tokens, &bt) or_return
-			node.structure.base_type = bt[:]
+			base_type := ast_parse_type(ctx, tokens) or_return
+			node.structure.base_type = transmute(AstNodeIndex) append_return_index(ctx.ast, base_type)
 
 			next, nexts = peek_token(tokens)
 		}
@@ -1451,6 +1450,10 @@ ast_parse_scoped_sequence_no_open_brace :: proc(ctx: ^AstContext, tokens : ^[]To
 			case .VariableDeclaration:
 				if parent_node != nil && member.var_declaration.initializer_expression != {} {
 					parent_node.structure.flags |= { .HasImplicitCtor }
+				}
+
+				when F == type_of(ast_parse_enum_value_declaration) {
+					member.var_declaration.type = parent_node.structure.base_type
 				}
 
 				fallthrough
@@ -2697,7 +2700,7 @@ AstNode :: struct {
 		},
 		structure : struct {
 			name : TokenRange,
-			base_type : TokenRange,
+			base_type : AstNodeIndex,
 			members : [dynamic]AstNodeIndex,
 			deinitializer : AstNodeIndex,
 			attached_comments : [dynamic]AstNodeIndex,

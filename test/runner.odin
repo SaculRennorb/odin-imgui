@@ -135,7 +135,7 @@ test :: proc(t : ^testing.T)
 		clear(&result.buf)
 		loc.procedure = "converter.convert_and_format"
 		converter_context : converter.ConverterContext = { result = result, ast = ast[:], root_sequence = root_sequence[:] }
-		converter.convert_and_format(&converter_context)
+		converter.convert_and_format(&converter_context, {})
 
 		os.write_entire_file(fmt.tprintf(BASEDIR+"/out/%v.odin", path.stem(file.name)), converter_context.result.buf[:])
 

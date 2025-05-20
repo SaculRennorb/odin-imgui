@@ -23,13 +23,16 @@ ConverterContext :: struct {
 	next_anonymous_struct_index : i32,
 }
 
-convert_and_format :: proc(ctx : ^ConverterContext)
+convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string)
 {
 	ONE_INDENT :: "\t"
 
 	if len(ctx.root_sequence) != 0 {
 		current_name_context_heap = &ctx.context_heap
 		append(&ctx.context_heap, NameContext{ parent = -1 })
+		for pair in implicit_names {
+			insert_new_definition(&ctx.context_heap, 0, pair[0], -1, pair[1])
+		}
 
 		str.write_string(&ctx.result, "package test\n\n")
 		write_node_sequence(ctx, ctx.root_sequence, 0, "")
@@ -247,8 +250,8 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 				str.write_string(&ctx.result, complete_structure_name);
 				str.write_string(&ctx.result, " :: enum ")
 
-				if structure.base_type != nil {
-					write_type(ctx, structure.base_type, og_name_context)
+				if structure.base_type != {} {
+					write_type(ctx, ctx.ast[structure.base_type].type[:], og_name_context)
 				}
 				else {
 					str.write_string(&ctx.result, "i32")
@@ -1450,11 +1453,12 @@ convert_and_format :: proc(ctx : ^ConverterContext)
 		had_first_newline := false
 
 		name_context = name_context_
-		if structure.base_type != nil {
+		if structure.base_type != {} {
+			base_type := ctx.ast[structure.base_type].type[:]
 			// copy over defs from base type, using their location
-			_, base_context := find_definition_for_name(ctx, name_context, structure.base_type)
+			_, base_context := find_definition_for_name(ctx, name_context, base_type)
 
-			base_member_name := str.concatenate({ "__base_", str.to_lower(structure.base_type[len(structure.base_type) - 1].source, context.temp_allocator) })
+			base_member_name := str.concatenate({ "__base_", str.to_lower(last(base_type).source, context.temp_allocator) })
 			name_context = transmute(NameContextIndex) append_return_index(&ctx.context_heap, NameContext{
 				parent      = name_context,
 				node        = base_context.node,

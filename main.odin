@@ -55,4 +55,6 @@ main :: proc()
 	str.builder_reset(&converter_context.result)
 	write_shim(&converter_context)
 	os.write_entire_file("out/shim.odin", converter_context.result.buf[:])
+
+	log.info("Done!")
 }

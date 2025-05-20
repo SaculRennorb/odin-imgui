@@ -2116,9 +2116,24 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 		#partial switch current_node.kind {
 			case .Identifier:
 				_, var_def := find_definition_for_name(ctx, name_context, current_node.identifier[:])
-				assert_eq(ctx.ast[var_def.node].kind, AstNodeKind.VariableDeclaration)
 
-				return resolve_type(ctx, var_def.node, var_def.parent)
+				node := ctx.ast[var_def.node]
+				#partial switch node.kind {
+					case .VariableDeclaration:
+						return resolve_type(ctx, var_def.node, var_def.parent)
+
+					case .FunctionDefinition:
+						fn_def := node.function_def
+
+						type := ctx.ast[fn_def.return_type].type[:]
+						type_stripped := strip_type(type)
+						_, type_context := find_definition_for_name(ctx, name_context, type_stripped[:])
+
+						return type, transmute(NameContextIndex) mem.ptr_sub(type_context, &ctx.context_heap[0])
+
+					case:
+						panic(fmt.tprintf("Unexpected identifier type: %#v", var_def))
+				}
 			
 			case .ExprUnaryLeft:
 				return resolve_type(ctx, current_node.unary_left.right, name_context)
@@ -2128,8 +2143,8 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 
 			case .ExprIndex:
 				indexed_type, expression_context := resolve_type(ctx, current_node.index.array_expression, name_context)
-				if last(indexed_type).kind == .Star {
-					// ptr index
+				if last(indexed_type).kind == .Star || last(indexed_type).kind == .AstNode /*array*/ {
+					// ptr / array index
 					return indexed_type[:len(indexed_type) - 1], expression_context // slice of one layer of 
 				}
 				else { // assume the type is indexable and look for a matching operator
@@ -2149,6 +2164,8 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 
 						return type, transmute(NameContextIndex) mem.ptr_sub(type_context, &ctx.context_heap[0])
 					}
+
+					panic(fmt.tprintf("Index operator not found on %#v", structure_node))
 				}
 
 			case .MemberAccess:
@@ -2203,11 +2220,13 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 
 				return type, type_context != nil ? transmute(NameContextIndex) mem.ptr_sub(type_context, &ctx.context_heap[0]) : 0
 
+			case .FunctionCall:
+				// technically not quite right, but thats also because of the structure of these nodes
+				return resolve_type(ctx, current_node.function_call.expression, name_context)
+
 			case:
 				panic(fmt.tprintf("Not implemented %#v", current_node))
 		}
-
-		unreachable();
 	}
 }
 

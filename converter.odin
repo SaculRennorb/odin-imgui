@@ -824,6 +824,8 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 				name_context := insert_new_definition(&ctx.context_heap, name_context, "__", current_node_index, "__")
 				defer resize(&ctx.context_heap, context_reset)
 
+				condition_node : AstNode
+
 				str.write_string(&ctx.result, "for")
 				if !loop.is_foreach {
 					if len(loop.initializer) != 0 || len(loop.loop_statement) != 0 {
@@ -838,9 +840,12 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 						if len(loop.loop_statement) != 0 { write_node_sequence_merged(ctx, loop.loop_statement[:], name_context) }
 					}
 					else if len(loop.condition) != 0 && current_node.kind != .Do {
-						str.write_byte(&ctx.result, ' ')
 						assert_eq(len(loop.condition), 1)
-						write_node(ctx, loop.condition[0], name_context)
+						condition_node = ctx.ast[loop.condition[0]]
+						if condition_node.kind != .VariableDeclaration {
+							str.write_byte(&ctx.result, ' ')
+							write_node(ctx, loop.condition[0], name_context)
+						}
 					}
 				}
 				else {
@@ -894,6 +899,34 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 
 							str.write_string(&ctx.result, indent_str)
 							str.write_byte(&ctx.result, '}')
+					}
+				}
+				else if condition_node.kind == .VariableDeclaration {
+					str.write_string(&ctx.result, " {\n")
+
+					str.write_string(&ctx.result, body_indent_str)
+					write_node(ctx, loop.condition[0], name_context)
+					str.write_byte(&ctx.result, '\n')
+
+					str.write_string(&ctx.result, body_indent_str)
+					str.write_string(&ctx.result, "if !(")
+					str.write_string(&ctx.result, condition_node.var_declaration.var_name.source)
+					str.write_string(&ctx.result, ") { break }\n")
+
+					switch len(loop.body_sequence) {
+						case 0:
+							str.write_string(&ctx.result, indent_str)
+							str.write_byte(&ctx.result, '}')
+
+						case:
+							if ctx.ast[loop.body_sequence[0]].kind != .NewLine {
+								str.write_byte(&ctx.result, '\n')
+							}
+
+							write_node_sequence(ctx, loop.body_sequence[:], name_context, body_indent_str)
+
+							str.write_string(&ctx.result, indent_str)
+							str.write_string(&ctx.result, "}")
 					}
 				}
 				else {

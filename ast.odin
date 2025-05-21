@@ -1107,7 +1107,9 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 			tokens^ = nexts
 
 			eat_token_expect_push_err(ctx, tokens, .BracketRoundOpen) or_return
-			condition := ast_parse_expression(ctx, tokens) or_return
+			condition : [dynamic]AstNodeIndex
+			ast_parse_statement(ctx, tokens, &condition) or_return
+			assert_eq(len(condition), 1)
 			eat_token_expect_push_err(ctx, tokens, .BracketRoundClose) or_return
 
 			body_sequence : [dynamic]AstNodeIndex
@@ -1130,7 +1132,7 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 			}
 
 			parsed_node = transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode { kind = .While, loop = {
-				condition = make_one(transmute(AstNodeIndex) append_return_index(ctx.ast, condition)),
+				condition = condition,
 				body_sequence = body_sequence,
 			}})
 			append(sequence, parsed_node)

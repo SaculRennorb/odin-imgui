@@ -860,13 +860,15 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 						}
 					}
 				}
-				else {
+				else { // foreach
 					str.write_byte(&ctx.result, ' ')
 					
 					assert_eq(len(loop.initializer), 1)
 					initializer := ctx.ast[loop.initializer[0]]
 					assert_eq(initializer.kind, AstNodeKind.VariableDeclaration)
 					str.write_string(&ctx.result, initializer.var_declaration.var_name.source)
+
+					insert_new_definition(&ctx.context_heap, name_context, initializer.var_declaration.var_name.source, loop.initializer[0], initializer.var_declaration.var_name.source)
 					
 					str.write_string(&ctx.result, " in ")
 					
@@ -967,8 +969,35 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 			case .Branch:
 				branch := current_node.branch
 
+				context_heap_reset := len(&ctx.context_heap)
+				// scope including the condition since that can declare its own variables
+				name_context := insert_new_definition(&ctx.context_heap, name_context, "__", current_node_index, "__")
+
 				str.write_string(&ctx.result, "if ")
-				write_node(ctx, branch.condition, name_context)
+				switch len(branch.condition) {
+					case 1:
+						if ctx.ast[branch.condition[0]].kind == .VariableDeclaration {
+							write_node(ctx, branch.condition[0], name_context)
+							str.write_string(&ctx.result, "; ")
+							str.write_string(&ctx.result, ctx.ast[branch.condition[0]].var_declaration.var_name.source)
+						}
+						else {
+							write_node(ctx, branch.condition[0], name_context)
+						}
+
+					case 2:
+						if ctx.ast[branch.condition[0]].kind == .VariableDeclaration && ctx.ast[branch.condition[1]].kind != .VariableDeclaration {
+							write_node(ctx, branch.condition[0], name_context)
+							str.write_string(&ctx.result, "; ")
+							write_node(ctx, branch.condition[1], name_context)
+							break
+						}
+
+					fallthrough
+
+					case:
+						panic(fmt.tprintf("Cant convert branch condition %#v", branch.condition))
+				}
 
 				body_indent_str : string
 
@@ -978,6 +1007,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 
 					case 1:
 						context_heap_reset := len(&ctx.context_heap)
+						name_context := insert_new_definition(&ctx.context_heap, name_context, "__", current_node_index, "__")
 
 						str.write_string(&ctx.result, " { ")
 						write_node(ctx, branch.true_branch_sequence[0], name_context)
@@ -987,7 +1017,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 
 					case:
 						context_heap_reset := len(&ctx.context_heap)
-						name_context := insert_new_definition(&ctx.context_heap, name_context, "", branch.condition, "")
+						name_context := insert_new_definition(&ctx.context_heap, name_context, "__", current_node_index, "__")
 						
 						str.write_string(&ctx.result, " {")
 						body_indent_str = str.concatenate({ indent_str, ONE_INDENT }, context.temp_allocator)
@@ -1005,7 +1035,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 						 /**/
 
 					case 1:
-						context_heap_reset := len(&ctx.context_heap)
+						name_context := insert_new_definition(&ctx.context_heap, name_context, "__", current_node_index, "__")
 
 						if ctx.ast[branch.false_branch_sequence[0]].kind == .Branch { // else if chaining
 							str.write_byte(&ctx.result, '\n')
@@ -1024,11 +1054,8 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 							str.write_string(&ctx.result, " }")
 						}
 
-						resize(&ctx.context_heap, context_heap_reset)
-
 					case:
-						context_heap_reset := len(&ctx.context_heap)
-						name_context := insert_new_definition(&ctx.context_heap, name_context, "", branch.condition, "")
+						name_context := insert_new_definition(&ctx.context_heap, name_context, "", current_node_index, "")
 
 						str.write_byte(&ctx.result, '\n')
 						str.write_string(&ctx.result, indent_str)
@@ -1037,9 +1064,9 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 						write_node_sequence(ctx, branch.false_branch_sequence[:], name_context, body_indent_str)
 						str.write_string(&ctx.result, indent_str)
 						str.write_byte(&ctx.result, '}')
-
-						resize(&ctx.context_heap, context_heap_reset)
 				}
+
+				resize(&ctx.context_heap, context_heap_reset)
 
 				requires_termination = true
 
@@ -2268,6 +2295,16 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 			case .FunctionCall:
 				// technically not quite right, but thats also because of the structure of these nodes
 				return resolve_type(ctx, current_node.function_call.expression, name_context)
+
+			case .ExprCast:
+				type := ctx.ast[current_node.cast_.type].type[:]
+				type_stripped := strip_type(type)
+				_, type_context := find_definition_for_name(ctx, name_context, type_stripped[:])
+
+				return type, transmute(NameContextIndex) mem.ptr_sub(type_context, &ctx.context_heap[0])
+
+			case .ExprBacketed:
+				return resolve_type(ctx, current_node.inner, name_context)
 
 			case:
 				panic(fmt.tprintf("Not implemented %#v", current_node))

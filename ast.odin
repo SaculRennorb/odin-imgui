@@ -1179,7 +1179,12 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 			node := AstNode { kind = .Branch }
 
 			eat_token_expect_push_err(ctx, tokens, .BracketRoundOpen) or_return
-			condition := ast_parse_expression(ctx, tokens) or_return
+			ast_parse_statement(ctx, tokens, &node.branch.condition) or_return
+			if n, ns := peek_token(tokens); n.kind == .Semicolon { // if (int a = 0; a == 0) { .. }
+				tokens^ = ns // eat the ; 
+				condition := ast_parse_expression(ctx, tokens) or_return
+				append(&node.branch.condition, transmute(AstNodeIndex) append_return_index(ctx.ast, condition))
+			}
 			eat_token_expect_push_err(ctx, tokens, .BracketRoundClose) or_return
 
 			// @brittle
@@ -1190,8 +1195,6 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 			}
 
 			eol_coment_insertion_point := len(node.branch.true_branch_sequence)
-			
-			node.branch.condition = transmute(AstNodeIndex) append_return_index(ctx.ast, condition)
 
 			if n, ns := peek_token(tokens); n.kind == .BracketCurlyOpen {
 				tokens^ = ns // {
@@ -1508,7 +1511,7 @@ ast_parse_var_declaration_no_type :: proc(ctx: ^AstContext, tokens : ^[]Token, p
 	sequence_reset := len(sequence)
 
 	defer if err != .None {
-		push_error(ctx, { message = "Failed to format variable declaration", code_location = loc })
+		push_error(ctx, { message = "Failed to parse variable declaration", code_location = loc })
 		resize(sequence, sequence_reset)
 		resize(ctx.ast, ast_reset)
 		tokens^ = tokens_reset
@@ -2728,7 +2731,7 @@ AstNode :: struct {
 			is_foreach : bool,
 		},
 		branch : struct {
-			condition : AstNodeIndex,
+			condition : [dynamic]AstNodeIndex,
 			true_branch_sequence, false_branch_sequence : [dynamic]AstNodeIndex,
 		},
 		switch_ : struct {

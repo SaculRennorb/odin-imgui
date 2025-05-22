@@ -812,9 +812,21 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 				ns := current_node.namespace
 
 				complete_name := fold_token_range(definition_prefix, { ns.name })
-				name_context := insert_new_definition(&ctx.context_heap, name_context, ns.name.source, current_node_index, complete_name)
 
-				write_node_sequence(ctx, ns.sequence[:], name_context, indent_str, complete_name)
+				// try merging the namespace with an existing one
+				_, existing_context := try_find_definition_for_name(ctx, name_context, { ns.name }, { .Type })
+				name_context : NameContextIndex
+				if existing_context != nil {
+					name_context = transmute(NameContextIndex) mem.ptr_sub(existing_context, &ctx.context_heap[0])
+				}
+				else {
+					name_context = insert_new_definition(&ctx.context_heap, name_context, ns.name.source, current_node_index, complete_name)
+				}
+
+
+				write_node_sequence(ctx, trim_newlines_start(ctx, ns.sequence[:]), name_context, indent_str, complete_name)
+
+				swallow_paragraph = true
 
 
 			case .For, .While, .Do:
@@ -2469,6 +2481,29 @@ translate_type :: proc(output : ^[dynamic]TypeSegment, ast : []AstNode, input : 
 	}
 }
 
+trim_newlines_start :: proc(ctx : ^ConverterContext, tokens : []AstNodeIndex) -> (trimmed : []AstNodeIndex)
+{
+	trimmed = tokens
+	for len(trimmed) > 0 && ctx.ast[trimmed[0]].kind == .NewLine {
+		trimmed = trimmed[1:]
+	}
+	return
+}
+
+trim_newlines_end :: proc(ctx : ^ConverterContext, tokens : []AstNodeIndex) -> (trimmed : []AstNodeIndex)
+{
+	trimmed = tokens
+	for len(trimmed) > 0 && ctx.ast[last(trimmed)^].kind == .NewLine {
+		trimmed = trimmed[0:len(trimmed) - 1]
+	}
+	return
+}
+
+
+trim_newlines :: proc(ctx : ^ConverterContext, tokens : []AstNodeIndex) -> (trimmed : []AstNodeIndex)
+{
+	return #force_inline trim_newlines_end(ctx, #force_inline trim_newlines_start(ctx, tokens))
+}
 
 write_shim :: proc(ctx : ^ConverterContext)
 {

@@ -1,6 +1,3 @@
 package test
 
-
-
-
-N1011_fn :: proc() { }
+N1026_fn :: proc() { }

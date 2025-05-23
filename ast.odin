@@ -1524,7 +1524,7 @@ ast_parse_var_declaration_no_type :: proc(ctx: ^AstContext, tokens : ^[]Token, p
 			name := eat_token_expect_push_err(ctx, tokens, .Identifier) or_return
 			eat_token_expect(tokens, .BracketRoundClose)
 			arguments : [dynamic]AstNodeIndex
-			ast_parse_function_args_with_brackets(ctx, tokens, &arguments)
+			ast_parse_function_args_with_brackets(ctx, tokens, &arguments) or_return
 
 			fn_type := AstNode{ kind = .FunctionDefinition, function_def = {
 				return_type = transmute(AstNodeIndex) append_return_index(ctx.ast, preparsed_type),

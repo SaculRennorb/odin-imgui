@@ -814,7 +814,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 				complete_name := fold_token_range(definition_prefix, { ns.name })
 
 				// try merging the namespace with an existing one
-				_, existing_context := try_find_definition_for_name(ctx, name_context, { ns.name }, { .Type })
+				_, existing_context := try_find_definition_for_name(ctx, name_context, { ns.name }, { .Namespace })
 				name_context : NameContextIndex
 				if existing_context != nil {
 					name_context = transmute(NameContextIndex) mem.ptr_sub(existing_context, &ctx.context_heap[0])
@@ -1147,7 +1147,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 			case .UsingNamespace:
 				// assume we are already in a scope, its time to pull in namespace members
 
-				_, namespace_context := find_definition_for_name(ctx, name_context, current_node.using_namespace.namespace, {.Type})
+				_, namespace_context := find_definition_for_name(ctx, name_context, current_node.using_namespace.namespace, { .Namespace })
 
 				for def_name, def in namespace_context.definitions {
 					ctx.context_heap[name_context].definitions[def_name] = def
@@ -1446,7 +1446,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 				resize(&ctx.context_heap, context_heap_reset)
 			}
 
-			insert_new_definition(&ctx.context_heap, name_context, "this", -1, "this")
+			insert_new_definition(&ctx.context_heap, name_context, "this", structure.synthetic_this_var, "this")
 
 			str.write_string(&ctx.result, "\n\n")
 			str.write_string(&ctx.result, indent_str);
@@ -1867,7 +1867,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 				str.write_byte(&ctx.result, ')')
 			}
 
-			insert_new_definition(&ctx.context_heap, name_context, "this", -1, "this")
+			insert_new_definition(&ctx.context_heap, name_context, "this", parent_type.structure.synthetic_this_var, "this")
 
 			arg_count += 1
 		}
@@ -1931,11 +1931,18 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 		fn_node_ := &ctx.ast[function_node_idx]
 		if (fn_node_.function_def.flags & {.IsCtor, .IsDtor}) != {} && parent_type == nil {
 			_, type_context := find_definition_for_name(ctx, name_context, fn_node_.function_def.function_name[:], { .Type })
-			assert(type_context != nil)
 
 			parent_type = &ctx.ast[type_context.node]
 			complete_structure_name = type_context.complete_name
 			name_context = transmute(NameContextIndex) mem.ptr_sub(type_context, &ctx.context_heap[0])
+		}
+		else if len(fn_node_.function_def.function_name) > 1 && parent_type == nil { // generic member function detection
+			_, type_context := try_find_definition_for_name(ctx, name_context, fn_node_.function_def.function_name[:len(fn_node_.function_def.function_name) - 1], { .Type })
+			if type_context != nil {
+				parent_type = &ctx.ast[type_context.node]
+				complete_structure_name = type_context.complete_name
+				name_context = transmute(NameContextIndex) mem.ptr_sub(type_context, &ctx.context_heap[0])
+			}
 		}
 
 		write_function_inner(ctx, name_context, fn_node_, function_node_idx, complete_structure_name, parent_type, indent_str, write_forward_declared)
@@ -1950,6 +1957,9 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 				function_name = { Token{ kind = .Identifier, source = "init" } }
 			case .IsDtor in fn_node.flags:
 				function_name = { Token{ kind = .Identifier, source = "deinit" } }
+			case complete_structure_name != "" && parent_type != nil && parent_type.kind != .Namespace:
+				 // struct, enum, union: only take the last component @cleanup
+				function_name = fn_node.function_name[len(fn_node.function_name) - 1:]
 			case:
 				function_name = fn_node.function_name[:]
 		}
@@ -2595,6 +2605,7 @@ DefinitionKind :: enum {
 	Type,
 	Function,
 	Variable,
+	Namespace,
 }
 DeffinitionFilterAll := all(DefinitionFilter)
 
@@ -2632,6 +2643,12 @@ try_find_definition_for_name :: proc(ctx : ^ConverterContext, current_index : Na
 
 		if current_context.node != -1 {
 			#partial switch ctx.ast[current_context.node].kind {
+				case .Namespace:
+					if .Namespace not_in filter {
+						if im_root_context.parent == -1 { break ctx_stack }
+						im_root_context = &ctx.context_heap[im_root_context.parent]
+						continue ctx_stack
+					}
 				case .Struct, .Union, .Enum, .Type:
 					if .Type not_in filter {
 						if im_root_context.parent == -1 { break ctx_stack }

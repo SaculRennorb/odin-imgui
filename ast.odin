@@ -108,13 +108,14 @@ ast_parse_filescope_sequence :: proc(ctx : ^AstContext, tokens_ : []Token) -> (s
 				eat_token_expect_direct(tokens, .NewLine, false)
 
 			case .Struct, .Class, .Union, .Enum:
-				if node, se := ast_parse_structure(ctx, tokens); se == .None {
+				if structure, se := ast_parse_structure(ctx, tokens); se == .None {
+					node := &ctx.ast[structure]
 					node.structure.template_spec = template_spec
 					template_spec = make([dynamic]AstNodeIndex)
 
-					ast_attach_comments(ctx, &sequence, &node)
+					ast_attach_comments(ctx, &sequence, node)
 
-					append(&sequence, transmute(AstNodeIndex) append_return_index(ctx.ast, node))
+					append(&sequence, structure)
 					
 					if _, err := eat_token_expect(tokens, .Semicolon); err != nil {
 						panic(fmt.tprintf("Unexpected token after %v def: %v.", token.source, err))
@@ -381,8 +382,9 @@ ast_parse_template_spec_no_keyword :: proc(ctx : ^AstContext, tokens : ^[]Token,
 	return
 }
 
-ast_parse_structure :: proc(ctx: ^AstContext, tokens : ^[]Token, loc := #caller_location) -> (node : AstNode, err : AstError)
+ast_parse_structure :: proc(ctx: ^AstContext, tokens : ^[]Token, loc := #caller_location) -> (parsed_node : AstNodeIndex, err : AstError)
 {
+	node : AstNode
 	tokens_reset := tokens^
 	ast_reset := len(ctx.ast)
 	members : [dynamic]AstNodeIndex
@@ -429,6 +431,7 @@ ast_parse_structure :: proc(ctx: ^AstContext, tokens : ^[]Token, loc := #caller_
 
 	if next.kind == .Semicolon {
 		node.structure.flags |= {.IsForwardDeclared}
+		parsed_node = transmute(AstNodeIndex) append_return_index(ctx.ast, node)
 		return
 	}
 	
@@ -447,6 +450,14 @@ ast_parse_structure :: proc(ctx: ^AstContext, tokens : ^[]Token, loc := #caller_
 	}
 
 	node.structure.members = members
+
+	parsed_node = transmute(AstNodeIndex) append_return_index(ctx.ast, node)
+
+	ctx.ast[parsed_node].structure.synthetic_this_var = transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .VariableDeclaration, var_declaration = {
+		type     = transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .Type, type = slice.clone_to_dynamic(node.structure.name) }),
+		var_name = Token{ kind = .Identifier, source = "this" },
+	}})
+
 	return
 }
 
@@ -559,18 +570,17 @@ ast_parse_declaration :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[
 			return
 
 		case .Struct, .Class, .Union:
-			node := ast_parse_structure(ctx, tokens) or_return
+			parsed_node = ast_parse_structure(ctx, tokens) or_return
 
-			ast_attach_comments(ctx, sequence, &node)
+			ast_attach_comments(ctx, sequence, &ctx.ast[parsed_node])
 
 			
 			if n, _ := peek_token(tokens); n.kind == .Semicolon { // simple declaration
-				parsed_node = transmute(AstNodeIndex) append_return_index(ctx.ast, node)
 				append(sequence, parsed_node)
 				return	
 			}
 
-			ast_parse_var_declaration_no_type(ctx, tokens, node, sequence, {}) or_return
+			ast_parse_var_declaration_no_type(ctx, tokens, ctx.ast[parsed_node], sequence, {}) or_return
 			parsed_node = last(sequence^)^ // @hack
 			return
 
@@ -1339,17 +1349,16 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 			return
 
 		case .Struct, .Class, .Union, .Enum:
-			node := ast_parse_structure(ctx, tokens) or_return
+			parsed_node = ast_parse_structure(ctx, tokens) or_return
 
-			ast_attach_comments(ctx, sequence, &node)
+			ast_attach_comments(ctx, sequence, &ctx.ast[parsed_node])
 
 			if n, _ := peek_token(tokens); n.kind == .Semicolon { // normal declaration
-				parsed_node = transmute(AstNodeIndex) append_return_index(ctx.ast, node)
 				append(sequence, parsed_node)
 				return
 			}
 
-			ast_parse_var_declaration_no_type(ctx, tokens, node, sequence, {}) or_return
+			ast_parse_var_declaration_no_type(ctx, tokens, ctx.ast[parsed_node], sequence, {}) or_return
 			parsed_node = last(sequence^)^ // @hack
 			return
 
@@ -2711,6 +2720,7 @@ AstNode :: struct {
 			attached_comments : [dynamic]AstNodeIndex,
 			template_spec : [dynamic]AstNodeIndex,
 			flags : AstStructureFlags,
+			synthetic_this_var : AstNodeIndex,
 		},
 		member_access : struct {
 			expression, member : AstNodeIndex,

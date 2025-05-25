@@ -46,6 +46,7 @@ main :: proc()
 
 	converter_context : ConverterContext = { ast = ast[:], root_sequence = root_sequence[:] }
 	replaced_names := [][2]string {
+		{ "INT_MAX", "max(i32)" },
 		{ "FLT_MAX", "max(f32)" },
 		{ "FLT_MIN", "min(f32)" },
 		{ "CP_UTF8", "win32.CP_UTF8" },

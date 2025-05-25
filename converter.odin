@@ -41,7 +41,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 	write_node :: proc(ctx : ^ConverterContext, current_node_index : AstNodeIndex, name_context : NameContextIndex, indent_str := "", definition_prefix := "") -> (requires_termination, requires_new_paragraph, swallow_paragraph : bool)
 	{
 		current_node := &ctx.ast[current_node_index]
-		#partial switch current_node.kind {
+		node_kind_switch: #partial switch current_node.kind {
 			case .NewLine:
 				str.write_byte(&ctx.result, '\n')
 
@@ -780,6 +780,25 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 					switch fn_name {
 						case "sizeof":
 							str.write_string(&ctx.result, "size_of")
+
+						case "offsetof":
+							assert_eq(len(fncall.arguments), 2)
+
+							str.write_string(&ctx.result, "offset_of")
+							str.write_byte(&ctx.result, '(')
+							
+							write_node(ctx, fncall.arguments[0], name_context)
+							
+							str.write_string(&ctx.result, ", ")
+
+							ident := ctx.ast[fncall.arguments[1]].identifier
+							assert_eq(len(ident), 1)
+							str.write_string(&ctx.result, ident[0].source)
+							
+							str.write_byte(&ctx.result, ')')
+
+							requires_termination = true	
+							break node_kind_switch
 
 						case:
 							str.write_string(&ctx.result, fn_name)

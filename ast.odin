@@ -1714,6 +1714,16 @@ ast_parse_function_call :: proc(ctx: ^AstContext, tokens : ^[]Token, loc := #cal
 			}
 			eat_token_expect_push_err(ctx, tokens, .BracketRoundClose) or_return
 
+		case "offsetof":
+			eat_token_expect_push_err(ctx, tokens, .BracketRoundOpen) or_return
+			resize(&arguments, 2)
+			expr := ast_parse_expression(ctx, tokens, .Comma - ._1) or_return
+			arguments[0] = transmute(AstNodeIndex) append_return_index(ctx.ast, expr)
+			eat_token_expect_push_err(ctx, tokens, .Comma) or_return
+			field := eat_token_expect_push_err(ctx, tokens, .Identifier) or_return
+			arguments[1] = transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode{ kind = .Identifier, identifier = make_one(field) })
+			eat_token_expect_push_err(ctx, tokens, .BracketRoundClose) or_return
+
 		case:
 			ast_parse_function_call_arguments(ctx, tokens, &arguments) or_return
 	}

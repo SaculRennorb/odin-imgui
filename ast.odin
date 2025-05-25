@@ -1445,7 +1445,7 @@ ast_parse_scoped_sequence_no_open_brace :: proc(ctx: ^AstContext, tokens : ^[]To
 			#panic("wrong fn type")
 		}
 
-		member := &ctx.ast[member_index]
+		member := ctx.ast[member_index]
 		#partial switch member.kind {
 			case .FunctionDefinition:
 				if parent_node != nil {
@@ -1467,7 +1467,7 @@ ast_parse_scoped_sequence_no_open_brace :: proc(ctx: ^AstContext, tokens : ^[]To
 				}
 
 				when F == type_of(ast_parse_enum_value_declaration) {
-					member.var_declaration.type = parent_node.structure.base_type
+					ctx.ast[member_index].var_declaration.type = parent_node.structure.base_type
 				}
 
 				fallthrough
@@ -1489,8 +1489,10 @@ ast_parse_scoped_sequence_no_open_brace :: proc(ctx: ^AstContext, tokens : ^[]To
 				if n, ns := peek_token(tokens, false); n.kind == .Comment {
 					tokens^ = ns
 
-					append(&member.function_def.attached_comments, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode { kind = .Comment, attached = true, literal = n }))
-					append(&member.function_def.attached_comments, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode { kind = .NewLine, attached = true }))
+					x := transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode { kind = .Comment, attached = true, literal = n })
+					append(&ctx.ast[member_index].function_def.attached_comments, x)
+					y := transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode { kind = .NewLine, attached = true })
+					append(&ctx.ast[member_index].function_def.attached_comments, y)
 				}
 
 			case .OperatorDefinition:
@@ -1498,9 +1500,11 @@ ast_parse_scoped_sequence_no_open_brace :: proc(ctx: ^AstContext, tokens : ^[]To
 				if n, ns := peek_token(tokens, false); n.kind == .Comment {
 					tokens^ = ns
 
-					fn_def := &ctx.ast[member.operator_def.underlying_function]
-					append(&fn_def.function_def.attached_comments, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode { kind = .Comment, attached = true, literal = n }))
-					append(&fn_def.function_def.attached_comments, transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode { kind = .NewLine, attached = true }))
+					idx := member.operator_def.underlying_function
+					x := transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode { kind = .Comment, attached = true, literal = n })
+					append(&ctx.ast[idx].function_def.attached_comments, x)
+					y := transmute(AstNodeIndex) append_return_index(ctx.ast, AstNode { kind = .NewLine, attached = true })
+					append(&ctx.ast[idx].function_def.attached_comments, y)
 				}
 		}
 

@@ -726,7 +726,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 						str.write_string(&ctx.result, actual_member_context.complete_name)
 					}
 					else {
-						log.warn("failed to resolve type for", member.identifier)
+						log.warn("failed to resolve type for", member.identifier) // fix for incomplete generic resolver
 						write_token_range(&ctx.result, member.identifier[:])
 					}
 				}
@@ -2211,7 +2211,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 		return
 	}
 
-	resolve_type :: proc(ctx : ^ConverterContext, current_node_index : AstNodeIndex, name_context : NameContextIndex) -> (raw_type : TokenRange, type_context : NameContextIndex)
+	resolve_type :: proc(ctx : ^ConverterContext, current_node_index : AstNodeIndex, name_context : NameContextIndex, loc := #caller_location) -> (raw_type : TokenRange, type_context : NameContextIndex)
 	{
 		current_node := ctx.ast[current_node_index]
 		#partial switch current_node.kind {
@@ -2221,7 +2221,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 				node := ctx.ast[var_def.node]
 				#partial switch node.kind {
 					case .VariableDeclaration:
-						return resolve_type(ctx, var_def.node, var_def.parent)
+						return resolve_type(ctx, var_def.node, var_def.parent, loc)
 
 					case .FunctionDefinition:
 						fn_def := node.function_def
@@ -2232,18 +2232,21 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 
 						return type, transmute(NameContextIndex) mem.ptr_sub(type_context, &ctx.context_heap[0])
 
+					case .Struct, .Union: // structure constructor     Rect(1, 2, 1, 2)
+						return ctx.ast[var_def.node].structure.name, transmute(NameContextIndex) mem.ptr_sub(var_def, &ctx.context_heap[0])
+
 					case:
-						panic(fmt.tprintf("Unexpected identifier type: %#v", var_def))
+						panic(fmt.tprintf("Unexpected identifier type at %v for %v: %#v", loc, current_node.identifier, var_def))
 				}
 			
 			case .ExprUnaryLeft:
-				return resolve_type(ctx, current_node.unary_left.right, name_context)
+				return resolve_type(ctx, current_node.unary_left.right, name_context, loc)
 
 			case .ExprUnaryRight:
-				return resolve_type(ctx, current_node.unary_right.left, name_context)
+				return resolve_type(ctx, current_node.unary_right.left, name_context, loc)
 
 			case .ExprIndex:
-				indexed_type, expression_context := resolve_type(ctx, current_node.index.array_expression, name_context)
+				indexed_type, expression_context := resolve_type(ctx, current_node.index.array_expression, name_context, loc)
 				if last(indexed_type).kind == .Star || last(indexed_type).kind == .AstNode /*array*/ {
 					// ptr / array index
 					return indexed_type[:len(indexed_type) - 1], expression_context // slice of one layer of 
@@ -2271,12 +2274,12 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 
 			case .MemberAccess:
 				member_access := current_node.member_access
-				expr_type, expr_type_context_idx := resolve_type(ctx, member_access.expression, name_context)
+				expr_type, expr_type_context_idx := resolve_type(ctx, member_access.expression, name_context, loc)
 
 				member := ctx.ast[member_access.member]
 				#partial switch member.kind {
 					case .Identifier:
-						return resolve_type(ctx, member_access.member, expr_type_context_idx)
+						return resolve_type(ctx, member_access.member, expr_type_context_idx, loc)
 
 					case .FunctionCall:
 						fn_name_node := ctx.ast[member.function_call.expression]
@@ -2323,7 +2326,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 
 			case .FunctionCall:
 				// technically not quite right, but thats also because of the structure of these nodes
-				return resolve_type(ctx, current_node.function_call.expression, name_context)
+				return resolve_type(ctx, current_node.function_call.expression, name_context, loc)
 
 			case .ExprCast:
 				type := ctx.ast[current_node.cast_.type].type[:]
@@ -2333,7 +2336,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 				return type, transmute(NameContextIndex) mem.ptr_sub(type_context, &ctx.context_heap[0])
 
 			case .ExprBacketed:
-				return resolve_type(ctx, current_node.inner, name_context)
+				return resolve_type(ctx, current_node.inner, name_context, loc)
 
 			case:
 				panic(fmt.tprintf("Not implemented %#v", current_node))

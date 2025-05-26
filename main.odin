@@ -51,6 +51,9 @@ main :: proc()
 		{ "FLT_MIN", "min(f32)" },
 		{ "CP_UTF8", "win32.CP_UTF8" },
 		{ "FILENAME_MAX", "win32.FILENAME_MAX" },
+		{ "stdout", "stdout" }, // TODO
+		{ "stdin" , "stdin"  }, // TODO
+		{ "stderr", "stderr" }, // TODO
 	}
 	convert_and_format(&converter_context, replaced_names)
 	os.write_entire_file("out/imgui_gen.odin", converter_context.result.buf[:])

@@ -303,7 +303,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 				else { str.write_byte(&ctx.result, ' ') }
 				str.write_byte(&ctx.result, '}')
 
-			case .VariableDeclaration:
+			case .VariableDeclaration, .TemplateVariableDeclaration:
 				vardef := current_node.var_declaration
 
 				complete_name := fold_token_range(definition_prefix, { vardef.var_name })
@@ -717,7 +717,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 
 					this_type := ctx.ast[expression_type_context.node]
 					if this_type.kind != .Struct && this_type.kind != .Union && this_type.kind != .Enum \
-						&& this_type.kind != .VariableDeclaration /* generic args */ {
+						&& this_type.kind != .TemplateVariableDeclaration {
 						panic(fmt.tprintf("Unexpected expression type %#v for %v", this_type, member.identifier))
 					}
 
@@ -1878,7 +1878,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 					if i > 0 { str.write_string(&ctx.result, ", ") }
 
 					type_var := ctx.ast[ti]
-					assert_eq(type_var.kind, AstNodeKind.VariableDeclaration)
+					assert_eq(type_var.kind, AstNodeKind.TemplateVariableDeclaration)
 
 					str.write_byte(&ctx.result, '$')
 					str.write_string(&ctx.result, type_var.var_declaration.var_name.source)

@@ -372,7 +372,7 @@ ast_parse_template_spec_no_keyword :: proc(ctx : ^AstContext, tokens : ^[]Token,
 			initializer_expression = transmute(AstNodeIndex) append_return_index(ctx.ast, initializer)
 		}
 
-		node := AstNode { kind = .VariableDeclaration, var_declaration = {
+		node := AstNode { kind = .TemplateVariableDeclaration, var_declaration = {
 			type = transmute(AstNodeIndex) append_return_index(ctx.ast, type),
 			var_name = name,
 			initializer_expression = initializer_expression,
@@ -2614,6 +2614,7 @@ AstNodeKind :: enum {
 	LambdaDefinition,
 	Type,
 	VariableDeclaration,
+	TemplateVariableDeclaration,
 	Assert,
 	Return,
 	Break,
@@ -2912,6 +2913,7 @@ fmt_astnode :: proc(fi: ^fmt.Info, node: ^AstNode, verb: rune) -> bool
 		case .LambdaDefinition   : fmt.fmt_arg(fi, node.lambda_def, 'v')
 		case .Type               : fmt.fmt_arg(fi, node.type, 'v')
 		case .VariableDeclaration: fmt.fmt_arg(fi, node.var_declaration, 'v')
+		case .TemplateVariableDeclaration: fmt.fmt_arg(fi, node.var_declaration, 'v')
 		case .Assert             : fmt.fmt_arg(fi, node.assert, 'v')
 		case .Return             : fmt.fmt_arg(fi, node.return_, 'v')
 		case .Break              : fmt.fmt_arg(fi, node.literal, 'v')

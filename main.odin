@@ -42,9 +42,10 @@ main :: proc()
 	preprocess(&{ result = &preprocessed, inputs = input_map, ignored_identifiers = ignored_identifiers }, "imgui.cpp")
 
 	ast  : [dynamic]AstNode
-	root_sequence := ast_parse_filescope_sequence(&{ ast = &ast }, preprocessed[:])
+	ast_context : AstContext = { ast = &ast }
+	root_sequence := ast_parse_filescope_sequence(&ast_context, preprocessed[:])
 
-	converter_context : ConverterContext = { ast = ast[:], root_sequence = root_sequence[:] }
+	converter_context : ConverterContext = { ast = ast_context.ast[:], type_heap = ast_context.type_heap[:], root_sequence = root_sequence[:] }
 	replaced_names := [][2]string {
 		{ "INT_MAX", "max(i32)" },
 		{ "FLT_MAX", "max(f32)" },

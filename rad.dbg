@@ -1,0 +1,35 @@
+// raddbg 0.9.19 project file
+
+recent_file: path: "converter.odin"
+target:
+{
+  executable: "test.exe"
+  working_directory: ""
+  enabled: 1
+  arguments: 1312
+}
+type_view:
+{
+  type: `[]program::AstNode`
+  expr: "slice($)"
+}
+type_view:
+{
+  type: `[]program::AstNodeIndex`
+  expr: "slice($)"
+}
+type_view:
+{
+  type: `[]program::AstType`
+  expr: "slice($)"
+}
+type_view:
+{
+  type: `[dynamic]program::NameContext`
+  expr: "slice($)"
+}
+breakpoint:
+{
+  source_location: "converter.odin:2315:1"
+  hit_count: 1
+}

@@ -51,6 +51,12 @@ make_one :: #force_inline proc(e : $E, alloc := context.allocator) -> (arr : [dy
 	return
 }
 
+is_variant :: #force_inline proc "contextless" (expr : $U, $V : typeid) -> bool where intrinsics.type_is_variant_of(U, V)
+{
+	_, ok := expr.(V)
+	return ok
+}
+
 
 last :: proc { last_slice, last_array }
 last_slice :: #force_inline proc "contextless" (arr : []$T)        -> ^T { return &arr[len(arr) - 1] }

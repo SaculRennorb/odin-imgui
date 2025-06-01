@@ -2355,6 +2355,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 					case:
 						// assume the type is indexable and look for a matching operator
 						_, structure_def := find_definition_for(ctx, name_context, indexed_type)
+						structure_def_idx := transmute(NameContextIndex) mem.ptr_sub(structure_def, &ctx.context_heap[0])
 						structure_node := ctx.ast[structure_def.node]
 						assert(structure_node.kind == .Struct || structure_node.kind == .Union)
 
@@ -2362,9 +2363,8 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 							member := ctx.ast[mi]
 							if member.kind != .OperatorDefinition || member.operator_def.kind != .Index { continue }
 
-							ri := ctx.ast[member.operator_def.underlying_function].function_def.return_type
-							type := ctx.ast[ri].type
-							_, type_context := find_definition_for(ctx, name_context, type)
+							type := ctx.ast[member.operator_def.underlying_function].function_def.return_type
+							_, type_context := find_definition_for(ctx, structure_def_idx, type)
 
 							return type, transmute(NameContextIndex) mem.ptr_sub(type_context, &ctx.context_heap[0])
 						}
@@ -2598,7 +2598,7 @@ find_definition_for :: proc(ctx : ^ConverterContext, name_context : NameContextI
 	root_context, found_context = try_find_definition_for(ctx, name_context, type)
 	if found_context != nil { return }
 
-	err := fmt.tprintf("'%v' was not found in context", type)
+	err := fmt.tprintf("Type not found in context: %#v", ctx.type_heap[type])
 	log.error(err, location = loc)
 	dump_context_stack(ctx, name_context, ctx.context_heap[name_context].complete_name)
 	panic(err, loc)

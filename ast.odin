@@ -15,10 +15,11 @@ AstContext :: struct {
 }
 
 @(private)
-push_error :: #force_inline proc(ctx : ^AstContext, err : AstErrorFrame)
+push_error :: #force_inline proc(ctx : ^AstContext, err : AstErrorFrame, code_location := #caller_location)
 {
 	err := err
 	err.depth = len(ctx.error_stack)
+	err.code_location = code_location
 	append(&ctx.error_stack, err)
 }
 
@@ -68,10 +69,11 @@ format_error :: #force_inline proc(ctx : ^AstContext, message : string) -> strin
 
 ast_parse_filescope_sequence :: proc(ctx : ^AstContext, tokens_ : []Token) -> (sequence : [dynamic]AstNodeIndex)
 {
-	current_ast = ctx.ast
+	current_ast   = ctx.ast
+	current_types = &ctx.type_heap
 
 	if len(ctx.ast) == 0 { append(ctx.ast, AstNode{ }) } // dummy ast0 node
-	if len(ctx.type_heap) == 0 { append(&ctx.type_heap, AstTypeVoid{}) } // dummy type0 node
+	if len(ctx.type_heap) == 0 { append(&ctx.type_heap, AstTypeVoid{ }) } // dummy type0 node
 	template_spec: [dynamic]AstNodeIndex
 
 	tokens_ := tokens_
@@ -335,7 +337,7 @@ ast_parse_template_spec_no_keyword :: proc(ctx : ^AstContext, tokens : ^[]Token,
 	ast_reset := len(ctx.ast)
 
 	defer if err != .None {
-		push_error(ctx, { message = "Failed to parse template spec", code_location = loc })
+		push_error(ctx, { message = "Failed to parse template spec" }, loc)
 		delete(template_spec)
 		resize(ctx.ast, ast_reset)
 		tokens^ = tokens_reset
@@ -390,7 +392,7 @@ ast_parse_structure :: proc(ctx: ^AstContext, tokens : ^[]Token, loc := #caller_
 	members : [dynamic]AstNodeIndex
 
 	defer if err != .None {
-		push_error(ctx, { message = "Failed to parse structure", code_location = loc })
+		push_error(ctx, { message = "Failed to parse structure" }, loc)
 		delete(members)
 		resize(ctx.ast, ast_reset)
 		tokens^ = tokens_reset
@@ -511,7 +513,7 @@ ast_parse_declaration :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[
 	sequence_reset := len(sequence)
 
 	defer if err != .None {
-		push_error(ctx, { message = "Failed to parse declaration", code_location = loc })
+		push_error(ctx, { message = "Failed to parse declaration" }, loc)
 		resize(ctx.ast, ast_reset)
 		resize(sequence, sequence_reset)
 		tokens^ = tokens_reset
@@ -643,11 +645,12 @@ ast_parse_declaration :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[
 		case .Operator: // operator bool() { }    custom call operator comes without return type...
 			tokens^ = nexts
 
-			node := AstNode{ kind = .OperatorDefinition, operator_def = { kind = .ImplicitCast } }
 			implicit_cast_type := ast_parse_type(ctx, tokens) or_return
 			fn_node := ast_parse_function_def_no_return_type_and_name(ctx, tokens) or_return
 			fn_node.function_def.return_type = implicit_cast_type
-
+			
+			node := AstNode{ kind = .OperatorDefinition, operator_def = { kind = .ImplicitCast } }
+			node.operator_def.underlying_function = ast_append_node(ctx, fn_node)
 			parsed_node = ast_append_node(ctx, node)
 			append(sequence, parsed_node)
 
@@ -769,7 +772,7 @@ ast_parse_enum_value_declaration :: proc(ctx: ^AstContext, tokens : ^[]Token, se
 	sequence_reset := len(sequence)
 
 	defer if err != .None {
-		push_error(ctx, { message = "Failed to parse enum value declaration", code_location = loc })
+		push_error(ctx, { message = "Failed to parse enum value declaration" }, loc)
 		resize(ctx.ast, ast_reset)
 		resize(sequence, sequence_reset)
 		tokens^ = tokens_reset
@@ -922,7 +925,7 @@ ast_parse_function_def_no_return_type_and_name :: proc(ctx: ^AstContext, tokens 
 	body_sequence : [dynamic]AstNodeIndex
 
 	defer if err != .None {
-		push_error(ctx, { message = "Failed to parse function def", code_location = loc })
+		push_error(ctx, { message = "Failed to parse function def" }, loc)
 		delete(arguments)
 		delete(body_sequence)
 		resize(ctx.ast, ast_reset_size)
@@ -1017,7 +1020,7 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 	sequence_reset := len(sequence)
 
 	defer if err != .None {
-		push_error(ctx, { message = "Failed to parse statement", code_location = loc })
+		push_error(ctx, { message = "Failed to parse statement" }, loc)
 		resize(sequence, sequence_reset)
 		resize(ctx.ast, ast_reset_size)
 		tokens^ = token_reset
@@ -1535,7 +1538,7 @@ ast_parse_var_declaration_no_type :: proc(ctx: ^AstContext, tokens : ^[]Token, p
 	sequence_reset := len(sequence)
 
 	defer if err != .None {
-		push_error(ctx, { message = "Failed to parse variable declaration", code_location = loc })
+		push_error(ctx, { message = "Failed to parse variable declaration" }, loc)
 		resize(sequence, sequence_reset)
 		resize(ctx.ast, ast_reset)
 		tokens^ = tokens_reset
@@ -1588,7 +1591,7 @@ ast_parse_var_declaration_no_type :: proc(ctx: ^AstContext, tokens : ^[]Token, p
 
 				case:
 					err = .Some
-					push_error(ctx, { actual = next, message = "Expected type extension", code_location = #location() })
+					push_error(ctx, { actual = next, message = "Expected type extension" })
 					return
 			}
 		}
@@ -1679,7 +1682,7 @@ ast_parse_function_call :: proc(ctx: ^AstContext, tokens : ^[]Token, loc := #cal
 	arguments : [dynamic]AstNodeIndex
 
 	defer if err != .None {
-		push_error(ctx, { message = "Failed to parse function call", code_location = loc })
+		push_error(ctx, { message = "Failed to parse function call" })
 		delete(arguments)
 		resize(ctx.ast, ast_reset)
 		tokens^ = tokens_reset
@@ -1739,7 +1742,7 @@ ast_parse_function_call :: proc(ctx: ^AstContext, tokens : ^[]Token, loc := #cal
 ast_parse_function_call_arguments :: proc(ctx: ^AstContext, tokens : ^[]Token, arguments : ^[dynamic]AstNodeIndex, loc := #caller_location) -> (err : AstError)
 {
 	defer if err != .None {
-		push_error(ctx, { message = "Failed to parse function call arguemnts", code_location = loc })
+		push_error(ctx, { message = "Failed to parse function call arguemnts" })
 	}
 
 	eat_token_expect_push_err(ctx, tokens, .BracketRoundOpen) or_return
@@ -1810,7 +1813,7 @@ ast_parse_type :: proc(ctx : ^AstContext, tokens : ^[]Token, parent_type : AstTy
 	type_reset := len(ctx.type_heap)
 	tokens_reset := tokens^
 	defer if err != .None {
-		push_error(ctx, { message = "Failed to parse type", code_location = loc })
+		push_error(ctx, { message = "Failed to parse type" })
 		tokens^ = tokens_reset
 		resize(&ctx.type_heap, type_reset)
 	}
@@ -1838,26 +1841,30 @@ ast_parse_type :: proc(ctx : ^AstContext, tokens : ^[]Token, parent_type : AstTy
 				case "const":
 					tokens^ = ns
 					#partial switch &frag in ctx.type_heap[type] {
-						case AstTypePointer      : frag.flags |= { .Const }
+						case AstTypePointer  : frag.flags |= { .Const }
 						case AstTypeFragment : frag.flags |= { .Const }
 						case AstTypePrimitive: frag.flags |= { .Const }
+						case AstTypeVoid     : frag.flags |= { .Const }
 
 						case:
 							err = .Some
-							push_error(ctx, { message = "Expected inner type or expression" })
+							push_error(ctx, {
+								message = fmt.aprintf("const modifier can only be applied to pointers, fragments, primitives or void, but the previous fragment was %v.", frag),
+								actual = n,
+							})
 							return
 					}
 					continue
 					
 				case "auto":
 					tokens^ = ns
-					type = ast_append_type(ctx, AstTypeAuto{ });
+					type = ast_append_type(ctx, AstTypeAuto{ token = n });
 					has_name = true
 					continue
 
 				case "void":
 					tokens^ = ns
-					type = ast_append_type(ctx, AstTypeVoid{ });
+					type = ast_append_type(ctx, AstTypeVoid{ token = n });
 					has_name = true
 					continue
 
@@ -1966,7 +1973,7 @@ ast_parse_type :: proc(ctx : ^AstContext, tokens : ^[]Token, parent_type : AstTy
 							}
 							else {
 								err = .Some
-								push_error(ctx, { message = "Expected inner type or expression" })
+								push_error(ctx, { message = "Expected inner type or expression", actual = nn })
 								return
 							}
 					}
@@ -1993,7 +2000,7 @@ ast_parse_qualified_name_push_error :: proc(ctx : ^AstContext, tokens : ^[]Token
 	err_ : Maybe(AstErrorFrame)
 	r, err_ = ast_parse_qualified_name_direct(tokens, loc)
 	if e, err := err_.?; err {
-		push_error(ctx, e)
+		push_error(ctx, e, loc)
 	}
 	return
 }
@@ -2083,7 +2090,7 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 	sequence : [dynamic]AstNodeIndex
 
 	defer if err != .None {
-		push_error(ctx, { message = "Failed to parse expression", code_location = loc })
+		push_error(ctx, { message = "Failed to parse expression" }, loc)
 		delete(sequence)
 		resize(ctx.ast, ast_reset_size)
 		tokens^ = token_reset
@@ -2103,7 +2110,7 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 	err_, _ := peek_token(tokens)
 	err = .Some
 	defer if err == .Some {
-		push_error(ctx, { actual = err_, message = "Expected valid expression", code_location = #location() })
+		push_error(ctx, { actual = err_, message = "Expected valid expression" })
 	}
 
 	for {
@@ -2474,7 +2481,7 @@ ast_parse_lambda_declaration :: proc(ctx : ^AstContext, tokens : ^[]Token, loc :
 	node.kind = .LambdaDefinition
 
 	defer if err == .Some {
-		push_error(ctx, { message = "Failed to parse lambda deffinition", code_location = loc })
+		push_error(ctx, { message = "Failed to parse lambda deffinition" }, loc)
 	}
 
 	eat_token_expect_push_err(ctx, tokens, .BracketSquareOpen) or_return
@@ -2493,7 +2500,7 @@ ast_parse_lambda_declaration :: proc(ctx : ^AstContext, tokens : ^[]Token, loc :
 				append(&node.lambda_def.captures, ast_append_node(ctx, expression))
 
 			case:
-				push_error(ctx, { actual = n, message = "Expected valid lambda capture set", code_location = loc })
+				push_error(ctx, { actual = n, message = "Expected valid lambda capture set" }, loc)
 				err = .Some
 				return
 		}
@@ -2517,7 +2524,7 @@ eat_token_expect_push_err :: proc(ctx : ^AstContext, tokens : ^[]Token, expected
 	err_ : Maybe(AstErrorFrame)
 	t, err_ = eat_token_expect_direct(tokens, expected_type, ignore_newline, loc)
 	if e, er := err_.?; er {
-		push_error(ctx, e)
+		push_error(ctx, e, loc)
 		err = .Some
 	}
 	return
@@ -3022,6 +3029,30 @@ fmt_ast_err :: proc(fi: ^fmt.Info, err: ^AstErrorFrame, verb: rune) -> bool
 	return true
 }
 
+@(thread_local) current_types: ^[dynamic]AstType
+fmt_asttypeidx :: proc(fi: ^fmt.Info, idx: ^AstTypeIndex, verb: rune) -> bool
+{
+	if len(current_types) == 0 { return false }
+	if idx == nil {
+		io.write_string(fi.writer, "TypeIndex <nil>")
+		return true
+	}
+	if idx^ == 0 {
+		io.write_string(fi.writer, "TypeIndex 0")
+		return true
+	}
+	
+	io.write_string(fi.writer, fmt.tprintf("TypeIndex %v -> ", transmute(int) idx^))
+	fmt.fmt_arg(fi, current_types[idx^], verb)
+	return true
+}
+
+fmt_asttypeidx_a : fmt.User_Formatter : proc(fi: ^fmt.Info, arg: any, verb: rune) -> bool
+{
+	idx := transmute(^AstTypeIndex)arg.data
+	return fmt_asttypeidx(fi, idx, verb)
+}
+
 
 AstTypeInlineStructure :: distinct AstNodeIndex
 AstTypeFunction :: struct {
@@ -3047,8 +3078,13 @@ AstTypePrimitive :: struct {
 	fragments : []Token,
 	flags     : bit_set[enum{ Const }],
 }
-AstTypeAuto :: struct { }
-AstTypeVoid :: struct { }
+AstTypeAuto :: struct {
+	token : Token,
+}
+AstTypeVoid :: struct {
+	token : Token,
+	flags : bit_set[enum{ Const }],
+}
 
 AstType :: union { AstTypeInlineStructure, AstTypeFunction, AstTypePointer, AstTypeArray, AstTypeFragment, AstTypePrimitive, AstTypeAuto, AstTypeVoid }
 

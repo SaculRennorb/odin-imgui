@@ -92,6 +92,7 @@ _set_user_formatters :: proc()
 	formatters[typeid_of(AstNode)] = fmt_astnode_a
 	formatters[typeid_of(TokenRange)] = fmt_token_range_a
 	formatters[typeid_of(NameContextIndex)] = fmt_name_ctx_idx_a
+	formatters[typeid_of(AstTypeIndex)] = fmt_asttypeidx_a
 
 	fmt.set_user_formatters(&formatters)
 }

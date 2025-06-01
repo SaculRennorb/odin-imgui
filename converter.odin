@@ -2402,7 +2402,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 						assert_eq(ctx.ast[fndef_ctx.node].kind, AstNodeKind.FunctionDefinition)
 						fndef := ctx.ast[fndef_ctx.node].function_def
 
-						_, type_context := find_definition_for(ctx, name_context, fndef.return_type)
+						_, type_context := find_definition_for(ctx, expr_type_context_idx, fndef.return_type)
 
 						return fndef.return_type, transmute(NameContextIndex) mem.ptr_sub(type_context, &ctx.context_heap[0])
 

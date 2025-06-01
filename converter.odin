@@ -2227,33 +2227,43 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 					input := frag.fragments
 					switch input[0].source {
 						case "signed":
-							switch input[1].source {
-								case "char":
-									str.write_string(&ctx.result, "i8")
+							if len(input) == 1 {
+								str.write_string(&ctx.result, "i32")
+							}
+							else {
+								switch input[1].source {
+									case "char":
+										str.write_string(&ctx.result, "i8")
 
-								case "int":
-									str.write_string(&ctx.result, "i32")
+									case "int":
+										str.write_string(&ctx.result, "i32")
 
-								case "short":
-									str.write_string(&ctx.result, transform_from_short(input[2:], "i"))
+									case "short":
+										str.write_string(&ctx.result, transform_from_short(input[2:], "i"))
 
-								case "long":
-									str.write_string(&ctx.result, transform_from_long(input[2:], "i"))
+									case "long":
+										str.write_string(&ctx.result, transform_from_long(input[2:], "i"))
+								}
 							}
 
 						case "unsigned":
-							switch input[1].source {
-								case "char":
-									str.write_string(&ctx.result, "u8")
+							if len(input) == 1 {
+								str.write_string(&ctx.result, "u32")
+							}
+							else {
+								switch input[1].source {
+									case "char":
+										str.write_string(&ctx.result, "u8")
 
-								case "int":
-									str.write_string(&ctx.result, "u32")
+									case "int":
+										str.write_string(&ctx.result, "u32")
 
-								case "short":
-									str.write_string(&ctx.result, transform_from_short(input[2:], "u"))
+									case "short":
+										str.write_string(&ctx.result, transform_from_short(input[2:], "u"))
 
-								case "long":
-									str.write_string(&ctx.result, transform_from_long(input[2:], "u"))
+									case "long":
+										str.write_string(&ctx.result, transform_from_long(input[2:], "u"))
+								}
 							}
 
 						case "char":

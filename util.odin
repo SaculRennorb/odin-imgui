@@ -57,6 +57,13 @@ is_variant :: #force_inline proc "contextless" (expr : $U, $V : typeid) -> bool 
 	return ok
 }
 
+map_clone :: proc(m : $M/map[$K]$V, allocator := context.allocator) -> M
+{
+	clone := make_map_cap(M, cap(m), allocator)
+	for k, v in m { clone[k] = v }
+	return clone
+}
+
 
 last :: proc { last_slice, last_array }
 last_slice :: #force_inline proc "contextless" (arr : []$T)        -> ^T { return &arr[len(arr) - 1] }

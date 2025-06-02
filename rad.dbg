@@ -5,13 +5,10 @@ target:
 {
   executable: "test.exe"
   working_directory: ""
-  arguments: 1312
+  enabled: 1
+  arguments: 1014
 }
-type_view:
-{
-  type: `[]program::AstNode`
-  expr: "slice($)"
-}
+type_view:{ `[]program::AstNode` }
 type_view:
 {
   type: `[]program::AstNodeIndex`
@@ -31,15 +28,35 @@ target:
 {
   executable: "odin_imgui.exe"
   working_directory: ""
-  enabled: 1
-}
-breakpoint:
-{
-  source_location: "converter.odin:2601:1"
-  hit_count: 0
+  enabled: 0
 }
 type_view:
 {
   type: `[dynamic]program::AstNodeIndex`
   expr: "columns(slice($), $, ctx.ast.data[$])"
+}
+type_view:
+{
+  type: `[dynamic]program::AstType`
+  expr: "slice($)"
+}
+breakpoint:
+{
+  source_location: "converter.odin:657:1"
+  hit_count: 0
+}
+type_view:
+{
+  expr: "slice($)"
+  type: `[dynamic]program::AstNode`
+}
+type_view:
+{
+  type: `[dynamic]program::Token`
+  expr: "slice($)"
+}
+breakpoint:
+{
+  source_location: "converter.odin:637:1"
+  hit_count: 1
 }

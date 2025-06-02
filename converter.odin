@@ -16,8 +16,8 @@ import sa   "core:container/small_array"
 
 ConverterContext :: struct {
 	result : str.Builder,
-	ast : []AstNode,
-	type_heap : []AstType,
+	ast : [dynamic]AstNode,
+	type_heap : [dynamic]AstType,
 	root_sequence : []AstNodeIndex,
 	context_heap : [dynamic]NameContext,
 	overload_resolver : map[string][dynamic]string,
@@ -645,17 +645,8 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 					#partial switch expression_type_node.kind { // TODO(Rennorb) @cleanup
 						case .Struct, .Union:
 							structure_name = expression_type_node.structure.name
-						case .VariableDeclaration:
+						case .TemplateVariableDeclaration:
 							structure_name = {expression_type_node.var_declaration.var_name}
-					}
-					// @hack for macro dtor calls
-					if len(structure_name) == 0 && ctx.ast[current_node.member_access.expression].kind == .Identifier {
-						_, vctx := find_definition_for_name(ctx, name_context, ctx.ast[current_node.member_access.expression].identifier[:], {.Variable})
-						type := ctx.ast[vctx.node].var_declaration.type
-						//#partial switch ctx.ast[ti].kind {
-						//	case .Type:
-								structure_name = flatten_type(ctx, type)[:]
-						//}
 					}
 
 					fn_name_expr := ctx.ast[member.function_call.expression]
@@ -706,7 +697,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 					this_type := ctx.ast[expression_type_context.node]
 					if this_type.kind != .Struct && this_type.kind != .Union && this_type.kind != .Enum \
 						&& this_type.kind != .TemplateVariableDeclaration {
-						panic(fmt.tprintf("Unexpected expression type %#v for %v", this_type, member.identifier))
+						panic(fmt.tprintf("Unexpected expression type %#v for member access %v", this_type, member.identifier))
 					}
 
 
@@ -2299,7 +2290,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 		}
 	}
 
-	flatten_type :: proc(ctx : ^ConverterContext, type : AstTypeIndex) -> (output : [dynamic]Token)
+	flatten_type :: proc(ctx : ^ConverterContext, type : AstTypeIndex, loc := #caller_location) -> (output : [dynamic]Token)
 	{
 		for type := type; type != {}; {
 			#partial switch frag in ctx.type_heap[type] {
@@ -2314,7 +2305,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 					type = frag.element_type
 
 				case:
-					panic(fmt.tprint("Cannof flatten type element", frag));
+					panic(fmt.tprint("Cannof flatten type element", frag), loc);
 			}
 		}
 		return
@@ -2354,19 +2345,17 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 				return resolve_type(ctx, current_node.unary_right.left, name_context, loc)
 
 			case .ExprIndex:
-				indexed_type, expression_context := resolve_type(ctx, current_node.index.array_expression, name_context, loc)
-				#partial switch frag in ctx.type_heap[indexed_type] {
+				expression_type, expression_type_context := resolve_type(ctx, current_node.index.array_expression, name_context, loc)
+				#partial switch frag in ctx.type_heap[expression_type] {
 					case AstTypePointer:
-						return frag.destination_type, expression_context
+						return frag.destination_type, expression_type_context
 
 					case AstTypeArray:
-						return frag.element_type, expression_context
+						return frag.element_type, expression_type_context
 
 					case:
 						// assume the type is indexable and look for a matching operator
-						_, structure_def := find_definition_for(ctx, name_context, indexed_type)
-						structure_def_idx := transmute(NameContextIndex) mem.ptr_sub(structure_def, &ctx.context_heap[0])
-						structure_node := ctx.ast[structure_def.node]
+						structure_node := ctx.ast[ctx.context_heap[expression_type_context].node]
 						assert(structure_node.kind == .Struct || structure_node.kind == .Union)
 
 						for mi in structure_node.structure.members {
@@ -2374,9 +2363,10 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 							if member.kind != .OperatorDefinition || member.operator_def.kind != .Index { continue }
 
 							type := ctx.ast[member.operator_def.underlying_function].function_def.return_type
-							_, type_context := find_definition_for(ctx, structure_def_idx, type)
+							_, return_type_context := find_definition_for(ctx, expression_type_context, type)
+							return_type_context_idx := transmute(NameContextIndex) mem.ptr_sub(return_type_context, &ctx.context_heap[0])
 
-							return type, transmute(NameContextIndex) mem.ptr_sub(type_context, &ctx.context_heap[0])
+							return type, return_type_context_idx
 						}
 
 						panic(fmt.tprintf("Index operator not found on %#v", structure_node))
@@ -2426,9 +2416,27 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 					panic("auto resolver not implemented");
 				}
 
-				_, type_context := try_find_definition_for(ctx, name_context, def_node.type) // can be builtin type
+				#partial switch _ in ctx.type_heap[def_node.type] {
+					case AstTypePrimitive, AstTypeVoid:
+						return def_node.type, 0
+				}
 
-				return def_node.type, type_context != nil ? transmute(NameContextIndex) mem.ptr_sub(type_context, &ctx.context_heap[0]) : 0
+				_, type_context := find_definition_for(ctx, name_context, def_node.type)
+				type_context_idx := transmute(NameContextIndex) mem.ptr_sub(type_context, &ctx.context_heap[0])
+
+				type_node := ctx.ast[type_context.node]
+				if (type_node.kind == .Struct || type_node.kind == .Union) && len(type_node.structure.template_spec) != 0 {
+					instance_key := format_instantiated_structure_name_key(ctx, def_node.type)
+					_, instance_context, ctx_requires_creation, _ := map_entry(&type_context.instantiations, instance_key)
+					if ctx_requires_creation {
+						stemmed := stemm_type(ctx, def_node.type)
+						instance := bake_generic_structure(ctx, type_context.node, ctx.type_heap[stemmed].(AstTypeFragment))
+						instance_context^ = generate_instantiated_structure_context(ctx, type_context_idx, instance)
+					}
+					type_context_idx = instance_context^
+				}
+
+				return def_node.type, type_context_idx
 
 			case .FunctionCall:
 				// technically not quite right, but thats also because of the structure of these nodes
@@ -2446,6 +2454,248 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 				panic(fmt.tprintf("Not implemented %#v", current_node))
 		}
 	}
+
+	generate_instantiated_structure_context :: proc(ctx : ^ConverterContext, generic_structure_context : NameContextIndex, instantiated_structure : AstNodeIndex) -> NameContextIndex
+	{
+		generic_context := ctx.context_heap[generic_structure_context]
+
+		instantiated_context := generic_context
+		instantiated_context.node = instantiated_structure
+		instantiated_context.definitions = map_clone(generic_context.definitions)
+		instantiated_context_idx := transmute(NameContextIndex) append_return_index(&ctx.context_heap, instantiated_context)
+
+		for mi in ctx.ast[instantiated_structure].structure.members {
+			member := ctx.ast[mi]
+			#partial switch member.kind {
+				case .VariableDeclaration:
+					if .Static in member.var_declaration.flags { continue }
+
+					var_name := member.var_declaration.var_name.source
+					insert_new_definition(&ctx.context_heap, instantiated_context_idx, var_name, mi, var_name)
+			}
+		}
+
+		return instantiated_context_idx
+	}
+
+	format_instantiated_structure_name_key :: proc(ctx : ^ConverterContext, type : AstTypeIndex, b : ^str.Builder = nil) -> string
+	{
+		b := b
+		b_ : str.Builder
+		if b == nil { b = &b_ }
+
+		switch frag in ctx.type_heap[type] {
+			case AstTypeInlineStructure:
+				unimplemented()
+			case AstTypeFunction:
+				unimplemented()
+			case AstTypePointer:
+				str.write_byte(b, '^')
+				format_instantiated_structure_name_key(ctx, frag.destination_type, b)
+			case AstTypeArray:
+				str.write_byte(b, '[')
+				str.write_byte(b, ']')
+				format_instantiated_structure_name_key(ctx, frag.element_type, b)
+			case AstTypeFragment:
+				str.write_string(b, frag.identifier.source)
+				if len(frag.generic_parameters) > 0 {
+					str.write_byte(b, '(')
+					for pi, i in frag.generic_parameters {
+						str.write_byte(b, ',')
+						param := ctx.ast[pi]
+						if param.kind == .Type {
+							format_instantiated_structure_name_key(ctx, param.type, b)
+						}
+					}
+				}
+				str.write_byte(b, ')')
+			case AstTypePrimitive:
+				for f, i in frag.fragments {
+					if i > 0 { str.write_byte(b, ':') }
+					str.write_string(b, f.source)
+				}
+			case AstTypeAuto:
+				str.write_string(b, "auto")
+			case AstTypeVoid:
+				str.write_string(b, "void")
+		}
+
+		return str.to_string(b^)
+	}
+
+	bake_generic_structure :: proc(ctx : ^ConverterContext, structure : AstNodeIndex, parameter_source : AstTypeFragment) -> AstNodeIndex
+	{
+		#partial switch ctx.ast[structure].kind {
+			case .Struct, .Union:
+				assert(len(ctx.ast[structure].structure.template_spec) > 0)
+				/*ok*/
+			case: panic(fmt.tprintf("Unexpected astnode for baking: %#v", structure))
+		}
+
+		og_structure := ctx.ast[structure].structure
+
+		replacements : map[string]AstTypeIndex
+		for ti, i in og_structure.template_spec {
+			template_var_def := ctx.ast[ti].var_declaration
+			r := ctx.ast[parameter_source.generic_parameters[i]]
+			assert_node_kind(r, .Type)
+			replacements[template_var_def.var_name.source] = r.type
+		}
+
+		baked_members := slice.clone_to_dynamic(og_structure.members[:])
+		for &mi in baked_members {
+			member := ctx.ast[mi]
+			#partial switch member.kind {
+				case .VariableDeclaration:
+					if baked_type, did_bake_type := bake_generic_type(ctx, member.var_declaration.type, replacements); did_bake_type {
+						member.var_declaration.type = baked_type
+						mi = cvt_append_node(ctx, member)
+					}
+
+				case .FunctionDefinition:
+					// @hack dont care about arguments, we only care for the return type for now
+					if baked_type, did_bake_type := bake_generic_type(ctx, member.function_def.return_type, replacements); did_bake_type {
+						member.function_def.return_type = baked_type
+						mi = cvt_append_node(ctx, member)
+					}
+
+				case .OperatorDefinition:
+					fn_def := ctx.ast[member.operator_def.underlying_function]
+					// @hack dont care about arguments, we only care for the return type for now
+					if baked_type, did_bake_type := bake_generic_type(ctx, fn_def.function_def.return_type, replacements); did_bake_type {
+						fn_def.function_def.return_type = baked_type
+						member.operator_def.underlying_function = cvt_append_node(ctx, fn_def)
+						mi = cvt_append_node(ctx, member)
+					}
+			}
+		}
+		
+		baked := ctx.ast[structure]
+		baked.structure = {
+			template_spec = {},
+			members = baked_members,
+		}
+		return cvt_append_node(ctx, baked)
+	}
+
+	bake_generic_type :: proc(ctx : ^ConverterContext, type : AstTypeIndex, replacements : map[string]AstTypeIndex, loc := #caller_location) -> (baked_type : AstTypeIndex, did_replace_fragments : bool)
+	{
+		baked_type = type
+		switch frag in ctx.type_heap[type] {
+			case AstTypePointer:
+				baked_inner : AstTypeIndex
+				baked_inner, did_replace_fragments = bake_generic_type(ctx, frag.destination_type, replacements, loc)
+				if did_replace_fragments {
+					clone := frag
+					clone.destination_type = baked_inner
+					baked_type = cvt_append_type(ctx, clone)
+				}
+				return
+
+			case AstTypeArray:
+				baked_inner : AstTypeIndex
+				baked_inner, did_replace_fragments = bake_generic_type(ctx, frag.element_type, replacements, loc)
+				if did_replace_fragments {
+					clone := frag
+					clone.element_type = baked_inner
+					baked_type = cvt_append_type(ctx, clone)
+				}
+				return
+
+			case AstTypeInlineStructure:
+				unimplemented(loc = loc)
+
+			case AstTypeFunction:
+				unimplemented(loc = loc)
+
+			case AstTypeFragment:
+				if replacemnt, should_replace := replacements[frag.identifier.source]; should_replace {
+					baked_type = replacemnt
+					did_replace_fragments = true
+					return
+				}
+
+				baked_parameters : [dynamic]AstNodeIndex
+				for pi, pii in frag.generic_parameters {
+					#partial switch ctx.ast[pi].kind {
+						case .Type:
+							baked_inner, did_replace_inner := bake_generic_type(ctx, ctx.ast[pi].type, replacements, loc)
+							if did_replace_inner {
+								did_replace_fragments = true
+								if len(baked_parameters) != len(frag.generic_parameters) {
+									baked_parameters = slice.clone_to_dynamic(frag.generic_parameters)
+								}
+								baked_parameters[pii] = cvt_append_node(ctx, AstNode{ kind = .Type, type = baked_inner })
+						}
+					}
+				}
+
+				if len(baked_parameters) != 0 {
+					clone := frag
+					clone.generic_parameters = baked_parameters[:]
+					baked_type = cvt_append_type(ctx, clone)
+				}
+				return
+
+			case AstTypeVoid, AstTypePrimitive, AstTypeAuto:
+				baked_type = type
+				return
+		}
+		unreachable()
+	}
+}
+
+stemm_type :: proc(ctx : ^ConverterContext, type : AstTypeIndex, loc := #caller_location) -> AstTypeIndex
+{
+	type := type
+	for type != {} {
+		switch frag in ctx.type_heap[type] {
+			case AstTypePointer:
+				type = frag.destination_type
+			case AstTypeArray:
+				type = frag.element_type
+			case AstTypeInlineStructure, AstTypeFunction, AstTypeFragment, AstTypePrimitive, AstTypeAuto, AstTypeVoid:
+				return type
+		}
+	}
+	unreachable()
+}
+
+type_references_type :: proc(ctx : ^ConverterContext, type : AstTypeIndex, other_types : []string, loc := #caller_location) -> bool
+{
+	type := ctx.type_heap[type]
+	for type != nil {
+		switch frag in type {
+			case AstTypePointer:
+				type = ctx.type_heap[frag.destination_type]
+
+			case AstTypeArray:
+				type = ctx.type_heap[frag.element_type]
+
+			case AstTypeInlineStructure:
+				unimplemented(loc = loc);
+
+			case AstTypeFunction:
+				unimplemented(loc = loc);
+
+			case AstTypeFragment:
+				for other in other_types {
+					if frag.identifier.source == other { return true }
+				}
+
+				for pi in frag.generic_parameters {
+					#partial switch ctx.ast[pi].kind {
+						case .Type:
+							if type_references_type(ctx, ctx.ast[pi].type, other_types, loc) { return true }
+					}
+				}
+				type = ctx.type_heap[frag.parent_fragment]
+
+			case AstTypeVoid, AstTypePrimitive, AstTypeAuto:
+				return false
+		}
+	}
+	return false
 }
 
 
@@ -2506,6 +2756,7 @@ NameContext :: struct {
 	parent : NameContextIndex,
 	complete_name : string,
 	definitions : map[string]NameContextIndex,
+	instantiations : map[string]NameContextIndex,
 }
 
 insert_new_definition :: proc(context_heap : ^[dynamic]NameContext, current_index : NameContextIndex, name : string, node : AstNodeIndex, complete_name : string) -> NameContextIndex
@@ -2763,3 +3014,15 @@ assert_node_kind :: proc(node : AstNode, kind : AstNodeKind, loc := #caller_loca
 		panic(fmt.tprintf("Expected %v, but got %#v.\n", kind, node), loc)
 	}
 }
+
+cvt_append_type :: #force_inline proc(ctx : ^ConverterContext, frag : AstType) -> AstTypeIndex
+{
+	return transmute(AstTypeIndex) append_return_index(&ctx.type_heap, frag)
+}
+
+cvt_append_node :: #force_inline proc(ctx : ^ConverterContext, node : AstNode) -> AstNodeIndex
+{
+	return transmute(AstNodeIndex) append_return_index(&ctx.ast, node)
+}
+
+

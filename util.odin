@@ -103,3 +103,13 @@ _set_user_formatters :: proc()
 
 	fmt.set_user_formatters(&formatters)
 }
+
+PersistenceKind :: enum uint {
+	Temporary = 0,
+	Persistent = 1,
+}
+
+SplitIndex :: bit_field uint {
+	index : uint | size_of(uint) * 8 - 1,
+	persistence : PersistenceKind | 1,
+}

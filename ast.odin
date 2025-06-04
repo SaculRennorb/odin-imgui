@@ -1706,15 +1706,15 @@ ast_parse_function_call :: proc(ctx: ^AstContext, tokens : ^[]Token, loc := #cal
 			eat_token_expect_push_err(ctx, tokens, .BracketRoundOpen) or_return
 			tr := tokens^
 			resize(&arguments, 1)
-			type, terr := ast_parse_type(ctx, tokens); reset_error(ctx)
+			expr, exerr := ast_parse_expression(ctx, tokens); reset_error(ctx)
 			nn, nns := peek_token(tokens)
-			if terr == .None && nn.kind == .BracketRoundClose {
-				arguments[0] = ast_append_node(ctx, AstNode{ kind = .Type, type = type })
+			if exerr == .None && nn.kind == .BracketRoundClose {
+				arguments[0] = ast_append_node(ctx, expr)
 			}
 			else {
 				tokens^ = tr
-				expr := ast_parse_expression(ctx, tokens) or_return
-				arguments[0] = ast_append_node(ctx, expr)
+				type := ast_parse_type(ctx, tokens) or_return
+				arguments[0] = ast_append_node(ctx, AstNode{ kind = .Type, type = type })
 			}
 			eat_token_expect_push_err(ctx, tokens, .BracketRoundClose) or_return
 

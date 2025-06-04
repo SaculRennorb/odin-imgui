@@ -1,12 +1,14 @@
 // raddbg 0.9.19 project file
 
 recent_file: path: "converter.odin"
+recent_file: path: "test/runner.odin"
+recent_file: path: "../../../../../Program Files/odin/base/runtime/error_checks.odin"
+recent_file: path: "../../../../../Program Files/odin/base/runtime/core.odin"
 target:
 {
   executable: "test.exe"
   working_directory: ""
   enabled: 1
-  arguments: 1014
 }
 type_view:{ `[]program::AstNode` }
 type_view:
@@ -40,11 +42,6 @@ type_view:
   type: `[dynamic]program::AstType`
   expr: "slice($)"
 }
-breakpoint:
-{
-  source_location: "converter.odin:657:1"
-  hit_count: 0
-}
 type_view:
 {
   expr: "slice($)"
@@ -55,8 +52,8 @@ type_view:
   type: `[dynamic]program::Token`
   expr: "slice($)"
 }
-breakpoint:
+type_view:
 {
-  source_location: "converter.odin:637:1"
-  hit_count: 1
+  type: `map[string]program::NameContextIndex`
+  expr: "rows($, array($.data & 0xffffffffffffffC0, $.data & 0x3f))"
 }

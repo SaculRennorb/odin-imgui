@@ -36,7 +36,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 		append(&ctx.temp_context_heap, NameContext{ parent = { index = 0, persistence = .Temporary } })
 
 		for pair in implicit_names {
-			insert_new_definition(ctx, .Persistent, { index = 0, persistence = .Persistent }, pair[0], -1, pair[1])
+			insert_new_definition(ctx, .Persistent, { index = 0, persistence = .Persistent }, pair[0], 0, pair[1])
 		}
 
 		str.write_string(&ctx.result, "package test\n\n")
@@ -2850,7 +2850,7 @@ try_find_definition_for_name :: proc(ctx : ^ConverterContext, start_context : Na
 		}
 
 		current_context := get_name_context(ctx, current_context_idx)
-		if current_context.node != -1 {
+		if current_context.node != 0 {
 			#partial switch ctx.ast[current_context.node].kind {
 				case .Namespace:
 					if .Namespace not_in filter {
@@ -2942,7 +2942,7 @@ try_find_definition_for :: proc(ctx : ^ConverterContext, start_context : NameCon
 		}
 
 		current_context := get_name_context(ctx, current_context_idx)
-		if current_context.node != -1 {
+		if current_context.node != 0 {
 			#partial switch ctx.ast[current_context.node].kind {
 				case .Namespace, .Struct, .Union, .Enum, .Type, .TemplateVariableDeclaration, .Typedef:
 					/**/

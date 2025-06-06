@@ -124,9 +124,9 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 						str.write_string(&ctx.result, arg.source)
 						str.write_string(&ctx.result, " : ")
 						fmt.sbprintf(&ctx.result, "$T%v", arg_count)
-					}
 
-					arg_count += 1
+						arg_count += 1
+					}
 				}
 
 				// scan the expansion and find stringify operations to turn into #caller_expression's
@@ -517,7 +517,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 						str.write_byte(&ctx.result, byte(current_node.unary_left.operator))
 						write_node(ctx, current_node.unary_left.right, name_persistence, name_context)
 
-					case .Invert:
+					case .Invert, .Not:
 						str.write_byte(&ctx.result, '!')
 						write_node(ctx, current_node.unary_left.right, name_persistence, name_context)
 

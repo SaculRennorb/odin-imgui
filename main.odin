@@ -38,14 +38,21 @@ main :: proc()
 	ignored_identifiers := []string {
 		"IM_MSVC_RUNTIME_CHECKS_OFF",
 		"IM_MSVC_RUNTIME_CHECKS_RESTORE",
-		"IM_VEC2_CLASS_EXTRA",
-		"IM_VEC4_CLASS_EXTRA",
 		"IMGUI_API",
 		"IMGUI_CDECL",
 	}
 
+	removed_ifs := []PreProcRemoveIfData {
+		{ "IMGUI_DISABLE_OBSOLETE_FUNCTIONS", true },
+		{ "IM_VEC2_CLASS_EXTRA", false },
+		{ "IM_VEC4_CLASS_EXTRA", false },
+		{ "0", false },
+		{ "false", false },
+		{ "true", true },
+	}
+
 	preprocessed : [dynamic]Token
-	preprocess(&{ result = &preprocessed, inputs = input_map, ignored_identifiers = ignored_identifiers }, "<init_shim>")
+	preprocess(&{ result = &preprocessed, inputs = input_map, ignored_identifiers = ignored_identifiers, removed_ifs = removed_ifs }, "<init_shim>")
 
 	ast  : [dynamic]AstNode
 	ast_context : AstContext = { ast = &ast }
@@ -71,6 +78,8 @@ main :: proc()
 		{ "stdout", "stdout" }, // TODO
 		{ "stdin" , "stdin"  }, // TODO
 		{ "stderr", "stderr" }, // TODO
+		{ "SEEK_END", "SEEK_END" }, // TODO
+		{ "SEEK_SET", "SEEK_SET" }, // TODO
 	}
 	convert_and_format(&converter_context, replaced_names)
 	os.write_entire_file("out/imgui_gen.odin", converter_context.result.buf[:])

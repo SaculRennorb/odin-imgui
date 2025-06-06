@@ -2636,6 +2636,7 @@ AstUnaryOp :: enum {
 	Plus         = cast(int) TokenKind.Plus,
 	Minus        = cast(int) TokenKind.Minus,
 	Invert       = cast(int) TokenKind.Tilde,
+	Not          = cast(int) TokenKind.Exclamationmark,
 	Increment    = cast(int) TokenKind.PrefixIncrement, // cleanup explicit pre/post
 	Decrement    = cast(int) TokenKind.PrefixDecrement, // cleanup explicit pre/post
 }

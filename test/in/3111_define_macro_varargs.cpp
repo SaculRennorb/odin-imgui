@@ -1,3 +1,1 @@
-#define M3111(A, ...) \
-	A.Fn();           \
-	B(A);             \
+#define M3111(...) A(__VA_ARGS__)

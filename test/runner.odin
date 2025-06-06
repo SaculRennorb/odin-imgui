@@ -142,9 +142,13 @@ test_proc :: proc(t : ^testing.T, file : ^os.File_Info) {
 
 	initial_file_name := str.ends_with(file.name, ".cpp") ? file.name : str.concatenate({ file.name, ".cpp" }, context.temp_allocator)
 
+	removed_ifs := []converter.PreProcRemoveIfData {
+		{ "REMOVED_IF", false },
+	}
+
 	clear(&preprocessed)
 	loc.procedure = "converter.preprocess"
-	converter.preprocess(&{ result = &preprocessed, inputs = input_map }, initial_file_name)
+	converter.preprocess(&{ result = &preprocessed, inputs = input_map, removed_ifs = removed_ifs }, initial_file_name)
 
 	clear(&ast)
 	loc.procedure = "converter.ast_parse_filescope_sequence"

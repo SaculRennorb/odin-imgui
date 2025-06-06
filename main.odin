@@ -29,6 +29,12 @@ main :: proc()
 	tokenize_file(&input_map, "imgui_widgets.cpp")
 	tokenize_file(&input_map, "imconfig.h")
 
+	{
+		toks : [dynamic]Token
+		tokenize(&toks, #load("win32_type_shim.cpp") + `#include "imgui.cpp"`+"\n", "win32_type_shim.cpp")
+		input_map["<init_shim>"] = { toks[:], false}
+	}
+
 	ignored_identifiers := []string {
 		"IM_MSVC_RUNTIME_CHECKS_OFF",
 		"IM_MSVC_RUNTIME_CHECKS_RESTORE",
@@ -39,7 +45,7 @@ main :: proc()
 	}
 
 	preprocessed : [dynamic]Token
-	preprocess(&{ result = &preprocessed, inputs = input_map, ignored_identifiers = ignored_identifiers }, "imgui.cpp")
+	preprocess(&{ result = &preprocessed, inputs = input_map, ignored_identifiers = ignored_identifiers }, "<init_shim>")
 
 	ast  : [dynamic]AstNode
 	ast_context : AstContext = { ast = &ast }
@@ -52,6 +58,16 @@ main :: proc()
 		{ "FLT_MIN", "min(f32)" },
 		{ "CP_UTF8", "win32.CP_UTF8" },
 		{ "FILENAME_MAX", "win32.FILENAME_MAX" },
+		{ "CF_UNICODETEXT", "win32.CF_UNICODETEXT" },
+		{ "GMEM_MOVEABLE", "win32.GMEM_MOVEABLE" },
+		{ "SW_SHOWDEFAULT", "win32.SW_SHOWDEFAULT" },
+		{ "CFS_FORCE_POSITION", "win32.CFS_FORCE_POSITION" },
+		{ "CFS_CANDIDATEPOS", "win32.CFS_CANDIDATEPOS" },
+
+		{ "kPasteboardClipboard", "ios.kPasteboardClipboard" },
+		{ "kCFAllocatorDefault", "ios.kCFAllocatorDefault" },
+		{ "noErr", "ios.noErr" },
+
 		{ "stdout", "stdout" }, // TODO
 		{ "stdin" , "stdin"  }, // TODO
 		{ "stderr", "stderr" }, // TODO

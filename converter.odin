@@ -740,7 +740,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 				_, _, def := find_definition_for_name(ctx, name_context, current_node.identifier[:])
 				parent := ctx.ast[get_name_context(ctx, def.parent).node]
 
-				if ((parent.kind == .Struct || parent.kind == .Union) && .Static not_in ctx.ast[def.node].var_declaration.flags) {
+				if (ctx.ast[def.node].kind != .TemplateVariableDeclaration && (parent.kind == .Struct || parent.kind == .Union) && .Static not_in ctx.ast[def.node].var_declaration.flags) {
 					str.write_string(&ctx.result, "this.")
 				}
 				else if parent.kind == .Enum && ctx.ast[get_name_context(ctx, name_context).node].kind != .Enum {
@@ -2549,12 +2549,18 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 
 		og_structure := ctx.ast[structure].structure
 
-		replacements : map[string]AstTypeIndex
+		replacements : map[string]AstNodeIndex
 		for ti, i in og_structure.template_spec {
 			template_var_def := ctx.ast[ti].var_declaration
-			r := ctx.ast[parameter_source.generic_parameters[i]]
-			assert_node_kind(r, .Type)
-			replacements[template_var_def.var_name.source] = r.type
+			r : AstNodeIndex
+			if i < len(parameter_source.generic_parameters) {
+				r = parameter_source.generic_parameters[i]
+			}
+			else {
+				assert(template_var_def.initializer_expression != 0)
+				r = template_var_def.initializer_expression
+			}
+			replacements[template_var_def.var_name.source] = r
 		}
 
 		baked_members := slice.clone_to_dynamic(og_structure.members[:])
@@ -2593,7 +2599,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 		return cvt_append_node(ctx, baked)
 	}
 
-	bake_generic_type :: proc(ctx : ^ConverterContext, type : AstTypeIndex, replacements : map[string]AstTypeIndex, loc := #caller_location) -> (baked_type : AstTypeIndex, did_replace_fragments : bool)
+	bake_generic_type :: proc(ctx : ^ConverterContext, type : AstTypeIndex, replacements : map[string]AstNodeIndex, loc := #caller_location) -> (baked_type : AstTypeIndex, did_replace_fragments : bool)
 	{
 		baked_type = type
 		switch frag in ctx.type_heap[type] {
@@ -2625,7 +2631,8 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 
 			case AstTypeFragment:
 				if replacemnt, should_replace := replacements[frag.identifier.source]; should_replace {
-					baked_type = replacemnt
+					assert_node_kind(ctx.ast[replacemnt], .Type)
+					baked_type = ctx.ast[replacemnt].type
 					did_replace_fragments = true
 					return
 				}

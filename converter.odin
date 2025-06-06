@@ -310,7 +310,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 				vardef := current_node.var_declaration
 
 				complete_name := fold_token_range(definition_prefix, { vardef.var_name })
-				insert_new_definition(ctx, .Persistent, name_context, vardef.var_name.source, current_node_index, complete_name)
+				insert_new_definition(ctx, name_persistence, name_context, vardef.var_name.source, current_node_index, complete_name)
 
 				str.write_string(&ctx.result, complete_name);
 
@@ -328,7 +328,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 						case AstTypeInlineStructure:
 							// Anonymous structure context. It's added after the var name which is wired, but that doesn't matter as its stored in a map.
 							synthetic_name := fmt.tprintf(ANONYMOUS_STRUCT_NAME_FORMAT, ctx.next_anonymous_struct_index)
-							insert_new_definition(ctx, .Persistent, name_context, synthetic_name, AstNodeIndex(t), synthetic_name)
+							insert_new_definition(ctx, name_persistence, name_context, synthetic_name, AstNodeIndex(t), synthetic_name)
 							ctx.next_anonymous_struct_index += 1
 					}
 
@@ -354,7 +354,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 
 				if len(lambda.captures) == 0 {
 					name_reset := len(ctx.context_heap)
-					name_context := insert_new_definition(ctx, .Persistent, name_context, "__", current_node_index, "__")
+					name_context := insert_new_definition(ctx, name_persistence, name_context, "__", current_node_index, "__")
 					defer resize(&ctx.context_heap, name_reset)
 
 					write_function_type(ctx, name_context, name_persistence, function_^, "", nil)
@@ -2328,7 +2328,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 		current_node := ctx.ast[current_node_index]
 		#partial switch current_node.kind {
 			case .Identifier:
-				_, var_def_ctx_idx, var_def_ctx := find_definition_for_name(ctx, name_context, current_node.identifier[:])
+				_, var_def_ctx_idx, var_def_ctx := find_definition_for_name(ctx, name_context, current_node.identifier[:], loc = loc)
 
 				var_def := ctx.ast[var_def_ctx.node]
 				#partial switch var_def.kind {
@@ -2395,9 +2395,10 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 					case .FunctionCall:
 						fn_name_node := ctx.ast[member.function_call.expression]
 						assert_eq(fn_name_node.kind, AstNodeKind.Identifier)
-						fn_name := last(fn_name_node.identifier[:]).source
+						fn_name := last(fn_name_node.identifier[:])
 
-						fndef_idx := get_name_context(ctx, expr_type_context_idx).definitions[fn_name]
+						expr_type_context := get_name_context(ctx, expr_type_context_idx)
+						fndef_idx := expr_type_context.definitions[fn_name.source]
 						fndef_ctx := get_name_context(ctx, fndef_idx)
 
 						assert_eq(ctx.ast[fndef_ctx.node].kind, AstNodeKind.FunctionDefinition)
@@ -2436,12 +2437,12 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 
 				type_node := ctx.ast[type_context.node]
 				if (type_node.kind == .Struct || type_node.kind == .Union) && len(type_node.structure.template_spec) != 0 {
-					instance_key := format_instantiated_structure_name_key(ctx, def_node.type)
+					stemmed := stemm_type(ctx, def_node.type)
+					instance_key := format_instantiated_structure_name_key(ctx, stemmed)
 					_, instance_context, ctx_requires_creation, _ := map_entry(&type_context.instantiations, instance_key)
 					if ctx_requires_creation {
 						log.debugf("[%v] Baking new generic type %v", def_node.var_name.location, instance_key)
 
-						stemmed := stemm_type(ctx, def_node.type)
 						instance := bake_generic_structure(ctx, type_context.node, ctx.type_heap[stemmed].(AstTypeFragment))
 						instance_context^ = generate_instantiated_structure_context(ctx, type_context_idx, instance)
 					}
@@ -2487,6 +2488,10 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 
 					var_name := member.var_declaration.var_name.source
 					insert_new_definition(ctx, .Persistent, instantiated_context_idx, var_name, mi, var_name)
+
+				case .FunctionDefinition:
+					fn_name := last(member.function_def.function_name).source
+					insert_new_definition(ctx, .Persistent, instantiated_context_idx, fn_name, mi, fn_name)
 			}
 		}
 

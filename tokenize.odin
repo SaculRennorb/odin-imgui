@@ -299,12 +299,24 @@ tokenize :: proc(tokens : ^[dynamic]Token, text : string, file_path : string)
 								break number_loop
 							}
 
-						case 'L':
+						case 'l','L':
+							loopl: for {
+								switch remaining[1] {
+									case 'l', 'L', 'u', 'U': remaining = remaining[1:]
+									case: break loopl
+								}
+							}
 							append(tokens, Token{is_float ? .LiteralFloat : .LiteralInteger, str_from_se(start, remaining), loc})
 							remaining = remaining[1:]
 							break number_loop
 
-						case 'u':
+						case 'u', 'U':
+							loopu: for {
+								switch remaining[1] {
+									case 'l', 'L', 'u', 'U': remaining = remaining[1:]
+									case: break loopu
+								}
+							}
 							append(tokens, Token{.LiteralInteger, str_from_se(start, remaining), loc})
 							remaining = remaining[1:]
 							break number_loop

@@ -1579,13 +1579,34 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 				subsection_data.member_indent_str = str.concatenate({ indent_str, ONE_INDENT }, context.temp_allocator)
 			}
 
+			slice := sa.slice(&subsection_data.member_stack)
+
+			required_bit_width := 0
+			for ci in slice {
+				member := ctx.ast[ci]
+				if member.kind != .VariableDeclaration { continue }
+
+				width := ctx.ast[member.var_declaration.width_expression]
+				if width.kind == .LiteralInteger {
+					v, ok := strconv.parse_i64_maybe_prefixed(width.literal.source)
+					required_bit_width += (ok ? int(v) : 1)
+				}
+				else {
+					required_bit_width += 1
+				}
+			}
+
+			final_bit_width := 8 if required_bit_width <= 8 else 16 if required_bit_width <= 16 else 32 if required_bit_width <= 32 else 64;
+
+
 			str.write_string(&ctx.result, indent_str);
 			str.write_string(&ctx.result, "using _");
 			fmt.sbprint(&ctx.result, subsection_data.subsection_counter); subsection_data.subsection_counter += 1
-			str.write_string(&ctx.result, " : bit_field u8 {\n");
+			str.write_string(&ctx.result, " : bit_field u");
+			str.write_int(&ctx.result, final_bit_width)
+			str.write_string(&ctx.result, " {\n");
 
 			last_was_newline := true
-			slice := sa.slice(&subsection_data.member_stack)
 			loop: for cii := 0; cii < len(slice); cii += 1 {
 				ci := slice[cii]
 				#partial switch ctx.ast[ci].kind {

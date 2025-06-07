@@ -89,7 +89,7 @@ ImGuiDockNode :: struct {
 	SelectedTabId : ImGuiID, // [Leaf node only] Which of our tab/window is selected.
 	WantCloseTabId : ImGuiID, // [Leaf node only] Set when closing a specific tab/window.
 	RefViewportId : ImGuiID, // Reference viewport ID from visible window when HostWindow == NULL.
-	using _0 : bit_field u8 {
+	using _0 : bit_field u32 {
 		AuthorityForPos : ImGuiDataAuthority | 3,
 		AuthorityForSize : ImGuiDataAuthority | 3,
 		AuthorityForViewport : ImGuiDataAuthority | 3,

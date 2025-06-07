@@ -27,7 +27,11 @@ main :: proc()
 	tokenize_file(&input_map, "imgui_draw.cpp")
 	tokenize_file(&input_map, "imgui_tables.cpp")
 	tokenize_file(&input_map, "imgui_widgets.cpp")
-	tokenize_file(&input_map, "imconfig.h")
+	
+	{
+		//tokenize_file(&input_map, "imconfig.h")
+		input_map["imconfig.h"] = { {}, false}
+	}
 
 	{
 		toks : [dynamic]Token

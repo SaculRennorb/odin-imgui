@@ -14,7 +14,7 @@ ImGuiDockNodeFlags_ :: enum i32 {
 	ImGuiDockNodeFlags_AutoHideTabBar = 1 << 6, //       // Tab bar will automatically hide when there is a single window in the dock node.
 	ImGuiDockNodeFlags_NoUndocking = 1 << 7, //       // Disable undocking this node.
 
-when ! IMGUI_DISABLE_OBSOLETE_FUNCTIONS { // @gen ifndef
+when ! IMGUI_DISABLE_OBSOLETE_FUNCTIONS { /* @gen ifndef */
 	ImGuiDockNodeFlags_NoSplit = ImGuiDockNodeFlags_NoDockingSplit, // Renamed in 1.90
 	ImGuiDockNodeFlags_NoDockingInCentralNode = ImGuiDockNodeFlags_NoDockingOverCentralNode, // Renamed in 1.90
 } // preproc endif

@@ -1,3 +1,3 @@
 package test
 
-getter : proc(user_data : uintptr, idx : i32) -> ^u8
+getter : proc(user_data : rawptr, idx : i32) -> ^u8

@@ -577,6 +577,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 						case .AssignBitAnd:     str.write_string(&ctx.result, "&=")
 						case .AssignBitOr:      str.write_string(&ctx.result, "|=")
 						case .AssignBitXor:     str.write_string(&ctx.result, "~=")
+						case .BitXor: str.write_byte(&ctx.result, '~')
 						case:
 							str.write_byte(&ctx.result, u8(operator))
 					}
@@ -1280,7 +1281,9 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 
 								case .AssignAdd, .AssignSubtract, .AssignDivide, .AssignModulo, .AssignBitAnd, .AssignBitOr, .AssignBitXor, .AssignMultiply:
 									write_node(ctx, binary.left, .Temporary, name_context)
-									str.write_byte(&ctx.result, ' '); str.write_byte(&ctx.result, cast(byte) (binary.operator - cast(AstBinaryOp) TokenKind._MirroredBinaryOperators)); str.write_byte(&ctx.result, ' ')
+									str.write_byte(&ctx.result, ' ');
+									str.write_byte(&ctx.result, cast(byte) (binary.operator - cast(AstBinaryOp) TokenKind._MirroredBinaryOperators));
+									str.write_byte(&ctx.result, ' ')
 									write_node(ctx, binary.right, .Temporary, name_context)
 
 								case .AssignShiftLeft, .AssignShiftRight:
@@ -2111,7 +2114,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 			#partial switch frag in ctx.type_heap[type] {
 				case AstTypePointer:
 					if is_variant(ctx.type_heap[frag.destination_type], AstTypeVoid) {
-						str.write_string(&ctx.result, "uintptr")
+						str.write_string(&ctx.result, "rawptr")
 						return
 					}\
 					// else if underlying_primitive, ok := ctx.type_heap[frag.destination_type].(AstTypePrimitive); ok && len(underlying_primitive.fragments) == 1 && underlying_primitive.fragments[0].source == "char" {

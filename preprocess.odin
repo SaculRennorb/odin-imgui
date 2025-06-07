@@ -87,11 +87,9 @@ preprocess :: proc(ctx : ^PreProcContext, entry_file : string)
 					}
 
 					append(ctx.result, Token{ kind = .PreprocIf, location = ident.location })
-					append(ctx.result, Token{ kind = .Identifier, source = "defined", location = ident.location })
-					append(ctx.result, Token{ kind = .BracketRoundOpen, source = "(", location = ident.location })
 					defined_identifier := eat_token_expect_direct(&tokens, .Identifier, false) or_return
 					append(ctx.result, defined_identifier)
-					append(ctx.result, Token{ kind = .BracketRoundClose, source = ")", location = ident.location })
+					append(ctx.result, Token{ kind = .Comment, source = "// @gen ifdef", location = ident.location })
 
 				case "ifndef":
 					current_branch_depth += 1
@@ -109,11 +107,9 @@ preprocess :: proc(ctx : ^PreProcContext, entry_file : string)
 
 					append(ctx.result, Token{ kind = .PreprocIf, location = ident.location })
 					append(ctx.result, Token{ kind = .Exclamationmark, source = "!", location = ident.location })
-					append(ctx.result, Token{ kind = .Identifier, source = "defined", location = ident.location })
-					append(ctx.result, Token{ kind = .BracketRoundOpen, source = "(", location = ident.location })
 					defined_identifier := eat_token_expect_direct(&tokens, .Identifier, false) or_return
 					append(ctx.result, defined_identifier)
-					append(ctx.result, Token{ kind = .BracketRoundClose, source = ")", location = ident.location })
+					append(ctx.result, Token{ kind = .Comment, source = "// @gen ifndef", location = ident.location })
 
 				case "else":
 					append(ctx.result, Token{ kind = .PreprocElse, location = ident.location })

@@ -2116,6 +2116,10 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 					if is_variant(ctx.type_heap[frag.destination_type], AstTypeVoid) {
 						str.write_string(&ctx.result, "rawptr")
 						return
+					}
+					else if f, is_frag := ctx.type_heap[frag.destination_type].(AstTypeFragment); is_frag && f.identifier.source == "FILE" {
+						str.write_string(&ctx.result, "os.HANDLE")
+						return
 					}\
 					// else if underlying_primitive, ok := ctx.type_heap[frag.destination_type].(AstTypePrimitive); ok && len(underlying_primitive.fragments) == 1 && underlying_primitive.fragments[0].source == "char" {
 					// 	str.write_string(&ctx.result, "[^]u8")
@@ -2756,8 +2760,6 @@ trim_newlines :: proc(ctx : ^ConverterContext, tokens : []AstNodeIndex) -> (trim
 write_shim :: proc(ctx : ^ConverterContext)
 {
 	str.write_string(&ctx.result, `package test
-
-defined :: #force_inline proc "contextless" ($I) -> bool { I }
 
  pre_decr :: #force_inline proc "contextless" (p : ^$T) -> (new : T) { p^ -= 1; return p }
  pre_incr :: #force_inline proc "contextless" (p : ^$T) -> (new : T) { p^ += 1; return p }

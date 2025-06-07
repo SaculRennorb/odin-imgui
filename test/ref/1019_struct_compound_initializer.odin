@@ -8,7 +8,7 @@ fn1019 :: proc()
 {
 	a : A1019 = {1, 2}
 	b : A1019 = {
-		when defined ( A ) {
+		when A { // @gen ifdef
 		1,
 		} // preproc endif
 		2, // test

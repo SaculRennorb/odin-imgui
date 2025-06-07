@@ -1,7 +1,7 @@
 package test
 
 fn3002 :: proc() { }
-when ! defined ( D3002 ) {
+when ! D3002 { // @gen ifndef
 
 fn30022 :: proc()
 {

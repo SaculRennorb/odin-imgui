@@ -12,3 +12,7 @@ fn1017 :: proc()
 	deinit(&a)
 	deinit(b)
 }
+
+
+
+deinit :: proc { A1017_deinit }

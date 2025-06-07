@@ -1962,6 +1962,8 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 	{
 		fn_node := &function_node_.function_def
 
+		overloaded_name : string
+
 		function_name : TokenRange
 		switch {
 			case .IsCtor in fn_node.flags:
@@ -1969,13 +1971,34 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 			case .IsDtor in fn_node.flags:
 				function_name = { Token{ kind = .Identifier, source = "deinit" } }
 			case complete_structure_name != "" && parent_type != nil && parent_type.kind != .Namespace:
-				 // struct, enum, union: only take the last component @cleanup
+				// struct, enum, union: only take the last component @cleanup
 				function_name = fn_node.function_name[len(fn_node.function_name) - 1:]
+				
+				overload_index := 0
+				overload_count := 0
+				for mi in parent_type.structure.members {
+					member := ctx.ast[mi]
+					if member.kind != .FunctionDefinition { continue }
+
+					if last(member.function_def.function_name).source == last(function_name).source {
+						if mi == function_node_idx { overload_index = overload_count }
+						overload_count += 1
+					}
+				}
+
+				if overload_count > 1 {
+					overloaded_name = last(fn_node.function_name).source
+					function_name = { last(fn_node.function_name)^, Token{ kind = .Identifier, source = fmt.tprint(overload_index) } }
+				}
 			case:
 				function_name = fn_node.function_name[:]
 		}
 
 		complete_name := fold_token_range(complete_structure_name, function_name)
+
+		if overloaded_name != "" {
+			insert_new_overload(ctx, overloaded_name, complete_name)
+		}
 
 		// fold attached comments form forward declaration. This also works when chaining forward declarations
 		_, forward_declared_context_idx, forward_declared_context := try_find_definition_for_name(ctx, name_context, function_name, { .Function })
@@ -1988,7 +2011,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 		}
 
 		name_context := name_context
-		if len(function_name) == 1 {
+		if len(function_name) == 1 || overloaded_name != "" {
 			name_context = insert_new_definition(ctx, .Persistent, name_context, function_name[0].source, function_node_idx, complete_name)
 		}
 		else {
@@ -2770,15 +2793,20 @@ va_arg :: #force_inline proc(args : ^[]any, $T : typeid) -> (r : T) { r = (cast(
 
 `)
 
+	write_overloads(ctx)
+}
+
+write_overloads :: proc(ctx : ^ConverterContext)
+{
 	for name, overloads in ctx.overload_resolver {
 		str.write_byte(&ctx.result, '\n')
 		str.write_string(&ctx.result, name)
-		str.write_string(&ctx.result, " :: proc {")
+		str.write_string(&ctx.result, " :: proc { ")
 		for overloaded_name, i in overloads {
 			if i > 0 { str.write_string(&ctx.result, ", ") }
 			str.write_string(&ctx.result, overloaded_name)
 		}
-		str.write_string(&ctx.result, "}\n")
+		str.write_string(&ctx.result, " }\n")
 	}
 }
 

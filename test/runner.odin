@@ -160,6 +160,11 @@ test_proc :: proc(t : ^testing.T, file : ^os.File_Info) {
 	converter_context : converter.ConverterContext = { result = result, ast = ast, type_heap = ast_context.type_heap, root_sequence = root_sequence[:] }
 	converter.convert_and_format(&converter_context, {})
 
+	if len(converter_context.overload_resolver) > 0 {
+		str.write_string(&converter_context.result, "\n\n")
+		converter.write_overloads(&converter_context)
+	}
+
 	os.write_entire_file(fmt.tprintf(BASEDIR+"/out/%v.odin", path.stem(file.name)), converter_context.result.buf[:])
 
 	loc.procedure = "test.validate"

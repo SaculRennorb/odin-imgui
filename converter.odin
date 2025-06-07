@@ -1967,29 +1967,52 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 		function_name : TokenRange
 		switch {
 			case .IsCtor in fn_node.flags:
-				function_name = { Token{ kind = .Identifier, source = "init" } }
-			case .IsDtor in fn_node.flags:
-				function_name = { Token{ kind = .Identifier, source = "deinit" } }
-			case complete_structure_name != "" && parent_type != nil && parent_type.kind != .Namespace:
-				// struct, enum, union: only take the last component @cleanup
-				function_name = fn_node.function_name[len(fn_node.function_name) - 1:]
-				
 				overload_index := 0
 				overload_count := 0
 				for mi in parent_type.structure.members {
 					member := ctx.ast[mi]
 					if member.kind != .FunctionDefinition { continue }
 
-					if last(member.function_def.function_name).source == last(function_name).source {
+					if .IsCtor in member.function_def.flags {
 						if mi == function_node_idx { overload_index = overload_count }
 						overload_count += 1
 					}
 				}
 
 				if overload_count > 1 {
-					overloaded_name = last(fn_node.function_name).source
-					function_name = { last(fn_node.function_name)^, Token{ kind = .Identifier, source = fmt.tprint(overload_index) } }
+					overloaded_name = "init"
+					function_name = { Token{ kind = .Identifier, source = "init" }, Token{ kind = .Identifier, source = fmt.tprint(overload_index) } }
 				}
+				else {
+					function_name = { Token{ kind = .Identifier, source = "init" } }
+				}
+
+			case .IsDtor in fn_node.flags:
+				function_name = { Token{ kind = .Identifier, source = "deinit" } }
+
+			case complete_structure_name != "" && parent_type != nil && parent_type.kind != .Namespace:
+				fn_baseanme := last(fn_node.function_name)
+
+				overload_index := 0
+				overload_count := 0
+				for mi in parent_type.structure.members {
+					member := ctx.ast[mi]
+					if member.kind != .FunctionDefinition { continue }
+
+					if last(member.function_def.function_name).source == fn_baseanme.source {
+						if mi == function_node_idx { overload_index = overload_count }
+						overload_count += 1
+					}
+				}
+
+				if overload_count > 1 {
+					overloaded_name = fn_baseanme.source
+					function_name = { fn_baseanme^, Token{ kind = .Identifier, source = fmt.tprint(overload_index) } }
+				}
+				else {
+				function_name = fn_node.function_name[len(fn_node.function_name) - 1:]
+				}
+
 			case:
 				function_name = fn_node.function_name[:]
 		}

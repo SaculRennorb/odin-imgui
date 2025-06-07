@@ -2074,9 +2074,12 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 		}
 
 		// write directly, they are marked for skipping in write_sequence
+		last_attached_node_was_newline := false
 		for aid in fn_node.attached_comments {
 			write_node(ctx, aid, .Temporary, name_context)
+			last_attached_node_was_newline = ctx.ast[aid].kind == .NewLine
 		}
+		if len(fn_node.attached_comments) != 0 && !last_attached_node_was_newline { str.write_byte(&ctx.result, '\n'); }
 
 		str.write_string(&ctx.result, indent_str);
 		str.write_string(&ctx.result, complete_name);

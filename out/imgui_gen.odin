@@ -9413,8 +9413,8 @@ ImGui_ColorConvertRGBtoHSV :: proc(r : f32, g : f32, b : f32, out_h : ^f32, out_
 	}
 
 	chroma : f32 = r - (g < b ? g : b)
-	out_h = ImFabs(K + (g - b) / (6. * chroma + 1e - 20))
-	out_s = chroma / (r + 1e - 20)
+	out_h = ImFabs(K + (g - b) / (6. * chroma + 1e-20))
+	out_s = chroma / (r + 1e-20)
 	out_v = r
 }
 

@@ -285,13 +285,23 @@ tokenize :: proc(tokens : ^[dynamic]Token, text : string, file_path : string)
 				number_loop: for remaining = remaining[1:]; remaining < end; remaining = remaining[1:] {
 					switch remaining[0]  {
 						case '0'..='9':
+							/**/
 
 						case '\'':
+							/**/
 
 						case '.':
 							is_float = true
 
-						case 'a'..='e', 'A'..='E':
+						case 'a'..='d', 'A'..='D':
+							/**/
+						
+						case 'e', 'E':
+							if is_hex { continue }
+							// if not hex this is exponential notation
+							// now either a number bust follow, or a minus and a number
+							if remaining[1] == '-' { remaining = remaining[1:] }
+
 						case 'f', 'F':
 							if !is_hex {
 								append(tokens, Token{.LiteralFloat, str_from_se(start, remaining), loc})

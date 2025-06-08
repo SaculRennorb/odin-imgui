@@ -1577,7 +1577,10 @@ ast_parse_var_declaration_no_type :: proc(ctx: ^AstContext, tokens : ^[]Token, p
 					// int ***&a
 					tokens^ = ns
 
-					type = ast_append_type(ctx, AstTypePointer{ destination_type = type })
+					type = ast_append_type(ctx, AstTypePointer{
+						destination_type = type,
+						flags = next.kind == .Ampersand ? { .Reference } : { },
+					})
 
 				case .Identifier:
 					//         v
@@ -1917,7 +1920,10 @@ ast_parse_type :: proc(ctx : ^AstContext, tokens : ^[]Token, parent_type : AstTy
 		#partial switch n.kind {
 			case .Ampersand, .Star:
 				tokens^ = ns
-				type = ast_append_type(ctx, AstTypePointer{ destination_type = type });
+				type = ast_append_type(ctx, AstTypePointer{
+					destination_type = type,
+					flags = n.kind == .Ampersand ? { .Reference } : { },
+				});
 
 			case .BracketSquareOpen:
 				if nn, nns := peek_token(&ns); nn.kind == .BracketSquareClose { // ...[]

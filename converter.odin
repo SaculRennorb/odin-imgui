@@ -341,7 +341,41 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 
 					if vardef.initializer_expression != {} {
 						str.write_string(&ctx.result, " = ")
-						write_node(ctx, vardef.initializer_expression, name_persistence, name_context, indent_str)
+
+						expression_morph: {
+							initializer := ctx.ast[vardef.initializer_expression]
+							// short circuit pointer to ref assignments and vice versa
+							if initializer.kind == .ExprUnaryLeft {
+								if initializer.unary_left.operator == .Dereference {
+									right_type_idx, _ := resolve_type(ctx, initializer.unary_left.right, name_context)
+									right_type := ctx.type_heap[right_type_idx]
+
+									if rptr, is_ptr := right_type.(AstTypePointer); is_ptr && .Reference not_in rptr.flags { // ? = *p
+										left_type := ctx.type_heap[vardef.type]
+
+										if lptr, is_ptr := left_type.(AstTypePointer); is_ptr && .Reference in lptr.flags { // r = *pq
+											write_node(ctx, initializer.unary_left.right, name_persistence, name_context)
+											break expression_morph
+										}
+									}
+								}
+								else if initializer.unary_left.operator == .AddressOf && ctx.ast[initializer.unary_left.right].kind != .ExprIndex { // exclude = &a[b]
+									right_type_idx, _ := resolve_type(ctx, initializer.unary_left.right, name_context)
+									right_type := ctx.type_heap[right_type_idx]
+
+									if rptr, is_ptr := right_type.(AstTypePointer); is_ptr && .Reference in rptr.flags { // ? = &r
+										left_type := ctx.type_heap[vardef.type]
+
+										if lptr, is_ptr := left_type.(AstTypePointer); is_ptr && .Reference not_in lptr.flags { // p = &r
+											write_node(ctx, initializer.unary_left.right, name_persistence, name_context)
+											break expression_morph
+										}
+									}
+								}
+							}
+
+							write_node(ctx, vardef.initializer_expression, name_persistence, name_context, indent_str)
+						}
 					}
 				}
 
@@ -603,11 +637,54 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 						fallthrough
 
 					case:
-						write_node(ctx, binary.left, name_persistence, name_context)
-						str.write_byte(&ctx.result, ' ')
-						write_op(ctx, binary.operator)
-						str.write_byte(&ctx.result, ' ')
-						write_node(ctx, binary.right, name_persistence, name_context)
+						#partial switch binary.operator {
+							case .Assign:
+								// short circuit pointer to ref assignments and vice versa
+								if right.kind == .ExprUnaryLeft {
+									if right.unary_left.operator == .Dereference {
+										right_type_idx, _ := resolve_type(ctx, right.unary_left.right, name_context)
+										right_type := ctx.type_heap[right_type_idx]
+
+										if rptr, is_ptr := right_type.(AstTypePointer); is_ptr && .Reference not_in rptr.flags { // ? = *p
+											left_type_idx, _ := resolve_type(ctx, binary.left, name_context)
+											left_type := ctx.type_heap[left_type_idx]
+
+											if lptr, is_ptr := left_type.(AstTypePointer); is_ptr && .Reference in lptr.flags { // r = *p
+												write_node(ctx, binary.left, name_persistence, name_context)
+												str.write_string(&ctx.result, " = ")
+												write_node(ctx, right.unary_left.right, name_persistence, name_context)
+												break
+											}
+										}
+									}
+									else if right.unary_left.operator == .AddressOf && ctx.ast[right.unary_left.right].kind != .ExprIndex {
+										right_type_idx, _ := resolve_type(ctx, right.unary_left.right, name_context)
+										right_type := ctx.type_heap[right_type_idx]
+
+										if rptr, is_ptr := right_type.(AstTypePointer); is_ptr && .Reference in rptr.flags { // ? = &r
+											left_type_idx, _ := resolve_type(ctx, binary.left, name_context)
+											left_type := ctx.type_heap[left_type_idx]
+
+											if lptr, is_ptr := left_type.(AstTypePointer); is_ptr && .Reference not_in lptr.flags { // p = &r
+												write_node(ctx, binary.left, name_persistence, name_context)
+												str.write_string(&ctx.result, " = ")
+												write_node(ctx, right.unary_left.right, name_persistence, name_context)
+												break
+											}
+										}
+									}
+								}
+
+								fallthrough
+
+
+							case:
+								write_node(ctx, binary.left, name_persistence, name_context)
+								str.write_byte(&ctx.result, ' ')
+								write_op(ctx, binary.operator)
+								str.write_byte(&ctx.result, ' ')
+								write_node(ctx, binary.right, name_persistence, name_context)
+						}
 				}
 
 				requires_termination = true
@@ -2031,7 +2108,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 					function_name = { fn_baseanme^, Token{ kind = .Identifier, source = fmt.tprint(overload_index) } }
 				}
 				else {
-				function_name = fn_node.function_name[len(fn_node.function_name) - 1:]
+					function_name = fn_node.function_name[len(fn_node.function_name) - 1:]
 				}
 
 			case:
@@ -2188,7 +2265,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 						return
 					}
 					else if f, is_frag := ctx.type_heap[frag.destination_type].(AstTypeFragment); is_frag && f.identifier.source == "FILE" {
-						str.write_string(&ctx.result, "os.HANDLE")
+						str.write_string(&ctx.result, "os.Handle")
 						return
 					}\
 					// else if underlying_primitive, ok := ctx.type_heap[frag.destination_type].(AstTypePrimitive); ok && len(underlying_primitive.fragments) == 1 && underlying_primitive.fragments[0].source == "char" {

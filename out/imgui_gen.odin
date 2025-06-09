@@ -4494,7 +4494,7 @@ ImUpperPowerOfTwo :: #force_inline proc(v : i32) -> i32
 
 // Find beginning-of-line
 
-ImToUpper :: #force_inline proc(c : u8) -> u8 { return (c >= 'a' && c <= 'z') ? c &= !32 : c }
+ImToUpper :: #force_inline proc(c : u8) -> u8 { return (c >= 'a' && c <= 'z') ? c &= ~32 : c }
 ImCharIsBlankA :: #force_inline proc(c : u8) -> bool { return c == ' ' || c == '\t' }
 ImCharIsBlankW :: #force_inline proc(c : u32) -> bool { return c == ' ' || c == '\t' || c == 0x3000 }
 ImCharIsXdigitA :: #force_inline proc(c : u8) -> bool { return (c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f') }
@@ -4590,7 +4590,7 @@ ImClamp :: #force_inline proc($T : typeid, v : T, mn : T, mx : T) -> T { return 
 ImLerp :: #force_inline proc($T : typeid, a : T, b : T, t : f32) -> T { return cast(T) (a + (b - a) * cast(T) t) }
 ImSwap :: #force_inline proc($T : typeid, a : ^T, b : ^T)
 {
-	tmp : T = a; a = b; b = tmp
+	tmp : T = a; a^ = b; b^ = tmp
 }
 ImAddClampOverflow :: #force_inline proc($T : typeid, a : T, b : T, mn : T, mx : T) -> T
 {
@@ -4817,7 +4817,7 @@ ImBitArrayTestBit :: #force_inline proc(arr : ^ImU32, n : i32) -> bool
 }
 ImBitArrayClearBit :: #force_inline proc(arr : ^ImU32, n : i32)
 {
-	mask : ImU32 = cast(ImU32) 1 << (n & 31); arr[n >> 5] &= !mask
+	mask : ImU32 = cast(ImU32) 1 << (n & 31); arr[n >> 5] &= ~mask
 }
 ImBitArraySetBit :: #force_inline proc(arr : ^ImU32, n : i32)
 {
@@ -4830,9 +4830,9 @@ ImBitArraySetBitRange :: #force_inline proc(arr : ^ImU32, n : i32, n2 : i32)
 	for n <= n2 {
 		a_mod : i32 = (n & 31)
 		b_mod : i32 = (n2 > (n | 31) ? 31 : (n2 & 31)) + 1
-		mask : ImU32 = cast(ImU32) ((cast(ImU64) 1 << b_mod) - 1) & !cast(ImU32) ((cast(ImU64) 1 << a_mod) - 1)
+		mask : ImU32 = cast(ImU32) ((cast(ImU64) 1 << b_mod) - 1) & ~cast(ImU32) ((cast(ImU64) 1 << a_mod) - 1)
 		arr[n >> 5] |= mask
-		n = (n + 32) & !31
+		n = (n + 32) & ~31
 	}
 }
 
@@ -6272,7 +6272,7 @@ ImGuiDockNodeFlagsPrivate_ :: enum i32 {
 	ImGuiDockNodeFlags_NoDocking = ImGuiDockNodeFlags_NoDockingOverMe | ImGuiDockNodeFlags_NoDockingOverOther | ImGuiDockNodeFlags_NoDockingOverEmpty | ImGuiDockNodeFlags_NoDockingSplit | ImGuiDockNodeFlags_NoDockingSplitOther,
 
 	// Masks
-	ImGuiDockNodeFlags_SharedFlagsInheritMask_ = !0,
+	ImGuiDockNodeFlags_SharedFlagsInheritMask_ = ~0,
 	ImGuiDockNodeFlags_NoResizeFlagsMask_ = cast(i32) ImGuiDockNodeFlags_NoResize | ImGuiDockNodeFlags_NoResizeX | ImGuiDockNodeFlags_NoResizeY,
 
 	// When splitting, those local flags are moved to the inheriting child, never duplicated
@@ -8646,10 +8646,10 @@ ImBezierCubicClosestPointCasteljauStep :: proc(p : ^ImVec2, p_closest : ^ImVec2,
 		p_line : ImVec2 = ImLineClosestPoint(p_last, p_current, p)
 		dist2 : f32 = ImLengthSqr(p - p_line)
 		if dist2 < p_closest_dist2 {
-			p_closest = p_line
-			p_closest_dist2 = dist2
+			p_closest^ = p_line
+			p_closest_dist2^ = dist2
 		}
-		p_last = p_current
+		p_last^ = p_current
 	}
 	else if level < 10 {
 		x12 : f32 = (x1 + x2) * 0.5; y12 : f32 = (y1 + y2) * 0.5
@@ -8701,9 +8701,9 @@ ImTriangleBarycentricCoords :: proc(a : ^ImVec2, b : ^ImVec2, c : ^ImVec2, p : ^
 	v1 : ImVec2 = c - a
 	v2 : ImVec2 = p - a
 	denom : f32 = v0.x * v1.y - v1.x * v0.y
-	out_v = (v2.x * v1.y - v1.x * v2.y) / denom
-	out_w = (v0.x * v2.y - v2.x * v0.y) / denom
-	out_u = 1.0 - out_v - out_w
+	out_v^ = (v2.x * v1.y - v1.x * v2.y) / denom
+	out_w^ = (v0.x * v2.y - v2.x * v0.y) / denom
+	out_u^ = 1.0 - out_v - out_w
 }
 
 ImTriangleClosestPoint :: proc(a : ^ImVec2, b : ^ImVec2, c : ^ImVec2, p : ^ImVec2) -> ImVec2
@@ -9021,14 +9021,14 @@ GCrc32LookupTable : [256]ImU32 = {
 // FIXME-OPT: Replace with e.g. FNV1a hash? CRC32 pretty much randomly access 1KB. Need to do proper measurements.
 ImHashData :: proc(data_p : rawptr, data_size : uint, seed : ImGuiID) -> ImGuiID
 {
-	crc : ImU32 = !seed
+	crc : ImU32 = ~seed
 	data : ^u8 = cast(^u8) data_p
 	data_end : ^u8 = cast(^u8) data_p + data_size
 	when ! IMGUI_ENABLE_SSE4_2_CRC { /* @gen ifndef */
 	crc32_lut : ^ImU32 = GCrc32LookupTable
 	for data < data_end { crc = (crc >> 8) ~ crc32_lut[(crc & 0xFF) ~ post_incr(&data)^] }
 
-	return !crc
+	return ~crc
 	} else { // preproc else
 	for data + 4 <= data_end {
 		crc = _mm_crc32_u32(crc, cast(^ImU32) data^)
@@ -9037,7 +9037,7 @@ ImHashData :: proc(data_p : rawptr, data_size : uint, seed : ImGuiID) -> ImGuiID
 
 	for data < data_end { crc = _mm_crc32_u8(crc, post_incr(&data)^) }
 
-	return !crc
+	return ~crc
 	} // preproc endif
 }
 
@@ -9049,7 +9049,7 @@ ImHashData :: proc(data_p : rawptr, data_size : uint, seed : ImGuiID) -> ImGuiID
 // FIXME-OPT: Replace with e.g. FNV1a hash? CRC32 pretty much randomly access 1KB. Need to do proper measurements.
 ImHashStr :: proc(data_p : ^u8, data_size : uint, seed : ImGuiID) -> ImGuiID
 {
-	seed = !seed
+	seed = ~seed
 	crc : ImU32 = seed
 	data : ^u8 = cast(^u8) data_p
 	when ! IMGUI_ENABLE_SSE4_2_CRC { /* @gen ifndef */
@@ -9079,7 +9079,7 @@ ImHashStr :: proc(data_p : ^u8, data_size : uint, seed : ImGuiID) -> ImGuiID
 			} // preproc endif
 		}
 	}
-	return !crc
+	return ~crc
 }
 
 //-----------------------------------------------------------------------------
@@ -9413,9 +9413,9 @@ ImGui_ColorConvertRGBtoHSV :: proc(r : f32, g : f32, b : f32, out_h : ^f32, out_
 	}
 
 	chroma : f32 = r - (g < b ? g : b)
-	out_h = ImFabs(K + (g - b) / (6. * chroma + 1e-20))
-	out_s = chroma / (r + 1e-20)
-	out_v = r
+	out_h^ = ImFabs(K + (g - b) / (6. * chroma + 1e-20))
+	out_s^ = chroma / (r + 1e-20)
+	out_v^ = r
 }
 
 // Convert hsv floats ([0-1],[0-1],[0-1]) to rgb floats ([0-1],[0-1],[0-1]), from Foley & van Dam p593
@@ -9424,7 +9424,7 @@ ImGui_ColorConvertHSVtoRGB :: proc(h : f32, s : f32, v : f32, out_r : ^f32, out_
 {
 	if s == 0.0 {
 		// gray
-		out_b = v; out_g = out_b; out_r = out_g
+		out_b^ = v; out_g = out_b; out_r = out_g
 		return
 	}
 
@@ -9436,18 +9436,18 @@ ImGui_ColorConvertHSVtoRGB :: proc(h : f32, s : f32, v : f32, out_r : ^f32, out_
 	t : f32 = v * (1.0 - s * (1.0 - f))
 
 	switch i {
-		case 0:out_r = v; out_g = t; out_b = p; break
+		case 0:out_r^ = v; out_g^ = t; out_b^ = p; break
 
-		case 1:out_r = q; out_g = v; out_b = p; break
+		case 1:out_r^ = q; out_g^ = v; out_b^ = p; break
 
-		case 2:out_r = p; out_g = v; out_b = t; break
+		case 2:out_r^ = p; out_g^ = v; out_b^ = t; break
 
-		case 3:out_r = p; out_g = q; out_b = v; break
+		case 3:out_r^ = p; out_g^ = q; out_b^ = v; break
 
-		case 4:out_r = t; out_g = p; out_b = v; break
+		case 4:out_r^ = t; out_g^ = p; out_b^ = v; break
 
 		case 5:; fallthrough
-		case:out_r = v; out_g = p; out_b = q; break
+		case:out_r^ = v; out_g^ = p; out_b^ = q; break
 	}
 }
 
@@ -10090,7 +10090,7 @@ ImGui_GetColorU32 :: proc(col : ImU32, alpha_mul : f32) -> ImU32
 	if alpha_mul >= 1.0 { return col }
 	a : ImU32 = (col & IM_COL32_A_MASK) >> IM_COL32_A_SHIFT
 	a = cast(ImU32) (a * alpha_mul); // We don't need to clamp 0..255 because alpha is in 0..1 range.
-	return (col & !IM_COL32_A_MASK) | (a << IM_COL32_A_SHIFT)
+	return (col & ~IM_COL32_A_MASK) | (a << IM_COL32_A_SHIFT)
 }
 
 // modify a style color. always use this if you modify the style after NewFrame().
@@ -11322,7 +11322,7 @@ CalcDelayFromHoveredFlags :: #force_inline proc(flags : ImGuiHoveredFlags) -> f3
 ApplyHoverFlagsForTooltip :: proc(user_flags : ImGuiHoveredFlags, shared_flags : ImGuiHoveredFlags) -> ImGuiHoveredFlags
 {
 	// Allow instance flags to override shared flags
-	if user_flags & (ImGuiHoveredFlags_.ImGuiHoveredFlags_DelayNone | ImGuiHoveredFlags_.ImGuiHoveredFlags_DelayShort | ImGuiHoveredFlags_.ImGuiHoveredFlags_DelayNormal) { shared_flags &= !(ImGuiHoveredFlags_.ImGuiHoveredFlags_DelayNone | ImGuiHoveredFlags_.ImGuiHoveredFlags_DelayShort | ImGuiHoveredFlags_.ImGuiHoveredFlags_DelayNormal) }
+	if user_flags & (ImGuiHoveredFlags_.ImGuiHoveredFlags_DelayNone | ImGuiHoveredFlags_.ImGuiHoveredFlags_DelayShort | ImGuiHoveredFlags_.ImGuiHoveredFlags_DelayNormal) { shared_flags &= ~(ImGuiHoveredFlags_.ImGuiHoveredFlags_DelayNone | ImGuiHoveredFlags_.ImGuiHoveredFlags_DelayShort | ImGuiHoveredFlags_.ImGuiHoveredFlags_DelayNormal) }
 	return user_flags | shared_flags
 }
 
@@ -11337,7 +11337,7 @@ ImGui_IsItemHovered :: proc(flags : ImGuiHoveredFlags) -> bool
 {
 	g : ^ImGuiContext = GImGui
 	window : ^ImGuiWindow = g.CurrentWindow
-	IM_ASSERT_USER_ERROR((flags & !ImGuiHoveredFlagsPrivate_.ImGuiHoveredFlags_AllowedMaskForIsItemHovered) == 0, "Invalid flags for IsItemHovered()!")
+	IM_ASSERT_USER_ERROR((flags & ~ImGuiHoveredFlagsPrivate_.ImGuiHoveredFlags_AllowedMaskForIsItemHovered) == 0, "Invalid flags for IsItemHovered()!")
 
 	if g.NavHighlightItemUnderNav && g.NavCursorVisible && !(flags & ImGuiHoveredFlags_.ImGuiHoveredFlags_NoNavOverride) {
 		if !IsItemFocused() { return false }
@@ -11760,7 +11760,7 @@ ImGui_UpdateMouseMovingWindowNewFrame :: proc()
 				if moving_window.Viewport && !IsDragDropPayloadBeingAccepted() { g.MouseViewport = moving_window.Viewport }
 
 				// Clear the NoInput window flag set by the Viewport system
-				if moving_window.Viewport { moving_window.Viewport.Flags &= !ImGuiViewportFlags_.ImGuiViewportFlags_NoInputs }
+				if moving_window.Viewport { moving_window.Viewport.Flags &= ~ImGuiViewportFlags_.ImGuiViewportFlags_NoInputs }
 			}
 
 			g.MovingWindow = nil
@@ -12172,7 +12172,7 @@ ImGui_NewFrame :: proc()
 	}
 	if g.DebugLogAutoDisableFrames > 0 && pre_decr(&g.DebugLogAutoDisableFrames) == 0 {
 		DebugLog("(Debug Log: Auto-disabled some ImGuiDebugLogFlags after 2 frames)\n")
-		g.DebugLogFlags &= !g.DebugLogAutoDisableFlags
+		g.DebugLogFlags &= ~g.DebugLogAutoDisableFlags
 		g.DebugLogAutoDisableFlags = ImGuiDebugLogFlags_.ImGuiDebugLogFlags_None
 	}
 	} // preproc endif
@@ -12892,15 +12892,15 @@ ImGui_BeginChildEx :: proc(name : ^u8, id : ImGuiID, size_arg : ^ImVec2, child_f
 	// Sanity check as it is likely that some user will accidentally pass ImGuiWindowFlags into the ImGuiChildFlags argument.
 	ImGuiChildFlags_SupportedMask_ : ImGuiChildFlags = ImGuiChildFlags_.ImGuiChildFlags_Borders | ImGuiChildFlags_.ImGuiChildFlags_AlwaysUseWindowPadding | ImGuiChildFlags_.ImGuiChildFlags_ResizeX | ImGuiChildFlags_.ImGuiChildFlags_ResizeY | ImGuiChildFlags_.ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_.ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_.ImGuiChildFlags_AlwaysAutoResize | ImGuiChildFlags_.ImGuiChildFlags_FrameStyle | ImGuiChildFlags_.ImGuiChildFlags_NavFlattened
 	IM_UNUSED(ImGuiChildFlags_SupportedMask_)
-	IM_ASSERT((child_flags & !ImGuiChildFlags_SupportedMask_) == 0 && "Illegal ImGuiChildFlags value. Did you pass ImGuiWindowFlags values instead of ImGuiChildFlags?")
+	IM_ASSERT((child_flags & ~ImGuiChildFlags_SupportedMask_) == 0 && "Illegal ImGuiChildFlags value. Did you pass ImGuiWindowFlags values instead of ImGuiChildFlags?")
 	IM_ASSERT((window_flags & ImGuiWindowFlags_.ImGuiWindowFlags_AlwaysAutoResize) == 0 && "Cannot specify ImGuiWindowFlags_AlwaysAutoResize for BeginChild(). Use ImGuiChildFlags_AlwaysAutoResize!")
 	if ImGuiChildFlags_AlwaysAutoResize : ^child_flags; ImGuiChildFlags_AlwaysAutoResize {
 		IM_ASSERT((child_flags & (ImGuiChildFlags_.ImGuiChildFlags_ResizeX | ImGuiChildFlags_.ImGuiChildFlags_ResizeY)) == 0 && "Cannot use ImGuiChildFlags_ResizeX or ImGuiChildFlags_ResizeY with ImGuiChildFlags_AlwaysAutoResize!")
 		IM_ASSERT((child_flags & (ImGuiChildFlags_.ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_.ImGuiChildFlags_AutoResizeY)) != 0 && "Must use ImGuiChildFlags_AutoResizeX or ImGuiChildFlags_AutoResizeY with ImGuiChildFlags_AlwaysAutoResize!")
 	}
 
-	if ImGuiChildFlags_AutoResizeX : ^child_flags; ImGuiChildFlags_AutoResizeX { child_flags &= !ImGuiChildFlags_.ImGuiChildFlags_ResizeX }
-	if ImGuiChildFlags_AutoResizeY : ^child_flags; ImGuiChildFlags_AutoResizeY { child_flags &= !ImGuiChildFlags_.ImGuiChildFlags_ResizeY }
+	if ImGuiChildFlags_AutoResizeX : ^child_flags; ImGuiChildFlags_AutoResizeX { child_flags &= ~ImGuiChildFlags_.ImGuiChildFlags_ResizeX }
+	if ImGuiChildFlags_AutoResizeY : ^child_flags; ImGuiChildFlags_AutoResizeY { child_flags &= ~ImGuiChildFlags_.ImGuiChildFlags_ResizeY }
 
 	// Set window flags
 	window_flags |= ImGuiWindowFlags_.ImGuiWindowFlags_ChildWindow | ImGuiWindowFlags_.ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_.ImGuiWindowFlags_NoDocking
@@ -12931,11 +12931,11 @@ ImGui_BeginChildEx :: proc(name : ^u8, id : ImGuiID, size_arg : ^ImVec2, child_f
 	if (g.NextWindowData.Flags & ImGuiNextWindowDataFlags_.ImGuiNextWindowDataFlags_HasSize) != 0 && (g.NextWindowData.SizeCond & ImGuiCond_.ImGuiCond_Always) != 0 {
 		if g.NextWindowData.SizeVal.x > 0.0 {
 			size.x = g.NextWindowData.SizeVal.x
-			child_flags &= !ImGuiChildFlags_.ImGuiChildFlags_ResizeX
+			child_flags &= ~ImGuiChildFlags_.ImGuiChildFlags_ResizeX
 		}
 		if g.NextWindowData.SizeVal.y > 0.0 {
 			size.y = g.NextWindowData.SizeVal.y
-			child_flags &= !ImGuiChildFlags_.ImGuiChildFlags_ResizeY
+			child_flags &= ~ImGuiChildFlags_.ImGuiChildFlags_ResizeY
 		}
 	}
 	SetNextWindowSize(size)
@@ -13029,10 +13029,10 @@ ImGui_EndChild :: proc()
 
 SetWindowConditionAllowFlags :: proc(window : ^ImGuiWindow, flags : ImGuiCond, enabled : bool)
 {
-	window.SetWindowPosAllowFlags = enabled ? (window.SetWindowPosAllowFlags | flags) : (window.SetWindowPosAllowFlags & !flags)
-	window.SetWindowSizeAllowFlags = enabled ? (window.SetWindowSizeAllowFlags | flags) : (window.SetWindowSizeAllowFlags & !flags)
-	window.SetWindowCollapsedAllowFlags = enabled ? (window.SetWindowCollapsedAllowFlags | flags) : (window.SetWindowCollapsedAllowFlags & !flags)
-	window.SetWindowDockAllowFlags = enabled ? (window.SetWindowDockAllowFlags | flags) : (window.SetWindowDockAllowFlags & !flags)
+	window.SetWindowPosAllowFlags = enabled ? (window.SetWindowPosAllowFlags | flags) : (window.SetWindowPosAllowFlags & ~flags)
+	window.SetWindowSizeAllowFlags = enabled ? (window.SetWindowSizeAllowFlags | flags) : (window.SetWindowSizeAllowFlags & ~flags)
+	window.SetWindowCollapsedAllowFlags = enabled ? (window.SetWindowCollapsedAllowFlags | flags) : (window.SetWindowCollapsedAllowFlags & ~flags)
+	window.SetWindowDockAllowFlags = enabled ? (window.SetWindowDockAllowFlags | flags) : (window.SetWindowDockAllowFlags & ~flags)
 }
 
 ImGui_FindWindowByID :: proc(id : ImGuiID) -> ^ImGuiWindow
@@ -13608,7 +13608,7 @@ ImGui_RenderWindowDecorations :: proc(window : ^ImGuiWindow, title_bar_rect : ^I
 					alpha *= DOCKING_TRANSPARENT_PAYLOAD_ALPHA; // FIXME-DOCK: Should that be an override?
 					override_alpha = true
 				}
-				if override_alpha { bg_col = (bg_col & !IM_COL32_A_MASK) | (IM_F32_TO_INT8_SAT(alpha) << IM_COL32_A_SHIFT) }
+				if override_alpha { bg_col = (bg_col & ~IM_COL32_A_MASK) | (IM_F32_TO_INT8_SAT(alpha) << IM_COL32_A_SHIFT) }
 			}
 
 			// Render, for docked windows and host windows we ensure bg goes before decorations
@@ -13897,7 +13897,7 @@ ImGui_Begin :: proc(name : ^u8, p_open : ^bool, flags : ImGuiWindowFlags) -> boo
 			flags = window.Flags
 			if window.DockIsActive {
 				IM_ASSERT(window.DockNode != nil)
-				g.NextWindowData.Flags &= !ImGuiNextWindowDataFlags_.ImGuiNextWindowDataFlags_HasSizeConstraint; // Docking currently override constraints
+				g.NextWindowData.Flags &= ~ImGuiNextWindowDataFlags_.ImGuiNextWindowDataFlags_HasSizeConstraint; // Docking currently override constraints
 			}
 
 			// Amend the Appearing flag
@@ -13972,7 +13972,7 @@ ImGui_Begin :: proc(name : ^u8, p_open : ^bool, flags : ImGuiWindowFlags) -> boo
 			// FIXME: Look into removing the branch so everything can go through this same code path for consistency.
 			window.SetWindowPosVal = g.NextWindowData.PosVal
 			window.SetWindowPosPivot = g.NextWindowData.PosPivotVal
-			window.SetWindowPosAllowFlags &= !(ImGuiCond_.ImGuiCond_Once | ImGuiCond_.ImGuiCond_FirstUseEver | ImGuiCond_.ImGuiCond_Appearing)
+			window.SetWindowPosAllowFlags &= ~(ImGuiCond_.ImGuiCond_Once | ImGuiCond_.ImGuiCond_FirstUseEver | ImGuiCond_.ImGuiCond_Appearing)
 		}
 		else {
 			SetWindowPos(window, g.NextWindowData.PosVal, g.NextWindowData.PosCond)
@@ -14752,7 +14752,7 @@ ImGui_PushItemFlag :: proc(option : ImGuiItemFlags, enabled : bool)
 	item_flags : ImGuiItemFlags = g.CurrentItemFlags
 	IM_ASSERT(item_flags == back(&g.ItemFlagsStack))
 	if enabled { item_flags |= option }
-	else { item_flags &= !option }
+	else { item_flags &= ~option }
 	g.CurrentItemFlags = item_flags
 	push_back(&g.ItemFlagsStack, item_flags)
 }
@@ -14819,7 +14819,7 @@ ImGui_BeginDisabledOverrideReenable :: proc()
 	g : ^ImGuiContext = GImGui
 	IM_ASSERT(g.CurrentItemFlags & ImGuiItemFlagsPrivate_.ImGuiItemFlags_Disabled)
 	g.Style.Alpha = g.DisabledAlphaBackup
-	g.CurrentItemFlags &= !ImGuiItemFlagsPrivate_.ImGuiItemFlags_Disabled
+	g.CurrentItemFlags &= ~ImGuiItemFlagsPrivate_.ImGuiItemFlags_Disabled
 	push_back(&g.ItemFlagsStack, g.CurrentItemFlags)
 	post_incr(&g.DisabledStackSize)
 }
@@ -14919,7 +14919,7 @@ ImGui_IsWindowAbove :: proc(potential_above : ^ImGuiWindow, potential_below : ^I
 ImGui_IsWindowHovered :: proc(flags : ImGuiHoveredFlags) -> bool
 {
 	g : ^ImGuiContext = GImGui
-	IM_ASSERT_USER_ERROR((flags & !ImGuiHoveredFlagsPrivate_.ImGuiHoveredFlags_AllowedMaskForIsWindowHovered) == 0, "Invalid flags for IsWindowHovered()!")
+	IM_ASSERT_USER_ERROR((flags & ~ImGuiHoveredFlagsPrivate_.ImGuiHoveredFlags_AllowedMaskForIsWindowHovered) == 0, "Invalid flags for IsWindowHovered()!")
 
 	ref_window : ^ImGuiWindow = g.HoveredWindow
 	cur_window : ^ImGuiWindow = g.CurrentWindow
@@ -14994,7 +14994,7 @@ ImGui_SetWindowPos :: proc(window : ^ImGuiWindow, pos : ^ImVec2, cond : ImGuiCon
 	if cond && (window.SetWindowPosAllowFlags & cond) == 0 { return }
 
 	IM_ASSERT(cond == 0 || ImIsPowerOfTwo(cond)); // Make sure the user doesn't attempt to combine multiple condition flags.
-	window.SetWindowPosAllowFlags &= !(ImGuiCond_.ImGuiCond_Once | ImGuiCond_.ImGuiCond_FirstUseEver | ImGuiCond_.ImGuiCond_Appearing)
+	window.SetWindowPosAllowFlags &= ~(ImGuiCond_.ImGuiCond_Once | ImGuiCond_.ImGuiCond_FirstUseEver | ImGuiCond_.ImGuiCond_Appearing)
 	window.SetWindowPosVal = ImVec2(FLT_MAX, FLT_MAX)
 
 	// Set
@@ -15040,7 +15040,7 @@ ImGui_SetWindowSize :: proc(window : ^ImGuiWindow, size : ^ImVec2, cond : ImGuiC
 	if cond && (window.SetWindowSizeAllowFlags & cond) == 0 { return }
 
 	IM_ASSERT(cond == 0 || ImIsPowerOfTwo(cond)); // Make sure the user doesn't attempt to combine multiple condition flags.
-	window.SetWindowSizeAllowFlags &= !(ImGuiCond_.ImGuiCond_Once | ImGuiCond_.ImGuiCond_FirstUseEver | ImGuiCond_.ImGuiCond_Appearing)
+	window.SetWindowSizeAllowFlags &= ~(ImGuiCond_.ImGuiCond_Once | ImGuiCond_.ImGuiCond_FirstUseEver | ImGuiCond_.ImGuiCond_Appearing)
 
 	// Enable auto-fit (not done in BeginChild() path unless appearing or combined with ImGuiChildFlags_AlwaysAutoResize)
 	if (window.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_ChildWindow) == 0 || window.Appearing || (window.ChildFlags & ImGuiChildFlags_.ImGuiChildFlags_AlwaysAutoResize) != 0 { window.AutoFitFramesX = (size.x <= 0.0) ? 2 : 0 }
@@ -15075,7 +15075,7 @@ ImGui_SetWindowCollapsed :: proc(window : ^ImGuiWindow, collapsed : bool, cond :
 {
 	// Test condition (NB: bit 0 is always true) and clear flags for next time
 	if cond && (window.SetWindowCollapsedAllowFlags & cond) == 0 { return }
-	window.SetWindowCollapsedAllowFlags &= !(ImGuiCond_.ImGuiCond_Once | ImGuiCond_.ImGuiCond_FirstUseEver | ImGuiCond_.ImGuiCond_Appearing)
+	window.SetWindowCollapsedAllowFlags &= ~(ImGuiCond_.ImGuiCond_Once | ImGuiCond_.ImGuiCond_FirstUseEver | ImGuiCond_.ImGuiCond_Appearing)
 
 	// Set
 	window.Collapsed = collapsed
@@ -15751,7 +15751,7 @@ GetModForLRModKey :: proc(key : ImGuiKey) -> ImGuiKeyChord
 ImGui_FixupKeyChord :: proc(key_chord : ImGuiKeyChord) -> ImGuiKeyChord
 {
 	// Add ImGuiMod_XXXX when a corresponding ImGuiKey_LeftXXX/ImGuiKey_RightXXX is specified.
-	key : ImGuiKey = cast(ImGuiKey) (key_chord & !ImGuiKey.ImGuiMod_Mask_)
+	key : ImGuiKey = cast(ImGuiKey) (key_chord & ~ImGuiKey.ImGuiMod_Mask_)
 	if IsLRModKey(key) { key_chord |= GetModForLRModKey(key) }
 	return key_chord
 }
@@ -15810,10 +15810,10 @@ ImGui_GetKeyChordName :: proc(key_chord : ImGuiKeyChord) -> ^u8
 {
 	g : ^ImGuiContext = GImGui
 
-	key : ImGuiKey = cast(ImGuiKey) (key_chord & !ImGuiKey.ImGuiMod_Mask_)
+	key : ImGuiKey = cast(ImGuiKey) (key_chord & ~ImGuiKey.ImGuiMod_Mask_)
 	if IsLRModKey(key) {
 		// Return "Ctrl+LeftShift" instead of "Ctrl+Shift+LeftShift"
-		key_chord &= !GetModForLRModKey(key)
+		key_chord &= ~GetModForLRModKey(key)
 	}
 	ImFormatString(g.TempKeychordName, IM_ARRAYSIZE(g.TempKeychordName), "%s%s%s%s%s", (key_chord & ImGuiKey.ImGuiMod_Ctrl) ? "Ctrl+" : "", (key_chord & ImGuiKey.ImGuiMod_Shift) ? "Shift+" : "", (key_chord & ImGuiKey.ImGuiMod_Alt) ? "Alt+" : "", (key_chord & ImGuiKey.ImGuiMod_Super) ? "Super+" : "", (key != ImGuiKey.ImGuiKey_None || key_chord == ImGuiKey.ImGuiKey_None) ? GetKeyName(key) : "")
 	len : uint
@@ -15928,7 +15928,7 @@ ImGui_GetShortcutRoutingData :: proc(key_chord : ImGuiKeyChord) -> ^ImGuiKeyRout
 	g : ^ImGuiContext = GImGui
 	rt : ^ImGuiKeyRoutingTable = &g.KeysRoutingTable
 	routing_data : ^ImGuiKeyRoutingData
-	key : ImGuiKey = cast(ImGuiKey) (key_chord & !ImGuiKey.ImGuiMod_Mask_)
+	key : ImGuiKey = cast(ImGuiKey) (key_chord & ~ImGuiKey.ImGuiMod_Mask_)
 	mods : ImGuiKey = cast(ImGuiKey) (key_chord & ImGuiKey.ImGuiMod_Mask_)
 	if key == ImGuiKey.ImGuiKey_None { key = ConvertSingleModFlagToKey(mods) }
 	IM_ASSERT(IsNamedKey(key))
@@ -16005,7 +16005,7 @@ IsKeyChordPotentiallyCharInput :: proc(key_chord : ImGuiKeyChord) -> bool
 	if ignore_char_inputs { return false }
 
 	// Return true for A-Z, 0-9 and other keys associated to char inputs. Other keys such as F1-F12 won't be filtered.
-	key : ImGuiKey = cast(ImGuiKey) (key_chord & !ImGuiKey.ImGuiMod_Mask_)
+	key : ImGuiKey = cast(ImGuiKey) (key_chord & ~ImGuiKey.ImGuiMod_Mask_)
 	if key == ImGuiKey.ImGuiKey_None { return false }
 	return TestBit(&g.KeysMayBeCharInput, key)
 }
@@ -16060,7 +16060,7 @@ ImGui_SetShortcutRouting :: proc(key_chord : ImGuiKeyChord, flags : ImGuiInputFl
 
 		// ActiveIdUsingAllKeyboardKeys trumps all for ActiveId
 		if (flags & ImGuiInputFlags_.ImGuiInputFlags_RouteOverActive) == 0 && g.ActiveIdUsingAllKeyboardKeys {
-			key : ImGuiKey = cast(ImGuiKey) (key_chord & !ImGuiKey.ImGuiMod_Mask_)
+			key : ImGuiKey = cast(ImGuiKey) (key_chord & ~ImGuiKey.ImGuiMod_Mask_)
 			if key == ImGuiKey.ImGuiKey_None { key = ConvertSingleModFlagToKey(cast(ImGuiKey) (key_chord & ImGuiKey.ImGuiMod_Mask_)) }
 			if key >= ImGuiKey_Keyboard_BEGIN && key < ImGuiKey_Keyboard_END { return false }
 		}
@@ -16156,7 +16156,7 @@ ImGui_IsKeyPressed :: proc(key : ImGuiKey, flags : ImGuiInputFlags, owner_id : I
 	}
 	t : f32 = key_data.DownDuration
 	if t < 0.0 { return false }
-	IM_ASSERT((flags & !ImGuiInputFlagsPrivate_.ImGuiInputFlags_SupportedByIsKeyPressed) == 0); // Passing flags not supported by this function!
+	IM_ASSERT((flags & ~ImGuiInputFlagsPrivate_.ImGuiInputFlags_SupportedByIsKeyPressed) == 0); // Passing flags not supported by this function!
 	if flags & (ImGuiInputFlagsPrivate_.ImGuiInputFlags_RepeatRateMask_ | ImGuiInputFlagsPrivate_.ImGuiInputFlags_RepeatUntilMask_) {
 		// Setting any _RepeatXXX option enables _Repeatflags |= ImGuiInputFlags_.ImGuiInputFlags_Repeat
 	}
@@ -16236,7 +16236,7 @@ ImGui_IsMouseClicked :: proc(button : ImGuiMouseButton, flags : ImGuiInputFlags,
 	}
 	t : f32 = g.IO.MouseDownDuration[button]
 	if t < 0.0 { return false }
-	IM_ASSERT((flags & !ImGuiInputFlagsPrivate_.ImGuiInputFlags_SupportedByIsMouseClicked) == 0); // Passing flags not supported by this function! // FIXME: Could support RepeatRate and RepeatUntil flags here.
+	IM_ASSERT((flags & ~ImGuiInputFlagsPrivate_.ImGuiInputFlags_SupportedByIsMouseClicked) == 0); // Passing flags not supported by this function! // FIXME: Could support RepeatRate and RepeatUntil flags here.
 
 	repeat : bool = (flags & ImGuiInputFlags_.ImGuiInputFlags_Repeat) != 0
 	pressed : bool = (t == 0.0) || (repeat && t > g.IO.KeyRepeatDelay && CalcTypematicRepeatAmount(t - g.IO.DeltaTime, t, g.IO.KeyRepeatDelay, g.IO.KeyRepeatRate) > 0)
@@ -16907,7 +16907,7 @@ ImGui_SetKeyOwner :: proc(key : ImGuiKey, owner_id : ImGuiID, flags : ImGuiInput
 {
 	g : ^ImGuiContext = GImGui
 	IM_ASSERT(IsNamedKeyOrMod(key) && (owner_id != ImGuiKeyOwner_Any || (flags & (ImGuiInputFlagsPrivate_.ImGuiInputFlags_LockThisFrame | ImGuiInputFlagsPrivate_.ImGuiInputFlags_LockUntilRelease)))); // Can only use _Any with _LockXXX flags (to eat a key away without an ID to retrieve it)
-	IM_ASSERT((flags & !ImGuiInputFlagsPrivate_.ImGuiInputFlags_SupportedBySetKeyOwner) == 0); // Passing flags not supported by this function!
+	IM_ASSERT((flags & ~ImGuiInputFlagsPrivate_.ImGuiInputFlags_SupportedBySetKeyOwner) == 0); // Passing flags not supported by this function!
 	//IMGUI_DEBUG_LOG("SetKeyOwner(%s, owner_id=0x%08X, flags=%08X)\n", GetKeyName(key), owner_id, flags);
 
 	owner_data : ^ImGuiKeyOwnerData = GetKeyOwnerData(&g, key)
@@ -16926,7 +16926,7 @@ ImGui_SetKeyOwnersForKeyChord :: proc(key_chord : ImGuiKeyChord, owner_id : ImGu
 	if ImGuiMod_Shift : ^key_chord; ImGuiMod_Shift { SetKeyOwner(ImGuiMod_Shift, owner_id, flags) }
 	if ImGuiMod_Alt : ^key_chord; ImGuiMod_Alt { SetKeyOwner(ImGuiMod_Alt, owner_id, flags) }
 	if ImGuiMod_Super : ^key_chord; ImGuiMod_Super { SetKeyOwner(ImGuiMod_Super, owner_id, flags) }
-	if key_chord & !ImGuiKey.ImGuiMod_Mask_ { SetKeyOwner(cast(ImGuiKey) (key_chord & !ImGuiKey.ImGuiMod_Mask_), owner_id, flags) }
+	if key_chord & ~ImGuiKey.ImGuiMod_Mask_ { SetKeyOwner(cast(ImGuiKey) (key_chord & ~ImGuiKey.ImGuiMod_Mask_), owner_id, flags) }
 }
 
 // Inputs Utilities: Key/Input Ownership [BETA]
@@ -16950,8 +16950,8 @@ ImGui_SetItemKeyOwner :: proc(key : ImGuiKey, flags : ImGuiInputFlags)
 	if id == 0 || (g.HoveredId != id && g.ActiveId != id) { return }
 	if (flags & ImGuiInputFlagsPrivate_.ImGuiInputFlags_CondMask_) == 0 { flags |= ImGuiInputFlagsPrivate_.ImGuiInputFlags_CondDefault_ }
 	if (g.HoveredId == id && (flags & ImGuiInputFlagsPrivate_.ImGuiInputFlags_CondHovered)) || (g.ActiveId == id && (flags & ImGuiInputFlagsPrivate_.ImGuiInputFlags_CondActive)) {
-		IM_ASSERT((flags & !ImGuiInputFlagsPrivate_.ImGuiInputFlags_SupportedBySetItemKeyOwner) == 0); // Passing flags not supported by this function!
-		SetKeyOwner(key, id, flags & !ImGuiInputFlagsPrivate_.ImGuiInputFlags_CondMask_)
+		IM_ASSERT((flags & ~ImGuiInputFlagsPrivate_.ImGuiInputFlags_SupportedBySetItemKeyOwner) == 0); // Passing flags not supported by this function!
+		SetKeyOwner(key, id, flags & ~ImGuiInputFlagsPrivate_.ImGuiInputFlags_CondMask_)
 	}
 }
 
@@ -16985,7 +16985,7 @@ ImGui_IsKeyChordPressed :: proc(key_chord : ImGuiKeyChord, flags : ImGuiInputFla
 	if g.IO.KeyMods != mods { return false }
 
 	// Special storage location for mods
-	key : ImGuiKey = cast(ImGuiKey) (key_chord & !ImGuiKey.ImGuiMod_Mask_)
+	key : ImGuiKey = cast(ImGuiKey) (key_chord & ~ImGuiKey.ImGuiMod_Mask_)
 	if key == ImGuiKey.ImGuiKey_None { key = ConvertSingleModFlagToKey(mods) }
 	if !IsKeyPressed(key, (flags & ImGuiInputFlagsPrivate_.ImGuiInputFlags_RepeatMask_), owner_id) { return false }
 	return true
@@ -17005,7 +17005,7 @@ ImGui_ItemHandleShortcut :: proc(id : ImGuiID)
 {
 	g : ^ImGuiContext = GImGui
 	flags : ImGuiInputFlags = g.NextItemData.ShortcutFlags
-	IM_ASSERT((flags & !ImGuiInputFlagsPrivate_.ImGuiInputFlags_SupportedBySetNextItemShortcut) == 0); // Passing flags not supported by SetNextItemShortcut()!
+	IM_ASSERT((flags & ~ImGuiInputFlagsPrivate_.ImGuiInputFlags_SupportedBySetNextItemShortcut) == 0); // Passing flags not supported by SetNextItemShortcut()!
 
 	if g.LastItemData.ItemFlags & ImGuiItemFlagsPrivate_.ImGuiItemFlags_Disabled { return }
 	if ImGuiInputFlags_Tooltip : ^flags; ImGuiInputFlags_Tooltip {
@@ -17111,7 +17111,7 @@ ImGui_Shortcut :: proc(key_chord : ImGuiKeyChord, flags : ImGuiInputFlags, owner
 	// Claim mods during the press
 	SetKeyOwnersForKeyChord(key_chord & ImGuiKey.ImGuiMod_Mask_, owner_id)
 
-	IM_ASSERT((flags & !ImGuiInputFlagsPrivate_.ImGuiInputFlags_SupportedByShortcut) == 0); // Passing flags not supported by this function!
+	IM_ASSERT((flags & ~ImGuiInputFlagsPrivate_.ImGuiInputFlags_SupportedByShortcut) == 0); // Passing flags not supported by this function!
 	return true
 }
 
@@ -17248,7 +17248,7 @@ ImGui_ErrorCheckNewFrameSanityChecks :: proc()
 		}
 		else {
 			// Disable feature, our backends do not support it
-			g.IO.ConfigFlags &= !ImGuiConfigFlags_.ImGuiConfigFlags_ViewportsEnable
+			g.IO.ConfigFlags &= ~ImGuiConfigFlags_.ImGuiConfigFlags_ViewportsEnable
 		}
 
 		// Perform simple checks on platform monitor data + compute a total bounding box for quick early outs
@@ -17820,7 +17820,7 @@ ImGui_PushItemWidth :: proc(item_width : f32)
 	window : ^ImGuiWindow = g.CurrentWindow
 	push_back(&window.DC.ItemWidthStack, window.DC.ItemWidth); // Backup current width
 	window.DC.ItemWidth = (item_width == 0.0 ? window.ItemWidthDefault : item_width)
-	g.NextItemData.HasFlags &= !ImGuiNextItemDataFlags_.ImGuiNextItemDataFlags_HasWidth
+	g.NextItemData.HasFlags &= ~ImGuiNextItemDataFlags_.ImGuiNextItemDataFlags_HasWidth
 }
 
 ImGui_PushMultiItemsWidths :: proc(components : i32, w_full : f32)
@@ -17839,7 +17839,7 @@ ImGui_PushMultiItemsWidths :: proc(components : i32, w_full : f32)
 	}
 
 	window.DC.ItemWidth = ImMax(prev_split, 1.0)
-	g.NextItemData.HasFlags &= !ImGuiNextItemDataFlags_.ImGuiNextItemDataFlags_HasWidth
+	g.NextItemData.HasFlags &= ~ImGuiNextItemDataFlags_.ImGuiNextItemDataFlags_HasWidth
 }
 
 ImGui_PopItemWidth :: proc()
@@ -18133,8 +18133,8 @@ ImGui_ScrollToRectEx :: proc(window : ^ImGuiWindow, item_rect : ^ImRect, flags :
 	// Also scroll parent window to keep us into view if necessary
 	if !(flags & ImGuiScrollFlags_.ImGuiScrollFlags_NoScrollParent) && (window.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_ChildWindow) {
 		// FIXME-SCROLL: May be an option?
-		if (in_flags & (ImGuiScrollFlags_.ImGuiScrollFlags_AlwaysCenterX | ImGuiScrollFlags_.ImGuiScrollFlags_KeepVisibleCenterX)) != 0 { in_flags = (in_flags & !ImGuiScrollFlags_.ImGuiScrollFlags_MaskX_) | ImGuiScrollFlags_.ImGuiScrollFlags_KeepVisibleEdgeX }
-		if (in_flags & (ImGuiScrollFlags_.ImGuiScrollFlags_AlwaysCenterY | ImGuiScrollFlags_.ImGuiScrollFlags_KeepVisibleCenterY)) != 0 { in_flags = (in_flags & !ImGuiScrollFlags_.ImGuiScrollFlags_MaskY_) | ImGuiScrollFlags_.ImGuiScrollFlags_KeepVisibleEdgeY }
+		if (in_flags & (ImGuiScrollFlags_.ImGuiScrollFlags_AlwaysCenterX | ImGuiScrollFlags_.ImGuiScrollFlags_KeepVisibleCenterX)) != 0 { in_flags = (in_flags & ~ImGuiScrollFlags_.ImGuiScrollFlags_MaskX_) | ImGuiScrollFlags_.ImGuiScrollFlags_KeepVisibleEdgeX }
+		if (in_flags & (ImGuiScrollFlags_.ImGuiScrollFlags_AlwaysCenterY | ImGuiScrollFlags_.ImGuiScrollFlags_KeepVisibleCenterY)) != 0 { in_flags = (in_flags & ~ImGuiScrollFlags_.ImGuiScrollFlags_MaskY_) | ImGuiScrollFlags_.ImGuiScrollFlags_KeepVisibleEdgeY }
 		delta_scroll += ScrollToRectEx(window.ParentWindow, ImRect(item_rect.Min - delta_scroll, item_rect.Max - delta_scroll), in_flags)
 	}
 
@@ -19463,7 +19463,7 @@ ImGui_NavScoreItem :: proc(result : ^ImGuiNavItemData) -> bool
 			AddRect(draw_list, curr.Min, curr.Max, IM_COL32(255, 200, 0, 100))
 			AddRect(draw_list, cand.Min, cand.Max, IM_COL32(255, 255, 0, 200))
 			AddRectFilled(draw_list, cand.Max - ImVec2(4, 4), cand.Max + CalcTextSize(buf) + ImVec2(4, 4), IM_COL32(40, 0, 0, 200))
-			AddText(draw_list, cand.Max, !0, buf)
+			AddText(draw_list, cand.Max, ~0, buf)
 		}
 		if debug_tty { IMGUI_DEBUG_LOG_NAV("id 0x%08X\n%s\n", g.LastItemData.ID, buf) }
 	}
@@ -19697,7 +19697,7 @@ ImGui_NavMoveRequestResolveWithPastTreeNode :: proc(result : ^ImGuiNavItemData, 
 	g : ^ImGuiContext = GImGui
 	g.NavMoveScoringItems = false
 	g.LastItemData.ID = tree_node_data.ID
-	g.LastItemData.ItemFlags = tree_node_data.ItemFlags & !ImGuiItemFlagsPrivate_.ImGuiItemFlags_HasSelectionUserData; // Losing SelectionUserData, recovered next-frame (cheaper).
+	g.LastItemData.ItemFlags = tree_node_data.ItemFlags & ~ImGuiItemFlagsPrivate_.ImGuiItemFlags_HasSelectionUserData; // Losing SelectionUserData, recovered next-frame (cheaper).
 	g.LastItemData.NavRect = tree_node_data.NavRect
 	NavApplyItemToResult(result); // Result this instead of implementing a NavApplyPastTreeNodeToResult()
 	NavClearPreferredPosForAxis(ImGuiAxis.ImGuiAxis_Y)
@@ -19729,11 +19729,11 @@ ImGui_NavMoveRequestForward :: proc(move_dir : ImGuiDir, clip_dir : ImGuiDir, mo
 ImGui_NavMoveRequestTryWrapping :: proc(window : ^ImGuiWindow, wrap_flags : ImGuiNavMoveFlags)
 {
 	g : ^ImGuiContext = GImGui
-	IM_ASSERT((wrap_flags & ImGuiNavMoveFlags_.ImGuiNavMoveFlags_WrapMask_) != 0 && (wrap_flags & !ImGuiNavMoveFlags_.ImGuiNavMoveFlags_WrapMask_) == 0); // Call with _WrapX, _WrapY, _LoopX, _LoopY
+	IM_ASSERT((wrap_flags & ImGuiNavMoveFlags_.ImGuiNavMoveFlags_WrapMask_) != 0 && (wrap_flags & ~ImGuiNavMoveFlags_.ImGuiNavMoveFlags_WrapMask_) == 0); // Call with _WrapX, _WrapY, _LoopX, _LoopY
 
 	// In theory we should test for NavMoveRequestButNoResultYet() but there's no point doing it:
 	// as NavEndFrame() will do the same test. It will end up calling NavUpdateCreateWrappingRequest().
-	if g.NavWindow == window && g.NavMoveScoringItems && g.NavLayer == ImGuiNavLayer.ImGuiNavLayer_Main { g.NavMoveFlags = (g.NavMoveFlags & !ImGuiNavMoveFlags_.ImGuiNavMoveFlags_WrapMask_) | wrap_flags }
+	if g.NavWindow == window && g.NavMoveScoringItems && g.NavLayer == ImGuiNavLayer.ImGuiNavLayer_Main { g.NavMoveFlags = (g.NavMoveFlags & ~ImGuiNavMoveFlags_.ImGuiNavMoveFlags_WrapMask_) | wrap_flags }
 }
 
 // FIXME: This could be replaced by updating a frame number in each window when (window == NavWindow) and (NavLayer == 0).
@@ -20272,7 +20272,7 @@ ImGui_NavMoveRequestApplyResult :: proc()
 	}
 
 	// Tabbing: Activates Inputable, otherwise only Focus
-	if (g.NavMoveFlags & ImGuiNavMoveFlags_.ImGuiNavMoveFlags_IsTabbing) && (result.ItemFlags & ImGuiItemFlagsPrivate_.ImGuiItemFlags_Inputable) == 0 { g.NavMoveFlags &= !ImGuiNavMoveFlags_.ImGuiNavMoveFlags_Activate }
+	if (g.NavMoveFlags & ImGuiNavMoveFlags_.ImGuiNavMoveFlags_IsTabbing) && (result.ItemFlags & ImGuiItemFlagsPrivate_.ImGuiItemFlags_Inputable) == 0 { g.NavMoveFlags &= ~ImGuiNavMoveFlags_.ImGuiNavMoveFlags_Activate }
 
 	// Activate
 	if g.NavMoveFlags & ImGuiNavMoveFlags_.ImGuiNavMoveFlags_Activate {
@@ -20846,7 +20846,7 @@ ImGui_BeginDragDropSource :: proc(flags : ImGuiDragDropFlags) -> bool
 		IM_UNUSED(ret)
 	}
 
-	if !(flags & ImGuiDragDropFlags_.ImGuiDragDropFlags_SourceNoDisableHover) && !(flags & ImGuiDragDropFlags_.ImGuiDragDropFlags_SourceExtern) { g.LastItemData.StatusFlags &= !ImGuiItemStatusFlags_.ImGuiItemStatusFlags_HoveredRect }
+	if !(flags & ImGuiDragDropFlags_.ImGuiDragDropFlags_SourceNoDisableHover) && !(flags & ImGuiDragDropFlags_.ImGuiDragDropFlags_SourceExtern) { g.LastItemData.StatusFlags &= ~ImGuiItemStatusFlags_.ImGuiItemStatusFlags_HoveredRect }
 
 	return true
 }
@@ -21826,7 +21826,7 @@ ImGui_UpdateViewportsNewFrame :: proc()
 			if g.PlatformIO.Platform_GetWindowMinimized && platform_funcs_available {
 				is_minimized : bool = Platform_GetWindowMinimized(&g.PlatformIO, viewport)
 				if is_minimized { viewport.Flags |= ImGuiViewportFlags_.ImGuiViewportFlags_IsMinimized }
-				else { viewport.Flags &= !ImGuiViewportFlags_.ImGuiViewportFlags_IsMinimized }
+				else { viewport.Flags &= ~ImGuiViewportFlags_.ImGuiViewportFlags_IsMinimized }
 			}
 
 			// Update our implicit z-order knowledge of platform windows, which is used when the backend cannot provide io.MouseHoveredViewport.
@@ -21834,7 +21834,7 @@ ImGui_UpdateViewportsNewFrame :: proc()
 			if g.PlatformIO.Platform_GetWindowFocus && platform_funcs_available {
 				is_focused : bool = Platform_GetWindowFocus(&g.PlatformIO, viewport)
 				if is_focused { viewport.Flags |= ImGuiViewportFlags_.ImGuiViewportFlags_IsFocused }
-				else { viewport.Flags &= !ImGuiViewportFlags_.ImGuiViewportFlags_IsFocused }
+				else { viewport.Flags &= ~ImGuiViewportFlags_.ImGuiViewportFlags_IsFocused }
 				if is_focused { focused_viewport = viewport }
 			}
 		}
@@ -22264,7 +22264,7 @@ ImGui_WindowSyncOwnedViewport :: proc(window : ^ImGuiWindow, parent_window_in_st
 
 	// Update common viewport flags
 	viewport_flags_to_clear : ImGuiViewportFlags = ImGuiViewportFlags_.ImGuiViewportFlags_TopMost | ImGuiViewportFlags_.ImGuiViewportFlags_NoTaskBarIcon | ImGuiViewportFlags_.ImGuiViewportFlags_NoDecoration | ImGuiViewportFlags_.ImGuiViewportFlags_NoRendererClear
-	viewport_flags : ImGuiViewportFlags = window.Viewport.Flags & !viewport_flags_to_clear
+	viewport_flags : ImGuiViewportFlags = window.Viewport.Flags & ~viewport_flags_to_clear
 	window_flags : ImGuiWindowFlags = window.Flags
 	is_modal : bool = (window_flags & ImGuiWindowFlags_.ImGuiWindowFlags_Modal) != 0
 	is_short_lived_floating_window : bool = (window_flags & (ImGuiWindowFlags_.ImGuiWindowFlags_ChildMenu | ImGuiWindowFlags_.ImGuiWindowFlags_Tooltip | ImGuiWindowFlags_.ImGuiWindowFlags_Popup)) != 0
@@ -22286,7 +22286,7 @@ ImGui_WindowSyncOwnedViewport :: proc(window : ^ImGuiWindow, parent_window_in_st
 
 	// We can overwrite viewport flags using ImGuiWindowClass (advanced users)
 	if window.WindowClass.ViewportFlagsOverrideSet { viewport_flags |= window.WindowClass.ViewportFlagsOverrideSet }
-	if window.WindowClass.ViewportFlagsOverrideClear { viewport_flags &= !window.WindowClass.ViewportFlagsOverrideClear }
+	if window.WindowClass.ViewportFlagsOverrideClear { viewport_flags &= ~window.WindowClass.ViewportFlagsOverrideClear }
 
 	// We can also tell the backend that clearing the platform window won't be necessary,
 	// as our window background is filling the viewport and we have disabled BgAlpha.
@@ -23064,7 +23064,7 @@ ImGui_DockContextProcessDock :: proc(ctx : ^ImGuiContext, req : ^ImGuiDockReques
 		node.Size = target_window.Size
 		if target_window.DockNodeAsHost == nil {
 			DockNodeAddWindow(node, target_window, true)
-			node.TabBar.Tabs[0].Flags &= !ImGuiTabItemFlagsPrivate_.ImGuiTabItemFlags_Unsorted
+			node.TabBar.Tabs[0].Flags &= ~ImGuiTabItemFlagsPrivate_.ImGuiTabItemFlags_Unsorted
 			target_window.DockIsActive = true
 		}
 	}
@@ -23080,7 +23080,7 @@ ImGui_DockContextProcessDock :: proc(ctx : ^ImGuiContext, req : ^ImGuiDockReques
 		new_node.HostWindow = node.HostWindow
 		node = new_node
 	}
-	SetLocalFlags(node, node.LocalFlags & !ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_HiddenTabBar)
+	SetLocalFlags(node, node.LocalFlags & ~ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_HiddenTabBar)
 
 	if node != payload_node {
 		// Create tab bar before we call DockNodeMoveWindows (which would attempt to move the old tab-bar, which would lead us to payload tabs wrongly appearing before target tabs!)
@@ -23111,7 +23111,7 @@ ImGui_DockContextProcessDock :: proc(ctx : ^ImGuiContext, req : ^ImGuiDockReques
 					last_focused_root_node : ^ImGuiDockNode = DockNodeGetRootNode(last_focused_node)
 					IM_ASSERT(last_focused_root_node == DockNodeGetRootNode(payload_node))
 					SetLocalFlags(last_focused_node, last_focused_node.LocalFlags | ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_CentralNode)
-					SetLocalFlags(node, node.LocalFlags & !ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_CentralNode)
+					SetLocalFlags(node, node.LocalFlags & ~ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_CentralNode)
 					last_focused_root_node.CentralNode = last_focused_node
 				}
 
@@ -23205,7 +23205,7 @@ ImGui_DockContextProcessUndockNode :: proc(ctx : ^ImGuiContext, node : ^ImGuiDoc
 		node.ParentNode = nil
 	}
 	for window in node.Windows {
-		window.Flags &= !ImGuiWindowFlags_.ImGuiWindowFlags_ChildWindow
+		window.Flags &= ~ImGuiWindowFlags_.ImGuiWindowFlags_ChildWindow
 		if window.ParentWindow { find_erase(&window.ParentWindow.DC.ChildWindows, window) }
 		UpdateWindowParentAndRootLinks(window, window.Flags, nil)
 	}
@@ -23373,7 +23373,7 @@ ImGui_DockNodeRemoveWindow :: proc(node : ^ImGuiDockNode, window : ^ImGuiWindow,
 	window.DockNode = nil
 	window.DockTabWantClose = false; window.DockIsActive = window.DockTabWantClose
 	window.DockId = save_dock_id
-	window.Flags &= !ImGuiWindowFlags_.ImGuiWindowFlags_ChildWindow
+	window.Flags &= ~ImGuiWindowFlags_.ImGuiWindowFlags_ChildWindow
 	if window.ParentWindow { find_erase(&window.ParentWindow.DC.ChildWindows, window) }
 	UpdateWindowParentAndRootLinks(window, window.Flags, nil); // Update immediately
 
@@ -23579,7 +23579,7 @@ ImGui_DockNodeUpdateFlagsAndCollapse :: proc(node : ^ImGuiDockNode)
 	if node.WantHiddenTabBarToggle && node.VisibleWindow && (node.VisibleWindow.WindowClass.DockNodeFlagsOverrideSet & ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_HiddenTabBar) { node.WantHiddenTabBarToggle = false }
 
 	// Apply toggles at a single point of the frame (here!)
-	if node.Windows.Size > 1 { SetLocalFlags(node, node.LocalFlags & !ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_HiddenTabBar) }
+	if node.Windows.Size > 1 { SetLocalFlags(node, node.LocalFlags & ~ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_HiddenTabBar) }
 	else if node.WantHiddenTabBarToggle { SetLocalFlags(node, node.LocalFlags ~ ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_HiddenTabBar) }
 	node.WantHiddenTabBarToggle = false
 
@@ -24102,7 +24102,7 @@ ImGui_DockNodeUpdateTabBar :: proc(node : ^ImGuiDockNode, host_window : ^ImGuiWi
 	tabs_unsorted_start : i32 = tab_bar.Tabs.Size
 	for tab_n : i32 = tab_bar.Tabs.Size - 1; tab_n >= 0 && (tab_bar.Tabs[tab_n].Flags & ImGuiTabItemFlagsPrivate_.ImGuiTabItemFlags_Unsorted); post_decr(&tab_n) {
 		// FIXME-DOCK: Consider only clearing the flag after the tab has been alive for a few consecutive frames, allowing late comers to not break sorting?
-		tab_bar.Tabs[tab_n].Flags &= !ImGuiTabItemFlagsPrivate_.ImGuiTabItemFlags_Unsorted
+		tab_bar.Tabs[tab_n].Flags &= ~ImGuiTabItemFlagsPrivate_.ImGuiTabItemFlags_Unsorted
 		tabs_unsorted_start = tab_n
 	}
 
@@ -24384,11 +24384,11 @@ ImGui_DockNodeCalcDropRectsAndTestMousePos :: proc(parent : ^ImRect, dir : ImGui
 	}
 
 	c : ImVec2 = ImTrunc(GetCenter(&parent))
-	if dir == ImGuiDir.ImGuiDir_None { out_r = ImRect(c.x - hs_w, c.y - hs_w, c.x + hs_w, c.y + hs_w) }
-	else if dir == ImGuiDir.ImGuiDir_Up { out_r = ImRect(c.x - hs_w, c.y - off.y - hs_h, c.x + hs_w, c.y - off.y + hs_h) }
-	else if dir == ImGuiDir.ImGuiDir_Down { out_r = ImRect(c.x - hs_w, c.y + off.y - hs_h, c.x + hs_w, c.y + off.y + hs_h) }
-	else if dir == ImGuiDir.ImGuiDir_Left { out_r = ImRect(c.x - off.x - hs_h, c.y - hs_w, c.x - off.x + hs_h, c.y + hs_w) }
-	else if dir == ImGuiDir.ImGuiDir_Right { out_r = ImRect(c.x + off.x - hs_h, c.y - hs_w, c.x + off.x + hs_h, c.y + hs_w) }
+	if dir == ImGuiDir.ImGuiDir_None { out_r^ = ImRect(c.x - hs_w, c.y - hs_w, c.x + hs_w, c.y + hs_w) }
+	else if dir == ImGuiDir.ImGuiDir_Up { out_r^ = ImRect(c.x - hs_w, c.y - off.y - hs_h, c.x + hs_w, c.y - off.y + hs_h) }
+	else if dir == ImGuiDir.ImGuiDir_Down { out_r^ = ImRect(c.x - hs_w, c.y + off.y - hs_h, c.x + hs_w, c.y + off.y + hs_h) }
+	else if dir == ImGuiDir.ImGuiDir_Left { out_r^ = ImRect(c.x - off.x - hs_h, c.y - hs_w, c.x - off.x + hs_h, c.y + hs_w) }
+	else if dir == ImGuiDir.ImGuiDir_Right { out_r^ = ImRect(c.x + off.x - hs_h, c.y - hs_w, c.x + off.x + hs_h, c.y + hs_w) }
 
 	if test_mouse_pos == nil { return false }
 
@@ -24624,7 +24624,7 @@ ImGui_DockNodeTreeSplit :: proc(ctx : ^ImGuiContext, parent_node : ^ImGuiDockNod
 	child_0.SharedFlags = parent_node.SharedFlags & ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_SharedFlagsInheritMask_
 	child_1.SharedFlags = parent_node.SharedFlags & ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_SharedFlagsInheritMask_
 	child_inheritor.LocalFlags = parent_node.LocalFlags & ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_LocalFlagsTransferMask_
-	parent_node.LocalFlags &= !ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_LocalFlagsTransferMask_
+	parent_node.LocalFlags &= ~ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_LocalFlagsTransferMask_
 	UpdateMergedFlags(child_0)
 	UpdateMergedFlags(child_1)
 	UpdateMergedFlags(parent_node)
@@ -24661,7 +24661,7 @@ ImGui_DockNodeTreeMerge :: proc(ctx : ^ImGuiContext, parent_node : ^ImGuiDockNod
 	parent_node.SizeRef = backup_last_explicit_size
 
 	// Flags transfer
-	parent_node.LocalFlags &= !ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_LocalFlagsTransferMask_; // Preserve Dockspace flag
+	parent_node.LocalFlags &= ~ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_LocalFlagsTransferMask_; // Preserve Dockspace flag
 	parent_node.LocalFlags |= (child_0 ? child_0.LocalFlags : 0) & ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_LocalFlagsTransferMask_
 	parent_node.LocalFlags |= (child_1 ? child_1.LocalFlags : 0) & ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_LocalFlagsTransferMask_
 	parent_node.LocalFlagsInWindows = (child_0 ? child_0.LocalFlagsInWindows : 0) | (child_1 ? child_1.LocalFlagsInWindows : 0); // FIXME: Would be more consistent to update from actual windows
@@ -24915,7 +24915,7 @@ ImGui_SetWindowDock :: proc(window : ^ImGuiWindow, dock_id : ImGuiID, cond : ImG
 {
 	// Test condition (NB: bit 0 is always true) and clear flags for next time
 	if cond && (window.SetWindowDockAllowFlags & cond) == 0 { return }
-	window.SetWindowDockAllowFlags &= !(ImGuiCond_.ImGuiCond_Once | ImGuiCond_.ImGuiCond_FirstUseEver | ImGuiCond_.ImGuiCond_Appearing)
+	window.SetWindowDockAllowFlags &= ~(ImGuiCond_.ImGuiCond_Once | ImGuiCond_.ImGuiCond_FirstUseEver | ImGuiCond_.ImGuiCond_Appearing)
 
 	if window.DockId == dock_id { return }
 
@@ -25193,7 +25193,7 @@ ImGui_DockBuilderAddNode :: proc(node_id : ImGuiID, flags : ImGuiDockNodeFlags) 
 
 	node : ^ImGuiDockNode = nil
 	if ImGuiDockNodeFlags_DockSpace : ^flags; ImGuiDockNodeFlags_DockSpace {
-		DockSpace(node_id, ImVec2(0, 0), (flags & !ImGuiDockNodeFlags_DockSpace) | ImGuiDockNodeFlags_.ImGuiDockNodeFlags_KeepAliveOnly)
+		DockSpace(node_id, ImVec2(0, 0), (flags & ~ImGuiDockNodeFlags_DockSpace) | ImGuiDockNodeFlags_.ImGuiDockNodeFlags_KeepAliveOnly)
 		node = DockContextFindNodeByID(&g, node_id)
 	}
 	else {
@@ -25645,7 +25645,7 @@ ImGui_BeginDocked :: proc(window : ^ImGuiWindow, p_open : ^bool)
 	if IsHiddenTabBar(node) || IsNoTabBar(node) { window.Flags |= ImGuiWindowFlags_.ImGuiWindowFlags_NoTitleBar }
 	else {
 		// Clear the NoTitleBar flag in case the user set it: confusingly enough we need a title bar height so we are correctly offset, but it won't be displayed!
-		window.Flags &= !ImGuiWindowFlags_.ImGuiWindowFlags_NoTitleBar
+		window.Flags &= ~ImGuiWindowFlags_.ImGuiWindowFlags_NoTitleBar
 	}
 
 	// Save new dock order only if the window has been visible once already
@@ -27220,7 +27220,7 @@ ImGui_DebugNodeDrawList :: proc(window : ^ImGuiWindow, viewport : ^ImGuiViewport
 	Selectable(buf, false)
 	if fg_draw_list && IsItemHovered() {
 		backup_flags : ImDrawListFlags = fg_draw_list.Flags
-		fg_draw_list.Flags &= !ImDrawListFlags_.ImDrawListFlags_AntiAliasedLines; // Disable AA on triangle outlines is more readable for very large and thin triangles.
+		fg_draw_list.Flags &= ~ImDrawListFlags_.ImDrawListFlags_AntiAliasedLines; // Disable AA on triangle outlines is more readable for very large and thin triangles.
 		AddPolyline(fg_draw_list, triangle, 3, IM_COL32(255, 255, 0, 255), ImDrawFlags_.ImDrawFlags_Closed, 1.0)
 		fg_draw_list.Flags = backup_flags
 	}
@@ -27241,7 +27241,7 @@ ImGui_DebugNodeDrawCmdShowMeshAndBoundingBox :: proc(out_draw_list : ^ImDrawList
 	clip_rect : ImRect = draw_cmd.ClipRect
 	vtxs_rect : ImRect; init(&vtxs_rect, FLT_MAX, FLT_MAX, -FLT_MAX, -FLT_MAX)
 	backup_flags : ImDrawListFlags = out_draw_list.Flags
-	out_draw_list.Flags &= !ImDrawListFlags_.ImDrawListFlags_AntiAliasedLines; // Disable AA on triangle outlines is more readable for very large and thin triangles.
+	out_draw_list.Flags &= ~ImDrawListFlags_.ImDrawListFlags_AntiAliasedLines; // Disable AA on triangle outlines is more readable for very large and thin triangles.
 	for idx_n, idx_end : u32 = draw_cmd.IdxOffset, draw_cmd.IdxOffset + draw_cmd.ElemCount; idx_n < idx_end;  {
 		idx_buffer : ^ImDrawIdx = (draw_list.IdxBuffer.Size > 0) ? draw_list.IdxBuffer.Data : nil; // We don't hold on those pointers past iterations as ->AddPolyline() may invalidate them if out_draw_list==draw_list
 		vtx_buffer : ^ImDrawVert = draw_list.VtxBuffer.Data + draw_cmd.VtxOffset
@@ -27585,7 +27585,7 @@ ImGui_ShowDebugLogWindow :: proc(p_open : ^bool)
 		return
 	}
 
-	all_enable_flags : ImGuiDebugLogFlags = ImGuiDebugLogFlags_.ImGuiDebugLogFlags_EventMask_ & !ImGuiDebugLogFlags_.ImGuiDebugLogFlags_EventInputRouting
+	all_enable_flags : ImGuiDebugLogFlags = ImGuiDebugLogFlags_.ImGuiDebugLogFlags_EventMask_ & ~ImGuiDebugLogFlags_.ImGuiDebugLogFlags_EventInputRouting
 	CheckboxFlags("All", &g.DebugLogFlags, all_enable_flags)
 	SetItemTooltip("(except InputRouting which is spammy)")
 
@@ -27626,7 +27626,7 @@ ImGui_ShowDebugLogWindow :: proc(p_open : ^bool)
 	BeginChild("##log", ImVec2(0.0, 0.0), ImGuiChildFlags_.ImGuiChildFlags_Borders, ImGuiWindowFlags_.ImGuiWindowFlags_AlwaysVerticalScrollbar | ImGuiWindowFlags_.ImGuiWindowFlags_AlwaysHorizontalScrollbar)
 
 	backup_log_flags : ImGuiDebugLogFlags = g.DebugLogFlags
-	g.DebugLogFlags &= !ImGuiDebugLogFlags_.ImGuiDebugLogFlags_EventClipper
+	g.DebugLogFlags &= ~ImGuiDebugLogFlags_.ImGuiDebugLogFlags_EventClipper
 
 	clipper : ImGuiListClipper
 	Begin(&clipper, size(&g.DebugLogIndex))

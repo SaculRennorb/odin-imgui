@@ -45,7 +45,7 @@ ImGuiDockNodeFlagsPrivate_ :: enum i32 {
 	ImGuiDockNodeFlags_NoDocking = ImGuiDockNodeFlags_NoDockingOverMe | ImGuiDockNodeFlags_NoDockingOverOther | ImGuiDockNodeFlags_NoDockingOverEmpty | ImGuiDockNodeFlags_NoDockingSplit | ImGuiDockNodeFlags_NoDockingSplitOther,
 
 	// Masks
-	ImGuiDockNodeFlags_SharedFlagsInheritMask_ = !0,
+	ImGuiDockNodeFlags_SharedFlagsInheritMask_ = ~0,
 	ImGuiDockNodeFlags_NoResizeFlagsMask_ = cast(i32) ImGuiDockNodeFlags_NoResize | ImGuiDockNodeFlags_NoResizeX | ImGuiDockNodeFlags_NoResizeY,
 
 	// When splitting, those local flags are moved to the inheriting child, never duplicated

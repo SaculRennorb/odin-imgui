@@ -547,11 +547,11 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 
 			case .ExprUnaryLeft:
 				switch current_node.unary_left.operator {
-					case .AddressOf, .Plus, .Minus:
+					case .AddressOf, .Plus, .Minus, .Invert:
 						str.write_byte(&ctx.result, byte(current_node.unary_left.operator))
 						write_node(ctx, current_node.unary_left.right, name_persistence, name_context)
 
-					case .Invert, .Not:
+					case .Not:
 						str.write_byte(&ctx.result, '!')
 						write_node(ctx, current_node.unary_left.right, name_persistence, name_context)
 
@@ -671,8 +671,8 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 									}
 								}
 
-								// deref assign to references   r = v  -> p^ = v
-								if lptr, is_ptr := left_type.(AstTypePointer); is_ptr && .Reference in lptr.flags {
+								// deref assign to references   r = v  -> p^ = v, except when its a[i] = v
+								if lptr, is_ptr := left_type.(AstTypePointer); is_ptr && .Reference in lptr.flags && ctx.ast[binary.left].kind != .ExprIndex {
 									write_node(ctx, binary.left, name_persistence, name_context)
 									str.write_string(&ctx.result, "^ = ")
 									write_node(ctx, binary.right, name_persistence, name_context)

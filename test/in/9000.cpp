@@ -1,3 +1,5 @@
+typedef int ImGuiDockNodeFlags;
+
 // Flags for ImGui::DockSpace(), shared/inherited by child nodes.
 // (Some flags can be applied to individual nodes directly)
 // FIXME-DOCK: Also see ImGuiDockNodeFlagsPrivate_ which may involve using the WIP and internal DockBuilder api.

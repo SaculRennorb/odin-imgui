@@ -1,9 +1,9 @@
 // raddbg 0.9.19 project file
 
 recent_file: path: "converter.odin"
+recent_file: path: "../../../../../Program Files/odin/base/runtime/error_checks.odin"
 recent_file: path: "ast.odin"
 recent_file: path: "../../../../../Program Files/odin/base/runtime/core.odin"
-recent_file: path: "../../../../../Program Files/odin/base/runtime/error_checks.odin"
 recent_file: path: "d:/a/_work/1/s/src/vctools/crt/vcruntime/src/string/amd64/memset.asm"
 recent_file: path: "main.odin"
 recent_file: path: "test/runner.odin"
@@ -37,6 +37,7 @@ target:
 {
   executable: "odin_imgui.exe"
   working_directory: ""
+  enabled: 1
 }
 type_view:
 {
@@ -65,6 +66,7 @@ type_view:
 }
 breakpoint:
 {
-  source_location: "converter.odin:363:1"
+  source_location: "converter.odin:2594:1"
+  condition: "def_node.type == 4889"
   hit_count: 1
 }

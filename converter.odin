@@ -639,6 +639,8 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 					case:
 						#partial switch binary.operator {
 							case .Assign:
+								left_type_idx, left_type_ctx := resolve_type(ctx, binary.left, name_context)
+								left_type := ctx.type_heap[left_type_idx]
 								// short circuit pointer to ref assignments and vice versa
 								if right.kind == .ExprUnaryLeft {
 									if right.unary_left.operator == .Dereference {
@@ -646,9 +648,6 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 										right_type := ctx.type_heap[right_type_idx]
 
 										if rptr, is_ptr := right_type.(AstTypePointer); is_ptr && .Reference not_in rptr.flags { // ? = *p
-											left_type_idx, _ := resolve_type(ctx, binary.left, name_context)
-											left_type := ctx.type_heap[left_type_idx]
-
 											if lptr, is_ptr := left_type.(AstTypePointer); is_ptr && .Reference in lptr.flags { // r = *p
 												write_node(ctx, binary.left, name_persistence, name_context)
 												str.write_string(&ctx.result, " = ")
@@ -662,9 +661,6 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 										right_type := ctx.type_heap[right_type_idx]
 
 										if rptr, is_ptr := right_type.(AstTypePointer); is_ptr && .Reference in rptr.flags { // ? = &r
-											left_type_idx, _ := resolve_type(ctx, binary.left, name_context)
-											left_type := ctx.type_heap[left_type_idx]
-
 											if lptr, is_ptr := left_type.(AstTypePointer); is_ptr && .Reference not_in lptr.flags { // p = &r
 												write_node(ctx, binary.left, name_persistence, name_context)
 												str.write_string(&ctx.result, " = ")
@@ -673,6 +669,14 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 											}
 										}
 									}
+								}
+
+								// deref assign to references   r = v  -> p^ = v
+								if lptr, is_ptr := left_type.(AstTypePointer); is_ptr && .Reference in lptr.flags {
+									write_node(ctx, binary.left, name_persistence, name_context)
+									str.write_string(&ctx.result, "^ = ")
+									write_node(ctx, binary.right, name_persistence, name_context)
+									break
 								}
 
 								fallthrough
@@ -2587,23 +2591,27 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 						return def_node.type, {}
 				}
 
-				_, type_context_idx, type_context := find_definition_for(ctx, name_context, def_node.type)
-
-				type_node := ctx.ast[type_context.node]
-				if (type_node.kind == .Struct || type_node.kind == .Union) && len(type_node.structure.template_spec) != 0 {
-					stemmed := stemm_type(ctx, def_node.type)
-					instance_key := format_instantiated_structure_name_key(ctx, stemmed)
-					_, instance_context, ctx_requires_creation, _ := map_entry(&type_context.instantiations, instance_key)
-					if ctx_requires_creation {
-						log.debugf("[%v] Baking new generic type %v", def_node.var_name.location, instance_key)
-
-						instance := bake_generic_structure(ctx, type_context.node, ctx.type_heap[stemmed].(AstTypeFragment))
-						instance_context^ = generate_instantiated_structure_context(ctx, type_context_idx, instance)
-					}
-					type_context_idx = instance_context^
+				stemmed := stemm_type(ctx, def_node.type)
+				if is_variant(ctx.type_heap[stemmed], AstTypePrimitive) {
+					return def_node.type, {}
 				}
+				else {
+					_, type_context_idx, type_context := find_definition_for(ctx, name_context, def_node.type)
 
-				return def_node.type, type_context_idx
+					type_node := ctx.ast[type_context.node]
+					if (type_node.kind == .Struct || type_node.kind == .Union) && len(type_node.structure.template_spec) != 0 {
+						instance_key := format_instantiated_structure_name_key(ctx, stemmed)
+						_, instance_context, ctx_requires_creation, _ := map_entry(&type_context.instantiations, instance_key)
+						if ctx_requires_creation {
+							log.debugf("[%v] Baking new generic type %v", def_node.var_name.location, instance_key)
+
+							instance := bake_generic_structure(ctx, type_context.node, ctx.type_heap[stemmed].(AstTypeFragment))
+							instance_context^ = generate_instantiated_structure_context(ctx, type_context_idx, instance)
+						}
+						type_context_idx = instance_context^
+					}
+					return def_node.type, type_context_idx
+				}
 
 			case .FunctionCall:
 				// technically not quite right, but thats also because of the structure of these nodes
@@ -3066,8 +3074,6 @@ find_definition_for :: proc(ctx : ^ConverterContext, start_context : NameContext
 
 try_find_definition_for :: proc(ctx : ^ConverterContext, start_context : NameContextIndex, type : AstTypeIndex) -> (found_context_tail_idx, found_context_head_idx : NameContextIndex, found_context : ^NameContext)
 {
-	if type == {} { return }
-
 	flattened_type := make([dynamic]AstTypeFragment, context.temp_allocator)
 	flaten_loop: for type := type; type != {}; {
 		#partial switch frag in ctx.type_heap[type] {
@@ -3085,6 +3091,8 @@ try_find_definition_for :: proc(ctx : ^ConverterContext, start_context : NameCon
 				break flaten_loop
 		}
 	}
+
+	if len(flattened_type) == 0 { return }
 
 	current_root_context_idx := start_context
 
@@ -3173,16 +3181,16 @@ dump_context_stack :: proc(ctx : ^ConverterContext, name_context_idx : NameConte
 	context.logger.options ~= {.Line, .Procedure}
 	
 	if len(name_context.definitions) == 0 {
-		log.infof("%10v #%3v %v%v   -> %v | <leaf>", name_context_idx.persistence, name_context_idx.index, indent, name, name_context.node >= 0 ? ctx.ast[name_context.node].kind : AstNodeKind{});
+		log.errorf("%10v #%3v %v%v   -> %v | <leaf>", name_context_idx.persistence, name_context_idx.index, indent, name, name_context.node >= 0 ? ctx.ast[name_context.node].kind : AstNodeKind{});
 	}
 	else {
-		log.infof("%10v #%3v %v%v   -> %v | %v children:", name_context_idx.persistence, name_context_idx.index, indent, name, name_context.node >= 0 ? ctx.ast[name_context.node].kind : AstNodeKind{}, len(name_context.definitions));
+		log.errorf("%10v #%3v %v%v   -> %v | %v children:", name_context_idx.persistence, name_context_idx.index, indent, name, name_context.node >= 0 ? ctx.ast[name_context.node].kind : AstNodeKind{}, len(name_context.definitions));
 
 		indent := str.concatenate({ indent, "  " }, context.temp_allocator)
 		i := 0
 		for name, didx in name_context.definitions {
 			if i > 20 {
-				// log.infof("<STOP !>")
+				// log.errorf("<STOP !>")
 				// return
 			}
 			dump_context_stack(ctx, didx, name, indent, name_context_idx, forward_only)

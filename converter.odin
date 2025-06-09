@@ -2496,7 +2496,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 					case .FunctionDefinition: //TODO(Rennorb) @explain
 						fn_def := var_def.function_def
 
-						_, type_context_idx, _ := find_definition_for(ctx, name_context, fn_def.return_type)
+						_, type_context_idx, _ := try_find_definition_for_or_warn(ctx, name_context, fn_def.return_type)
 
 						return fn_def.return_type, type_context_idx
 
@@ -2592,34 +2592,42 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 						return def_node.type, {}
 				}
 
+				type_context_idx : NameContextIndex
+
 				stemmed := stemm_type(ctx, def_node.type)
-				if is_variant(ctx.type_heap[stemmed], AstTypePrimitive) {
-					return def_node.type, {}
-				}
-				else {
-					_, type_context_idx, type_context := find_definition_for(ctx, name_context, def_node.type)
-
-					type_node := ctx.ast[type_context.node]
-					if (type_node.kind == .Struct || type_node.kind == .Union) && len(type_node.structure.template_spec) != 0 {
-						instance_key := format_instantiated_structure_name_key(ctx, stemmed)
-						_, instance_context, ctx_requires_creation, _ := map_entry(&type_context.instantiations, instance_key)
-						if ctx_requires_creation {
-							log.debugf("[%v] Baking new generic type %v", def_node.var_name.location, instance_key)
-
-							instance := bake_generic_structure(ctx, type_context.node, ctx.type_heap[stemmed].(AstTypeFragment))
-							instance_context^ = generate_instantiated_structure_context(ctx, type_context_idx, instance)
+				#partial switch _ in ctx.type_heap[stemmed] {
+					case AstTypePrimitive, AstTypeVoid:
+						/**/
+					case:
+						type_context : ^NameContext
+						_, type_context_idx, type_context = try_find_definition_for(ctx, name_context, def_node.type)
+						if type_context_idx.index == 0 {
+							log.warnf("Failed to find deffinition for %v", ctx.type_heap[def_node.type])
 						}
-						type_context_idx = instance_context^
-					}
-					return def_node.type, type_context_idx
+						else {
+							type_node := ctx.ast[type_context.node]
+							if (type_node.kind == .Struct || type_node.kind == .Union) && len(type_node.structure.template_spec) != 0 {
+								instance_key := format_instantiated_structure_name_key(ctx, stemmed)
+								_, instance_context, ctx_requires_creation, _ := map_entry(&type_context.instantiations, instance_key)
+								if ctx_requires_creation {
+									log.debugf("[%v] Baking new generic type %v", def_node.var_name.location, instance_key)
+
+									instance := bake_generic_structure(ctx, type_context.node, ctx.type_heap[stemmed].(AstTypeFragment))
+									instance_context^ = generate_instantiated_structure_context(ctx, type_context_idx, instance)
+								}
+								type_context_idx = instance_context^
+							}
+						}
 				}
+
+				return def_node.type, type_context_idx
 
 			case .FunctionCall:
 				// technically not quite right, but thats also because of the structure of these nodes
 				return resolve_type(ctx, current_node.function_call.expression, name_context, loc)
 
 			case .ExprCast:
-				_, type_context_idx, _ := find_definition_for(ctx, name_context, current_node.cast_.type)
+				_, type_context_idx, _ := try_find_definition_for_or_warn(ctx, name_context, current_node.cast_.type)
 
 				return current_node.cast_.type, type_context_idx
 
@@ -3071,6 +3079,21 @@ find_definition_for :: proc(ctx : ^ConverterContext, start_context : NameContext
 	log.error(err, location = loc)
 	dump_context_stack(ctx, start_context, get_name_context(ctx, start_context).complete_name)
 	panic(err, loc)
+}
+
+try_find_definition_for_or_warn :: proc(ctx : ^ConverterContext, start_context : NameContextIndex, type : AstTypeIndex, loc := #caller_location) -> (found_context_tail_idx, found_context_head_idx : NameContextIndex, found_context : ^NameContext)
+{
+	found_context_tail_idx, found_context_head_idx, found_context = try_find_definition_for(ctx, start_context, type)
+	if found_context != nil { return }
+
+	stemmed := stemm_type(ctx, type)
+	#partial switch _ in ctx.type_heap[stemmed] {
+		case AstTypePrimitive, AstTypeVoid:
+			return
+	}
+
+	log.errorf("Type not found in context: %v", ctx.type_heap[type], location = loc)
+	return
 }
 
 try_find_definition_for :: proc(ctx : ^ConverterContext, start_context : NameContextIndex, type : AstTypeIndex) -> (found_context_tail_idx, found_context_head_idx : NameContextIndex, found_context : ^NameContext)

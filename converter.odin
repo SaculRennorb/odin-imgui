@@ -2517,29 +2517,30 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 			case .ExprIndex:
 				expression_type, expression_type_context := resolve_type(ctx, current_node.index.array_expression, name_context, loc)
 				#partial switch frag in ctx.type_heap[expression_type] {
-					case AstTypePointer:
-						return frag.destination_type, expression_type_context
-
 					case AstTypeArray:
 						return frag.element_type, expression_type_context
 
-					case:
-						// assume the type is indexable and look for a matching operator
-						structure_node := ctx.ast[get_name_context(ctx, expression_type_context).node]
-						assert(structure_node.kind == .Struct || structure_node.kind == .Union)
-
-						for mi in structure_node.structure.members {
-							member := ctx.ast[mi]
-							if member.kind != .OperatorDefinition || member.operator_def.kind != .Index { continue }
-
-							type := ctx.ast[member.operator_def.underlying_function].function_def.return_type
-							_, return_type_context_idx, _ := find_definition_for(ctx, expression_type_context, type)
-
-							return type, return_type_context_idx
+					case AstTypePointer:
+						if .Reference not_in frag.flags {
+							return frag.destination_type, expression_type_context
 						}
-
-						panic(fmt.tprintf("Index operator not found on %#v", structure_node))
 				}
+
+				// assume the type is indexable and look for a matching operator
+				structure_node := ctx.ast[get_name_context(ctx, expression_type_context).node]
+				assert(structure_node.kind == .Struct || structure_node.kind == .Union)
+
+				for mi in structure_node.structure.members {
+					member := ctx.ast[mi]
+					if member.kind != .OperatorDefinition || member.operator_def.kind != .Index { continue }
+
+					type := ctx.ast[member.operator_def.underlying_function].function_def.return_type
+					_, return_type_context_idx, _ := try_find_definition_for_or_warn(ctx, expression_type_context, type)
+
+					return type, return_type_context_idx
+				}
+
+				panic(fmt.tprintf("Index operator not found on %#v", structure_node))
 
 			case .MemberAccess:
 				member_access := current_node.member_access
@@ -3178,13 +3179,13 @@ dump_context_stack :: proc(ctx : ^ConverterContext, name_context_idx : NameConte
 	old_opt := context.logger.options
 	defer context.logger.options = old_opt 
 
-	context.logger.options ~= {.Line, .Procedure}
+	context.logger.options -= {.Line, .Procedure, .Short_File_Path, .Long_File_Path}
 	
 	if len(name_context.definitions) == 0 {
-		log.errorf("%10v #%3v %v%v   -> %v | <leaf>", name_context_idx.persistence, name_context_idx.index, indent, name, name_context.node >= 0 ? ctx.ast[name_context.node].kind : AstNodeKind{});
+		log.errorf("%-10v #%3v %v%v   -> %v | <leaf>", name_context_idx.persistence, name_context_idx.index, indent, name, name_context.node >= 0 ? ctx.ast[name_context.node].kind : AstNodeKind{});
 	}
 	else {
-		log.errorf("%10v #%3v %v%v   -> %v | %v children:", name_context_idx.persistence, name_context_idx.index, indent, name, name_context.node >= 0 ? ctx.ast[name_context.node].kind : AstNodeKind{}, len(name_context.definitions));
+		log.errorf("%-10v #%3v %v%v   -> %v | %v children:", name_context_idx.persistence, name_context_idx.index, indent, name, name_context.node >= 0 ? ctx.ast[name_context.node].kind : AstNodeKind{}, len(name_context.definitions));
 
 		indent := str.concatenate({ indent, "  " }, context.temp_allocator)
 		i := 0

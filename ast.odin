@@ -890,21 +890,28 @@ ast_parse_function_args_def_with_brackets :: proc(ctx: ^AstContext, tokens : ^[]
 			case:
 				type := ast_parse_type(ctx, tokens) or_return
 
-				nn, nns := peek_token(tokens)
-				#partial switch nn.kind {
-					case .Comma, .BracketRoundClose:
-						var_def := AstNode{ kind = .VariableDeclaration, var_declaration = {
-							type = type,
-							// no name
-						}}
-						append(arguments, ast_append_node(ctx, var_def))
+				current_arg: for {
+					nn, nns := peek_token(tokens)
+					#partial switch nn.kind {
+						case .Comma, .BracketRoundClose:
+							var_def := AstNode{ kind = .VariableDeclaration, var_declaration = {
+								type = type,
+								// no name
+							}}
+							append(arguments, ast_append_node(ctx, var_def))
+							break current_arg
 
-					case: // odent or fnptr brackets
-						s : [dynamic]AstNodeIndex
-						ast_parse_var_declaration_no_type(ctx, tokens, type, &s, {}, true) or_return
+						case .Comment:  // fn(int /*length*/)
+							tokens^ = nns // just skip this for now
 
-						append(arguments, s[0])
-						delete(s)
+						case: // ident or fnptr brackets
+							s : [1]AstNodeIndex
+							d := slice.into_dynamic(s[:])
+							ast_parse_var_declaration_no_type(ctx, tokens, type, &d, {}, stop_at_comma = true) or_return
+
+							append(arguments, s[0])
+							break current_arg
+					}
 				}
 		}
 	}
@@ -1712,7 +1719,7 @@ ast_parse_function_call :: proc(ctx: ^AstContext, tokens : ^[]Token, loc := #cal
 	qualified_name := ast_parse_qualified_name(ctx, tokens) or_return
 	// Some special parsing for specific functions...
 	// Ually this would have to be way more complicated to handle macros, but ill jsut hardcode this.
-	switch last(qualified_name).source {
+	switch last_or_nil(qualified_name).source {
 		case "va_arg":
 			eat_token_expect_push_err(ctx, tokens, .BracketRoundOpen) or_return
 			resize(&arguments, 2)

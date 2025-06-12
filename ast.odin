@@ -1672,9 +1672,21 @@ ast_parse_var_declaration_no_type :: proc(ctx: ^AstContext, tokens : ^[]Token, p
 			next, ns = peek_token(tokens)
 		}
 
-		if next.kind != .Comma || stop_at_comma { return }
-		
-		tokens^ = ns // eat ,
+		#partial switch next.kind {
+			case .Comma:
+				if stop_at_comma { return }
+				tokens^ = ns // eat ,
+
+			case .Semicolon, // int a;
+					.BracketRoundClose, // fn(int a)
+					.Colon: // for(int a : b)
+				return
+			
+			case:
+				push_error(ctx, { message = "Expected valid variable declaration temination token", actual = next })
+				err = .Some
+				return
+		}
 	}
 }
 

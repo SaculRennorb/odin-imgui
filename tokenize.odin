@@ -237,6 +237,7 @@ tokenize :: proc(tokens : ^[dynamic]Token, text : string, file_path : string)
 					case "for":         kind = .For
 					case "do":          kind = .Do
 					case "while":       kind = .While
+					case "goto":        kind = .Goto
 					case "if":          kind = .If
 					case "else":        kind = .Else
 					case "typedef":     kind = .Typedef
@@ -446,6 +447,7 @@ TokenKind :: enum {
 	For,
 	While,
 	Do,
+	Goto,
 	If,
 	Else,
 	Switch,

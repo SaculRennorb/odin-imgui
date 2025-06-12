@@ -1071,6 +1071,17 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 			append(sequence, parsed_node)
 			return
 
+		case .Goto:
+			tokens^ = nexts
+
+			node := AstNode{
+				kind = .Goto,
+				label = eat_token_expect_push_err(ctx, tokens, .Identifier) or_return,
+			}
+			parsed_node = ast_append_node(ctx, node)
+			append(sequence, parsed_node)
+			return
+
 		case .For:
 			tokens^ = nexts
 
@@ -1402,6 +1413,15 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 			parsed_node = ast_append_node(ctx, AstNode{ kind = .UsingNamespace, using_namespace = { namespace } })
 			append(sequence, parsed_node)
 			return
+
+		case .Identifier:
+			if nn, nns := peek_token(&nexts); nn.kind == .Colon {
+				tokens^ = nns
+
+				parsed_node = ast_append_node(ctx, AstNode{ kind = .Label, label = next })
+				append(sequence, parsed_node)
+				return
+			}
 	}
 
 
@@ -2753,6 +2773,8 @@ AstNodeKind :: enum {
 	For,
 	Do,
 	While,
+	Goto,
+	Label,
 	Branch,
 	Switch,
 	Typedef,
@@ -2855,6 +2877,7 @@ AstNode :: struct {
 		return_ : struct {
 			expression : AstNodeIndex,
 		},
+		label : Token,
 		structure : struct {
 			name : TokenRange,
 			base_type : AstTypeIndex,
@@ -3005,6 +3028,8 @@ fmt_astnode :: proc(fi: ^fmt.Info, node: ^AstNode, verb: rune) -> bool
 		case .For                : fmt.fmt_arg(fi, node.loop, 'v')
 		case .Do                 : fmt.fmt_arg(fi, node.loop, 'v')
 		case .While              : fmt.fmt_arg(fi, node.loop, 'v')
+		case .Goto               : fmt.fmt_arg(fi, node.label, 'v')
+		case .Label              : fmt.fmt_arg(fi, node.label, 'v')
 		case .Branch             : fmt.fmt_arg(fi, node.branch, 'v')
 		case .Switch             : fmt.fmt_arg(fi, node.switch_, 'v')
 		case .Identifier         : fmt.fmt_arg(fi, node.identifier, 'v')

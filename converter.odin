@@ -542,6 +542,13 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 					write_node(ctx, current_node.return_.expression, name_persistence, name_context)
 				}
 
+			case .Goto: // LabelConversion
+				str.write_string(&ctx.result, "continue ")
+				str.write_string(&ctx.result, current_node.label.source)
+				str.write_string(&ctx.result, " /* @gen goto: validate direction */")
+
+				requires_termination = true
+
 			case .LiteralBool, .LiteralFloat, .LiteralInteger, .LiteralString, .LiteralCharacter, .Continue, .Break:
 				str.write_string(&ctx.result, current_node.literal.source)
 
@@ -1452,6 +1459,23 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 					}
 				}
 				if ctx.ast[ci].kind == .NewLine { continue }
+			}
+
+			if node_kind == .Label { // :LabelConversion
+				member_indent_str := str.concatenate({ indent_str, ONE_INDENT }, context.temp_allocator)
+				
+				str.write_string(&ctx.result, ctx.ast[ci].label.source)
+				str.write_string(&ctx.result, ": for {\n")
+
+				write_node_sequence(ctx, sequence[cii + 1:], name_context, name_persistence, member_indent_str, definition_prefix, termination, always_terminate)
+
+				str.write_byte(&ctx.result, '\n')
+				str.write_string(&ctx.result, member_indent_str)
+				str.write_string(&ctx.result, "break\n")
+				str.write_string(&ctx.result, indent_str)
+				str.write_string(&ctx.result, "}\n")
+
+				return
 			}
 
 			previous_requires_termination, previous_requires_new_paragraph, should_swallow_paragraph = write_node(ctx, ci, name_persistence, name_context, indent_str, definition_prefix)

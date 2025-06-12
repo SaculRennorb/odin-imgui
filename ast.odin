@@ -1495,6 +1495,11 @@ ast_parse_scoped_sequence_no_open_brace :: proc(ctx: ^AstContext, tokens : ^[]To
 					// most declarations and statements must end in a semicolon
 					eat_token_expect_push_err(ctx, tokens, .Semicolon) or_return
 				}
+
+			case .Sequence:
+				//if ctx.ast[member.sequence.members[0]].kind == .VariableDeclaration {
+					eat_token_expect_push_err(ctx, tokens, .Semicolon) //or_return
+				//}
 		}
 
 		#partial switch member.kind {

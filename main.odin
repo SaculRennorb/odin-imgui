@@ -27,6 +27,9 @@ main :: proc()
 	tokenize_file(&input_map, "imgui_draw.cpp")
 	tokenize_file(&input_map, "imgui_tables.cpp")
 	tokenize_file(&input_map, "imgui_widgets.cpp")
+	tokenize_file(&input_map, "imstb_textedit.h")
+	tokenize_file(&input_map, "misc/freetype/imgui_freetype.h")
+	tokenize_file(&input_map, "misc/freetype/imgui_freetype.cpp")
 	
 	{
 		//tokenize_file(&input_map, "imconfig.h")
@@ -35,8 +38,13 @@ main :: proc()
 
 	{
 		toks : [dynamic]Token
-		tokenize(&toks, #load("win32_type_shim.cpp") + `#include "imgui.cpp"`+"\n", "win32_type_shim.cpp")
-		input_map["<init_shim>"] = { toks[:], false}
+		tokenize(&toks, #load("init_shim.cpp"), "init_shim.cpp")
+		input_map["init_shim.cpp"] = { toks[:], false}
+	}
+	{
+		toks : [dynamic]Token
+		tokenize(&toks, #load("win32_type_shim.cpp"), "win32_type_shim.cpp")
+		input_map["win32_type_shim.cpp"] = { toks[:], false}
 	}
 
 	ignored_identifiers := []string {
@@ -56,7 +64,7 @@ main :: proc()
 	}
 
 	preprocessed : [dynamic]Token
-	preprocess(&{ result = &preprocessed, inputs = input_map, ignored_identifiers = ignored_identifiers, removed_ifs = removed_ifs }, "<init_shim>")
+	preprocess(&{ result = &preprocessed, inputs = input_map, ignored_identifiers = ignored_identifiers, removed_ifs = removed_ifs }, "init_shim.cpp")
 
 	ast  : [dynamic]AstNode
 	ast_context : AstContext = { ast = &ast }

@@ -156,6 +156,13 @@ preprocess :: proc(ctx : ^PreProcContext, entry_file : string)
 									//include_path := args[1].source
 									continue loop // just skip system includes
 		
+								case .Identifier: // include uses a macro in a few places ito include user files
+									str := strings.concatenate({ "// @gen include ", args[0].source })
+									append(ctx.result, Token{ kind = .Comment, source = str, location = args[0].location })	
+									append(ctx.result, Token{ kind = .NewLine, location = args[0].location })	
+									continue loop
+									
+
 								case:
 									panic(fmt.tprint("Unknown include arg:", args[0]))
 							}

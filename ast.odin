@@ -1601,7 +1601,7 @@ ast_parse_var_declaration_no_type :: proc(ctx: ^AstContext, tokens : ^[]Token, p
 
 		// found and eaten identifier
 
-		if next.kind == .BracketSquareOpen { // void fn(int a[]);   or  int a[3];
+		for next.kind == .BracketSquareOpen { // void fn(int a[]);   or  int a[3];   or   int a[3][4];
 			tokens^ = ns
 
 			length_expr : AstNodeIndex

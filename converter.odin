@@ -103,8 +103,15 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 				define := current_node.typedef
 				
 				str.write_string(&ctx.result, define.name.source)
-				str.write_string(&ctx.result, " :: ")
-				write_type(ctx, name_context, name_persistence, define.type, indent_str, indent_str)
+				type_node := ctx.ast[define.type]
+				#partial switch type_node.kind {
+					case .Type:
+						str.write_string(&ctx.result, " :: ")
+						write_type(ctx, name_context, name_persistence, type_node.type, indent_str, indent_str)
+
+					case: // structure
+						write_node(ctx, define.type, name_persistence, name_context, indent_str, indent_str)
+				}
 
 				insert_new_definition(ctx, name_persistence, name_context, define.name.source, current_node_index, define.name.source)
 

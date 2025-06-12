@@ -392,7 +392,7 @@ ast_parse_structure :: proc(ctx: ^AstContext, tokens : ^[]Token, loc := #caller_
 	members : [dynamic]AstNodeIndex
 
 	defer if err != .None {
-		push_error(ctx, { message = "Failed to parse structure" }, loc)
+		push_error(ctx, { message = "Failed to parse structure", actual = len(tokens) != 0 ? tokens[0] : {} }, loc)
 		delete(members)
 		resize(ctx.ast, ast_reset)
 		tokens^ = tokens_reset
@@ -513,7 +513,7 @@ ast_parse_declaration :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[
 	sequence_reset := len(sequence)
 
 	defer if err != .None {
-		push_error(ctx, { message = "Failed to parse declaration" }, loc)
+		push_error(ctx, { message = "Failed to parse declaration", actual = len(tokens) != 0 ? tokens[0] : {} }, loc)
 		resize(ctx.ast, ast_reset)
 		resize(sequence, sequence_reset)
 		tokens^ = tokens_reset
@@ -837,6 +837,16 @@ ast_parse_function_def :: proc(ctx: ^AstContext, tokens : ^[]Token) -> (node : A
 
 ast_parse_typedef_no_keyword :: proc(ctx : ^AstContext, tokens : ^[]Token) -> (node : AstNode, err : AstError)
 {
+
+	node.kind = .Typedef
+
+	#partial switch t, _ := peek_token(tokens); t.kind {
+		case .Class, .Struct, .Union, .Enum:
+			node.typedef.type = ast_parse_structure(ctx, tokens) or_return
+			node.typedef.name = eat_token_expect_push_err(ctx, tokens, .Identifier) or_return
+			return
+	}
+
 	start := raw_data(tokens^)
 
 	for {
@@ -845,21 +855,20 @@ ast_parse_typedef_no_keyword :: proc(ctx : ^AstContext, tokens : ^[]Token) -> (n
 		tokens^ = ns
 	}
 
-	node = AstNode { kind = .Typedef }
-	
-	test := raw_data(tokens^)[-1]
-	if test.kind == .Identifier {
+
+	if test := raw_data(tokens^)[-1]; test.kind == .Identifier {
 		type_tokens := slice_from_se(start, raw_data(tokens^)[-1:])
 		type := ast_parse_type(ctx, &type_tokens) or_return
 		assert_eq(len(type_tokens), 0)
 		
 		node.typedef.name = test
-		node.typedef.type = type
+		node.typedef.type = ast_append_node(ctx, { kind = .Type, type = type })
 	}
 	else { // fnptr
-		type_tokens := slice_from_se(start, raw_data(tokens^)[1:])
-		node.typedef.type = ast_parse_fnptr_type(ctx, &type_tokens) or_return
-		node.typedef.name = ctx.type_heap[ctx.type_heap[node.typedef.type].(AstTypePointer).destination_type].(AstTypeFunction).name
+		typedef_tokens := slice_from_se(start, raw_data(tokens^)[1:])
+		type := ast_parse_fnptr_type(ctx, &typedef_tokens) or_return
+		node.typedef.type = ast_append_node(ctx, { kind = .Type, type = type })
+		node.typedef.name = ctx.type_heap[ctx.type_heap[type].(AstTypePointer).destination_type].(AstTypeFunction).name
 	}
 
 	return
@@ -1840,7 +1849,7 @@ ast_parse_type :: proc(ctx : ^AstContext, tokens : ^[]Token, parent_type : AstTy
 	type_reset := len(ctx.type_heap)
 	tokens_reset := tokens^
 	defer if err != .None {
-		push_error(ctx, { message = "Failed to parse type" })
+		push_error(ctx, { message = "Failed to parse type", actual = len(tokens) != 0 ? tokens[0] : {} })
 		tokens^ = tokens_reset
 		resize(&ctx.type_heap, type_reset)
 	}
@@ -2891,7 +2900,7 @@ AstNode :: struct {
 		},
 		typedef : struct {
 			name : Token,
-			type : AstTypeIndex,
+			type : AstNodeIndex,
 		},
 	}
 }

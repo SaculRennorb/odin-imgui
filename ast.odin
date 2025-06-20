@@ -392,7 +392,7 @@ ast_parse_structure :: proc(ctx: ^AstContext, tokens : ^[]Token, loc := #caller_
 	members : [dynamic]AstNodeIndex
 
 	defer if err != .None {
-		push_error(ctx, { message = "Failed to parse structure", actual = len(tokens) != 0 ? tokens[0] : {} }, loc)
+		push_error(ctx, { message = "Failed to parse structure", actual = first_or_nil(tokens^) }, loc)
 		delete(members)
 		resize(ctx.ast, ast_reset)
 		tokens^ = tokens_reset
@@ -513,7 +513,7 @@ ast_parse_declaration :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[
 	sequence_reset := len(sequence)
 
 	defer if err != .None {
-		push_error(ctx, { message = "Failed to parse declaration", actual = len(tokens) != 0 ? tokens[0] : {} }, loc)
+		push_error(ctx, { message = "Failed to parse declaration", actual = first_or_nil(tokens^) }, loc)
 		resize(ctx.ast, ast_reset)
 		resize(sequence, sequence_reset)
 		tokens^ = tokens_reset
@@ -941,7 +941,7 @@ ast_parse_function_def_no_return_type_and_name :: proc(ctx: ^AstContext, tokens 
 	body_sequence : [dynamic]AstNodeIndex
 
 	defer if err != .None {
-		push_error(ctx, { message = "Failed to parse function def" }, loc)
+		push_error(ctx, { message = "Failed to parse function def", actual = first_or_nil(tokens^) }, loc)
 		delete(arguments)
 		delete(body_sequence)
 		resize(ctx.ast, ast_reset_size)
@@ -1036,7 +1036,7 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 	sequence_reset := len(sequence)
 
 	defer if err != .None {
-		push_error(ctx, { message = "Failed to parse statement" }, loc)
+		push_error(ctx, { message = "Failed to parse statement", actual = first_or_nil(tokens^) }, loc)
 		resize(sequence, sequence_reset)
 		resize(ctx.ast, ast_reset_size)
 		tokens^ = token_reset
@@ -1522,7 +1522,7 @@ ast_parse_scoped_sequence_no_open_brace :: proc(ctx: ^AstContext, tokens : ^[]To
 
 				fallthrough
 				
-			case .Typedef, .Struct, .Union, .Enum, .Do, .ExprBinary, .ExprUnaryLeft, .ExprUnaryRight, .ExprCast, .MemberAccess, .FunctionCall, .OperatorCall, .Return, .Break, .Continue, .UsingNamespace:
+			case .Typedef, .Struct, .Union, .Enum, .Do, .ExprBinary, .ExprUnaryLeft, .ExprUnaryRight, .ExprCast, .MemberAccess, .FunctionCall, .OperatorCall, .Return, .Break, .Continue, .Goto, .UsingNamespace:
 				when F == type_of(ast_parse_enum_value_declaration) {
 					// enum value declarations (may) end in a comma
 					eat_token_expect(tokens, .Comma)
@@ -1869,7 +1869,7 @@ ast_parse_type :: proc(ctx : ^AstContext, tokens : ^[]Token, parent_type : AstTy
 	type_reset := len(ctx.type_heap)
 	tokens_reset := tokens^
 	defer if err != .None {
-		push_error(ctx, { message = "Failed to parse type", actual = len(tokens) != 0 ? tokens[0] : {} })
+		push_error(ctx, { message = "Failed to parse type", actual = first_or_nil(tokens^) })
 		tokens^ = tokens_reset
 		resize(&ctx.type_heap, type_reset)
 	}
@@ -2149,7 +2149,7 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 	sequence : [dynamic]AstNodeIndex
 
 	defer if err != .None {
-		push_error(ctx, { message = "Failed to parse expression" }, loc)
+		push_error(ctx, { message = "Failed to parse expression", actual = first_or_nil(tokens^) }, loc)
 		delete(sequence)
 		resize(ctx.ast, ast_reset_size)
 		tokens^ = token_reset
@@ -3089,7 +3089,7 @@ fmt_ast_err :: proc(fi: ^fmt.Info, err: ^AstErrorFrame, verb: rune) -> bool
 		fmt.fmt_string(fi, fmt.tprintf("Expected %v", err.expected.kind), 'v')
 	}
 	if err.actual != {} {
-		fmt.fmt_string(fi, fmt.tprintf(" but found %v", err.actual), 'v')
+		fmt.fmt_string(fi, fmt.tprintf(" at %v", err.actual), 'v')
 	}
 	return true
 }

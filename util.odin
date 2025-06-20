@@ -74,6 +74,10 @@ last_or_nil :: proc { last_or_nil_slice, last_or_nil_array }
 last_or_nil_slice :: #force_inline proc "contextless" (arr : []$T)        -> T { return len(arr) != 0 ? arr[len(arr) - 1] : {} }
 last_or_nil_array :: #force_inline proc "contextless" (arr : [dynamic]$T) -> T { return len(arr) != 0 ? arr[len(arr) - 1] : {} }
 
+first_or_nil :: proc { first_or_nil_slice, first_or_nil_array }
+first_or_nil_slice :: #force_inline proc "contextless" (arr : []$T)        -> T { return len(arr) != 0 ? arr[0] : {} }
+first_or_nil_array :: #force_inline proc "contextless" (arr : [dynamic]$T) -> T { return len(arr) != 0 ? arr[0] : {} }
+
 all :: #force_inline proc "contextless" ($E : typeid) -> E
 {
 	return transmute(E) cast(intrinsics.type_bit_set_underlying_type(E)) ((1 << (uint(max(intrinsics.type_bit_set_elem_type(E))) + 1)) - 1)
@@ -112,4 +116,105 @@ PersistenceKind :: enum uint {
 SplitIndex :: bit_field uint {
 	index : uint | size_of(uint) * 8 - 1,
 	persistence : PersistenceKind | 1,
+}
+
+
+
+import win32 "core:sys/windows"
+import str "core:strings"
+import "winternal"
+
+@(init)
+install_exception_handler :: proc()
+{
+	win32.AddVectoredExceptionHandler(1, proc "system" (ExceptionInfo: ^win32.EXCEPTION_POINTERS) -> win32.LONG {
+		if ExceptionInfo.ExceptionRecord.ExceptionCode != win32.EXCEPTION_STACK_OVERFLOW { return win32.EXCEPTION_CONTINUE_SEARCH }
+
+		context_ := win32.CONTEXT { ContextFlags = win32.WOW64_CONTEXT_CONTROL }
+		win32.GetThreadContext(win32.GetCurrentThread(), &context_)
+		tib := winternal.NtCurrentTeb().Tib
+		stack_size := transmute(uintptr) tib.StackBase - transmute(uintptr) tib.StackLimit
+		stack_left := transmute(uintptr) context_.Rsp - transmute(uintptr) tib.StackLimit
+
+		std_out := win32.GetStdHandle(win32.STD_OUTPUT_HANDLE)
+		if std_out == win32.INVALID_HANDLE { return win32.EXCEPTION_CONTINUE_SEARCH }
+
+		@(static) stack_mem : [512]u8
+		context = {
+			temp_allocator = mem.small_stack_allocator(&mem.Small_Stack{ data = stack_mem[:] })
+		}
+
+		fmt.eprintf("Stack overflow, %v Bytes left of %v KB.\n", stack_left, stack_size / 1024)
+
+		when false {
+		
+		process := win32.GetCurrentProcess()
+		thread := win32.GetCurrentThread()
+
+		if !win32.SymInitialize(process, nil, win32.TRUE) {
+			fmt.eprint("Failed to initialize symbol resolver system.\n")
+			// continue anyway
+		}
+		
+		frame := winternal.STACKFRAME64 {
+			AddrPC = {
+				Offset = context_.Rip,
+				Mode = .AddrModeFlat,
+			},
+			AddrStack = {
+				Offset = context_.Rsp,
+				Mode = .AddrModeFlat,
+			},
+			AddrFrame = {
+				Offset = context_.Rbp,
+				Mode = .AddrModeFlat,
+			},
+		}
+
+		displacement : win32.DWORD64
+
+		NAME_LEN :: 128
+		_s, err := mem.alloc(size_of(win32.SYMBOL_INFOW) + NAME_LEN * size_of(win32.WCHAR), align_of(win32.SYMBOL_INFOW), context.temp_allocator)
+		if err != nil {
+			fmt.eprint("Failed to alloc frame symbol storage.\n")
+			return win32.EXCEPTION_CONTINUE_SEARCH
+		}
+		symbol := cast(^win32.SYMBOL_INFOW)_s
+		symbol.SizeOfStruct = size_of(win32.SYMBOL_INFOW)
+		symbol.MaxNameLen = NAME_LEN
+
+		fmt.eprint("Stack Trace\tPC                 Stack              Frame\n\tName\n")
+
+		for f in 0..<100 {
+			if !winternal.StackWalk64(winternal.IMAGE_FILE_MACHINE_AMD64, process, thread, &frame, &context_,
+				nil,
+				winternal.SymFunctionTableAccess64,
+				winternal.SymGetModuleBase64,
+				nil,
+			) {
+				break
+			}
+
+			fmt.eprintf("Frame [%v]:\t0x%016x 0x%016x 0x%016x\n\t", f, frame.AddrPC.Offset, frame.AddrStack.Offset, frame.AddrFrame.Offset)
+			
+			if !win32.SymFromAddrW(process, frame.AddrPC.Offset, &displacement, symbol) {
+				err := win32.GetLastError()
+				fmt.eprintf("Failed to get symbol at this address: error %v\n", err)
+				continue 
+			}
+
+			wname := win32.wstring(&symbol.Name[0])[:symbol.NameLen]
+			name, err := win32.utf16_to_utf8(wname, context.temp_allocator)
+			if err != nil {
+				fmt.eprintln("Failed to convert name to utf8\n")
+			}
+			else {
+				fmt.eprintln(name)
+			}
+		}
+
+		}
+
+		return win32.EXCEPTION_CONTINUE_SEARCH
+	})
 }

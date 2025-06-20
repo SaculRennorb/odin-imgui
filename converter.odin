@@ -2318,7 +2318,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 				case AstTypeArray:
 					str.write_byte(&ctx.result, '[')
 					if frag.length_expression != {} {
-						write_node(ctx, frag.length_expression, name_persistence, name_context, indent_str, member_indent_str)
+						write_node(ctx, frag.length_expression, name_persistence, name_context, indent_str)
 					}
 					else {
 						str.write_byte(&ctx.result, '^')
@@ -2334,6 +2334,9 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 					switch frag.identifier.source {
 						case "size_t":
 							str.write_string(&ctx.result, "uint")
+
+						case "intptr_t":
+							str.write_string(&ctx.result, "uintptr")
 
 						case "ptrdiff_t":
 							str.write_string(&ctx.result, "int")
@@ -2359,7 +2362,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 						str.write_byte(&ctx.result, '(')
 						for g, i in frag.generic_parameters {
 							if i > 0 { str.write_string(&ctx.result, ", ") }
-							write_node(ctx, g, name_persistence, name_context, indent_str, member_indent_str)
+							write_node(ctx, g, name_persistence, name_context, indent_str)
 						}
 						str.write_byte(&ctx.result, ')')
 					}
@@ -2373,7 +2376,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 					str.write_string(&ctx.result, "proc(")
 					for ai, i in frag.arguments {
 						if i > 0 { str.write_string(&ctx.result, ", ") }
-						write_node(ctx, ai, name_persistence, name_context, indent_str, member_indent_str)
+						write_node(ctx, ai, name_persistence, name_context, indent_str)
 					}
 					str.write_byte(&ctx.result, ')')
 

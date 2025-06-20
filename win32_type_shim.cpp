@@ -1,4 +1,8 @@
 // BEGIN WIN32 STRUCT SHIM
+
+typedef unsigned int DWORD;
+typedef int LONG;
+
 struct POINT {
 	LONG x, y;
 };

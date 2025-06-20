@@ -1035,11 +1035,15 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 	ast_reset_size := len(ctx.ast)
 	sequence_reset := len(sequence)
 
-	defer if err != .None {
+	__d :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dynamic]AstNodeIndex, ast_reset_size, sequence_reset : int, token_reset : []Token, loc : runtime.Source_Code_Location) {
 		push_error(ctx, { message = "Failed to parse statement", actual = first_or_nil(tokens^) }, loc)
 		resize(sequence, sequence_reset)
 		resize(ctx.ast, ast_reset_size)
 		tokens^ = token_reset
+	}
+
+	defer if err != .None {
+		__d(ctx, tokens, sequence, ast_reset_size, sequence_reset, token_reset, loc)
 	}
 
 	storage := ast_parse_storage_modifier(tokens)
@@ -2148,11 +2152,14 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 	ast_reset_size := len(ctx.ast)
 	sequence : [dynamic]AstNodeIndex
 
-	defer if err != .None {
+	__d :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : [dynamic]AstNodeIndex, ast_reset_size : int, token_reset : []Token, loc : runtime.Source_Code_Location) {
 		push_error(ctx, { message = "Failed to parse expression", actual = first_or_nil(tokens^) }, loc)
 		delete(sequence)
 		resize(ctx.ast, ast_reset_size)
 		tokens^ = token_reset
+	}
+	defer if err != .None {
+		__d(ctx, tokens, sequence, ast_reset_size, token_reset, loc)
 	}
 
 	// have to add this before every ok return, defer cannot modify return values

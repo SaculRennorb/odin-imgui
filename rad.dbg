@@ -1,72 +1,73 @@
-// raddbg 0.9.19 project file
+// raddbg 0.9.20 project file
 
 recent_file: path: "converter.odin"
+recent_file: path: "test/runner.odin"
+recent_file: path: "test/in/1309_struct_generic_member_usage.cpp"
+recent_file: path: "../../../../../Program Files/odin/core/testing/signal_handler.odin"
 recent_file: path: "../../../../../Program Files/odin/base/runtime/error_checks.odin"
+recent_file: path: "d:/a/_work/1/s/src/vctools/crt/vcruntime/src/string/amd64/memset.asm"
 recent_file: path: "ast.odin"
 recent_file: path: "../../../../../Program Files/odin/base/runtime/core.odin"
-recent_file: path: "d:/a/_work/1/s/src/vctools/crt/vcruntime/src/string/amd64/memset.asm"
+recent_file: path: "util.odin"
+recent_file: path: "../../tests/test.odin"
+recent_file: path: "D:/a/_work/1/s/src/vctools/crt/vcstartup/src/misc/amd64/chkstk.asm"
+recent_file: path: "../../external/odin/tests/internal/test_x86.odin"
+recent_file: path: "../../external/odin/core/testing/signal_handler.odin"
+recent_file: path: "../../external/odin/base/runtime/core_builtin.odin"
 recent_file: path: "main.odin"
-recent_file: path: "test/runner.odin"
-recent_file: path: "../../../../../Program Files/odin/core/testing/signal_handler.odin"
+recent_file: path: "../../../../../Program Files/odin/base/runtime/core_builtin.odin"
 recent_file: path: "../../../../../Program Files/odin/core/thread/thread_windows.odin"
-target:
-{
-  { "C:/Users/Rennorb/source/repos/odin_imgui/test.exe" }
-  arguments: 0217
-  enabled: 1
-  executable: "test.exe"
-  working_directory: ""
-}
 type_view: "[]program::AstNode"
 type_view:
 {
-  type: "[]program::AstNodeIndex"
-  expr: "columns(slice($), $, ctx.ast.data[$])"
-}
-type_view:
-{
-  type: "[]program::AstType"
+  type: "[]?"
   expr: "slice($)"
 }
 type_view:
 {
-  type: "[dynamic]program::NameContext"
+  type: "[dynamic]?"
   expr: "slice($)"
 }
 target:
 {
   executable: "odin_imgui.exe"
   working_directory: ""
-  enabled: 1
-}
-type_view:
-{
-  type: "[dynamic]program::AstNodeIndex"
-  expr: "columns(slice($), $, ctx.ast.data[$])"
-}
-type_view:
-{
-  type: "[dynamic]program::AstType"
-  expr: "slice($)"
-}
-type_view:
-{
-  expr: "slice($)"
-  type: "[dynamic]program::AstNode"
-}
-type_view:
-{
-  type: "[dynamic]program::Token"
-  expr: "slice($)"
+  enabled: 0
 }
 type_view:
 {
   type: "map[string]program::NameContextIndex"
   expr: "rows($, array($.data & 0xffffffffffffffC0, 2 << ($.data & 0x3f)))"
 }
+target:
+{
+  executable: "test.exe"
+  working_directory: ""
+  enabled: 1
+  arguments: 1309
+}
+type_view:
+{
+  type: ?^
+  expr: *$
+}
 breakpoint:
 {
-  source_location: "converter.odin:2594:1"
-  condition: "def_node.type == 4889"
+  source_location: "converter.odin:3129:1"
+  hit_count: 0
+}
+breakpoint:
+{
+  source_location: "converter.odin:1523:1"
+  hit_count: 2
+}
+breakpoint:
+{
+  source_location: "converter.odin:1649:1"
+  hit_count: 0
+}
+breakpoint:
+{
+  source_location: "converter.odin:1934:1"
   hit_count: 1
 }

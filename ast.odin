@@ -1976,6 +1976,12 @@ ast_parse_type :: proc(ctx : ^AstContext, tokens : ^[]Token, parent_type : AstTy
 
 		#partial switch n.kind {
 			case .Ampersand, .Star:
+				if type == {} {
+					push_error(ctx, { message = "Expected type before pointer designation", actual = n })
+					err = .Some
+					return
+				}
+
 				tokens^ = ns
 				type = ast_append_type(ctx, AstTypePointer{
 					destination_type = type,
@@ -1983,6 +1989,12 @@ ast_parse_type :: proc(ctx : ^AstContext, tokens : ^[]Token, parent_type : AstTy
 				});
 
 			case .BracketSquareOpen:
+				if type == {} {
+					push_error(ctx, { message = "Expected type before array designation", actual = n })
+					err = .Some
+					return
+				}
+
 				if nn, nns := peek_token(&ns); nn.kind == .BracketSquareClose { // ...[]
 					tokens^ = nns
 					type = ast_append_type(ctx, AstTypeArray{ element_type = type });
@@ -2010,6 +2022,12 @@ ast_parse_type :: proc(ctx : ^AstContext, tokens : ^[]Token, parent_type : AstTy
 
 
 			case .BracketTriangleOpen:
+				if type == {} {
+					push_error(ctx, { message = "Expected type before generic parameters", actual = n })
+					err = .Some
+					return
+				}
+
 				tokens^ = ns
 
 				params : [dynamic]AstNodeIndex
@@ -2386,8 +2404,28 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 					//TODO(Rennorb) @perf: Duplicate some work by reparsing, probably doenst matter.
 				}
 				resize(&ctx.error_stack, err_reset)
+
 				// bracketed expression: (expression)
-				tokens^ = og_nexts
+
+				if tokens[1].kind == .Star && tokens[2].kind == .Identifier && tokens[3].kind == .BracketRoundClose && tokens[4].kind == .BracketRoundOpen { // fnptr call: (*fnptr)(a, b, c)
+
+					ident := ast_append_node(ctx, AstNode{ kind = .Identifier, identifier = make_one(tokens[2]) })
+
+					tokens^ = tokens[4:] // eat everythign upt ot the '(a, b, ...'  args
+
+					args : [dynamic]AstNodeIndex
+					ast_parse_function_call_arguments(ctx, tokens, &args) or_return
+
+					node = AstNode { kind = .FunctionCall, function_call = {
+						expression = ident,
+						arguments = args,
+					}}
+
+					err = .None
+					continue
+				}
+
+				tokens^ = og_nexts // eat (
 
 				inner := ast_parse_expression(ctx, tokens) or_return
 				node = AstNode { kind = .ExprBacketed, inner = ast_append_node(ctx, inner)}

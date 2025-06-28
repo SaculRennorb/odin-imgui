@@ -783,9 +783,13 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 					}
 
 					str.write_byte(&ctx.result, '(')
+					for aidx in fncall.template_arguments {
+						write_node(ctx, aidx, scope_persistence, scope)
+						str.write_string(&ctx.result, ", ")
+					}
 					if !current_node.member_access.through_pointer { str.write_byte(&ctx.result, '&') }
 					write_node(ctx, current_node.member_access.expression, scope_persistence, scope)
-					for aidx, i in fncall.arguments {
+					for aidx in fncall.arguments {
 						str.write_string(&ctx.result, ", ")
 						write_node(ctx, aidx, scope_persistence, scope)
 					}
@@ -890,9 +894,16 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 					write_node(ctx, fncall.expression, scope_persistence, scope)
 				}
 				str.write_byte(&ctx.result, '(')
-				for aidx, i in fncall.arguments {
-					if i != 0 { str.write_string(&ctx.result, ", ") }
+				arg_index := 0
+				for aidx in fncall.template_arguments {
+					if arg_index != 0 { str.write_string(&ctx.result, ", ") }
 					write_node(ctx, aidx, scope_persistence, scope)
+					arg_index += 1
+				}
+				for aidx in fncall.arguments {
+					if arg_index != 0 { str.write_string(&ctx.result, ", ") }
+					write_node(ctx, aidx, scope_persistence, scope)
+					arg_index += 1
 				}
 				str.write_byte(&ctx.result, ')')
 

@@ -1661,11 +1661,13 @@ ast_parse_var_declaration_no_type :: proc(ctx: ^AstContext, tokens : ^[]Token, p
 
 			length_expr : AstNodeIndex
 
-			if length_expression, _ := ast_parse_expression(ctx, tokens); !has_error__reset(ctx) {
+			if nn, nns := peek_token(tokens); nn.kind != .BracketSquareClose {
 				//       v
 				// int a[expr];
-				length_expr = ast_append_node(ctx, length_expression)
+				l := ast_parse_expression(ctx, tokens) or_return
+				length_expr = ast_append_node(ctx, l)
 			}
+
 			eat_token_expect_push_err(ctx, tokens, .BracketSquareClose) or_return
 
 			type = ast_append_type(ctx, AstTypeArray{ element_type = type, length_expression = length_expr })
@@ -1760,6 +1762,13 @@ ast_parse_function_call :: proc(ctx: ^AstContext, tokens : ^[]Token, loc := #cal
 
 
 	qualified_name := ast_parse_qualified_name(ctx, tokens) or_return
+
+	template_arguments : [dynamic]AstNodeIndex
+	if n, ns := peek_token(tokens); n.kind == .BracketTriangleOpen {
+		tokens^ = ns
+		ast_parse_generic_arguments_no_opening_bracket(ctx, tokens, &template_arguments) or_return
+	}
+
 	// Some special parsing for specific functions...
 	// Ually this would have to be way more complicated to handle macros, but ill jsut hardcode this.
 	switch last_or_nil(qualified_name).source {
@@ -1804,6 +1813,7 @@ ast_parse_function_call :: proc(ctx: ^AstContext, tokens : ^[]Token, loc := #cal
 	expression_node := AstNode{ kind = .Identifier, identifier = ast_filter_qualified_name(qualified_name) }
 	node = AstNode{ kind = .FunctionCall, function_call = {
 		expression = ast_append_node(ctx, expression_node),
+		template_arguments = template_arguments,
 		arguments = arguments,
 	}}
 	return
@@ -2042,32 +2052,10 @@ ast_parse_type :: proc(ctx : ^AstContext, tokens : ^[]Token, parent_type : AstTy
 
 				params : [dynamic]AstNodeIndex
 
-				generics_loop: for {
-					#partial switch nn, nns := peek_token(tokens); nn.kind {
-						case .BracketTriangleClose:
-							tokens^ = nns // closing >
-							break generics_loop
-
-						case .Comma:
-							tokens^ = nns
-
-						case:
-							if param, type_err := ast_parse_type(ctx, tokens); type_err == .None {
-								append(&params, ast_append_node(ctx, AstNode{ kind = .Type, type = param}))
-								continue
-							}
-							reset_error(ctx)
-
-							if expr, expr_err := ast_parse_expression(ctx, tokens, .Comparison - ._1); expr_err == .None {
-								append(&params, ast_append_node(ctx, expr))
-								continue
-							}
-							else {
-								err = .Some
-								push_error(ctx, { message = "Expected inner type or expression", actual = nn })
-								return
-							}
-					}
+				if e := ast_parse_generic_arguments_no_opening_bracket(ctx, tokens, &params); e != .None {
+					delete(params)
+					err = .Some
+					return
 				}
 
 				(&ctx.type_heap[type].(AstTypeFragment)).generic_parameters = params[:]
@@ -2082,6 +2070,37 @@ ast_parse_type :: proc(ctx : ^AstContext, tokens : ^[]Token, parent_type : AstTy
 	}
 
 	return
+}
+
+ast_parse_generic_arguments_no_opening_bracket :: proc(ctx : ^AstContext, tokens : ^[]Token, argument_storage : ^[dynamic]AstNodeIndex, loc := #caller_location) -> (err : AstError)
+{
+	for {
+		#partial switch nn, nns := peek_token(tokens); nn.kind {
+			case .BracketTriangleClose:
+				tokens^ = nns // closing >
+				return
+
+			case .Comma:
+				tokens^ = nns
+
+			case:
+				if param, type_err := ast_parse_type(ctx, tokens); type_err == .None {
+					append(argument_storage, ast_append_node(ctx, AstNode{ kind = .Type, type = param}))
+					continue
+				}
+				reset_error(ctx)
+
+				if expr, expr_err := ast_parse_expression(ctx, tokens, .Comparison - ._1); expr_err == .None {
+					append(argument_storage, ast_append_node(ctx, expr))
+					continue
+				}
+				else {
+					err = .Some
+					push_error(ctx, { message = "Failed to parse template arguemnts, expected inner type or expression", actual = nn })
+					return
+				}
+		}
+	}
 }
 
 ast_parse_qualified_name :: proc{ ast_parse_qualified_name_direct, ast_parse_qualified_name_push_error }
@@ -2534,13 +2553,19 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 				continue
 		}
 
-		if node.kind == .Identifier { return } // dont parse 'int a' (two idents) as expression
-
 		simple, simple_err := ast_parse_qualified_name(tokens) 
 		if simple_err != nil {
 			if err == .None { fixup_sequence(&node, ctx, &sequence) }
 			return // keep the ok state
 		}
+
+		// dont parse 'int a' (two idents) as expression
+		if node.kind == .Identifier {
+			push_error(ctx, { actual = next, message = "Did not expect two identifiers after each other" }, loc)
+			err = .Some
+			return
+		}
+
 		node = AstNode{ kind = .Identifier, identifier = ast_filter_qualified_name(simple) }
 		err = .None
 
@@ -2549,6 +2574,19 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 			tokens^ = before_iteration
 			node = ast_parse_function_call(ctx, tokens) or_return
 			continue
+		}
+
+		if next.kind == .BracketTriangleOpen { // maybe generic function call ? 
+			ast_reset := len(ctx.ast)
+			type_reset := len(ctx.type_heap)
+			if fn_call_node, _ := ast_parse_function_call(ctx, &before_iteration); !has_error__reset(ctx) {
+				node = fn_call_node
+				tokens^ = before_iteration
+			}
+			else { // probably a comparison then   a < b
+				resize(ctx.ast, ast_reset)
+				resize(&ctx.type_heap, type_reset)
+			}
 		}
 	}
 }
@@ -2886,6 +2924,7 @@ AstNode :: struct {
 		},
 		function_call : struct {
 			expression : AstNodeIndex,
+			template_arguments : [dynamic]AstNodeIndex,
 			arguments  : [dynamic]AstNodeIndex,
 			is_destructor : bool,
 		},

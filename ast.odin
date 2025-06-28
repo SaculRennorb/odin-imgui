@@ -1231,21 +1231,33 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 
 			eat_token_expect_push_err(ctx, tokens, .BracketRoundOpen) or_return // opening (
 
-			pre_cond_token := tokens^
-			if expr, _ := ast_parse_expression(ctx, tokens); !has_error__reset(ctx) && tokens[0].kind == .BracketRoundClose { // normal if(cond)
-				node.branch.condition = make_one(ast_append_node(ctx, expr))
+			//NOTE(Rennorb): We need to try and parse a statement (vardef) first, even if we have to correct it afterwards,
+			// otherwise  'if(int* a = b)'  will get parsed as 'int times (assign b to a)', as there is no type analysis here.
+
+			before_statement := tokens^
+			ast_reset := len(ctx.ast)
+			type_reset := len(ctx.type_heap)
+
+			ast_parse_statement(ctx, tokens, &node.branch.condition) or_return
+			if n, ns := peek_token(tokens); n.kind == .Semicolon { // if (int a = 0; a == 0) { .. }
+				tokens^ = ns // eat the ; 
+				condition := ast_parse_expression(ctx, tokens) or_return
+				append(&node.branch.condition, ast_append_node(ctx, condition))
 			}
 			else {
-				tokens^ = pre_cond_token
+				cond := ctx.ast[node.branch.condition[0]]
+				// check for and correct  binary and being parsed as vardef of a reference type; 'a & b'  looks like  'int& a', same with 'a * b'
+				if len(node.branch.condition) == 1 && cond.kind == .VariableDeclaration && cond.var_declaration.initializer_expression == {} {
+					resize(&node.branch.condition, 1)
+					tokens^ = before_statement
+					resize(ctx.ast, ast_reset)
+					resize(&ctx.type_heap, type_reset)
 
-				ast_parse_statement(ctx, tokens, &node.branch.condition) or_return
-				if n, ns := peek_token(tokens); n.kind == .Semicolon { // if (int a = 0; a == 0) { .. }
-					tokens^ = ns // eat the ; 
-					condition := ast_parse_expression(ctx, tokens) or_return
-					append(&node.branch.condition, ast_append_node(ctx, condition))
+					expr := ast_parse_expression(ctx, tokens) or_return
+					#no_bounds_check node.branch.condition[0] = ast_append_node(ctx, expr)
 				}
 			}
-			
+
 			eat_token_expect_push_err(ctx, tokens, .BracketRoundClose) or_return // closing )
 
 			// @brittle

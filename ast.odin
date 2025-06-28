@@ -1957,6 +1957,7 @@ ast_parse_type :: proc(ctx : ^AstContext, tokens : ^[]Token, parent_type : AstTy
 				case "unsigned", "signed":
 					tokens^ = ns
 					append(&primitive_fragments, n)
+					has_int_modifier = true
 					continue
 
 				case "int", "char", "float", "double", "bool":

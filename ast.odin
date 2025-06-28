@@ -1229,14 +1229,24 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 
 			node := AstNode { kind = .Branch }
 
-			eat_token_expect_push_err(ctx, tokens, .BracketRoundOpen) or_return
-			ast_parse_statement(ctx, tokens, &node.branch.condition) or_return
-			if n, ns := peek_token(tokens); n.kind == .Semicolon { // if (int a = 0; a == 0) { .. }
-				tokens^ = ns // eat the ; 
-				condition := ast_parse_expression(ctx, tokens) or_return
-				append(&node.branch.condition, ast_append_node(ctx, condition))
+			eat_token_expect_push_err(ctx, tokens, .BracketRoundOpen) or_return // opening (
+
+			pre_cond_token := tokens^
+			if expr, _ := ast_parse_expression(ctx, tokens); !has_error__reset(ctx) && tokens[0].kind == .BracketRoundClose { // normal if(cond)
+				node.branch.condition = make_one(ast_append_node(ctx, expr))
 			}
-			eat_token_expect_push_err(ctx, tokens, .BracketRoundClose) or_return
+			else {
+				tokens^ = pre_cond_token
+
+				ast_parse_statement(ctx, tokens, &node.branch.condition) or_return
+				if n, ns := peek_token(tokens); n.kind == .Semicolon { // if (int a = 0; a == 0) { .. }
+					tokens^ = ns // eat the ; 
+					condition := ast_parse_expression(ctx, tokens) or_return
+					append(&node.branch.condition, ast_append_node(ctx, condition))
+				}
+			}
+			
+			eat_token_expect_push_err(ctx, tokens, .BracketRoundClose) or_return // closing )
 
 			// @brittle
 			eol_comment, eol_comment_err := eat_token_expect_direct(tokens, .Comment)
@@ -2523,6 +2533,8 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 				tokens^ = nexts
 				continue
 		}
+
+		if node.kind == .Identifier { return } // dont parse 'int a' (two idents) as expression
 
 		simple, simple_err := ast_parse_qualified_name(tokens) 
 		if simple_err != nil {

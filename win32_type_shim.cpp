@@ -17,8 +17,10 @@ typedef signed long long int int64_t;
 
 // BEGIN WIN32 STRUCT SHIM
 
+typedef void* HANDLE;
 typedef unsigned int DWORD;
 typedef int LONG;
+typedef unsigned short WCHAR;
 
 struct POINT {
 	LONG x, y;

@@ -83,6 +83,17 @@ main :: proc()
 		{ "CFS_FORCE_POSITION", "win32.CFS_FORCE_POSITION" },
 		{ "CFS_CANDIDATEPOS", "win32.CFS_CANDIDATEPOS" },
 
+		// { "stbrp_rect", "stbrp.rect" },
+		// { "stbrp_coord", "stbrp.coord" },
+		// { "stbrp_context", "stbrp.context" },
+
+		// { "stbtt_pack_context", "stbtt.pack_context" },
+		// { "stbtt_aligned_quad", "stbtt.aligned_quad" },
+		// { "stbtt_fontinfo", "stbtt.fontinfo" },
+		// { "stbtt_pack_range", "stbtt.pack_range" },
+		// { "stbtt_packedchar", "stbtt.packedchar" },
+		{ "stbtt_GetFontOffsetForIndex", "stbtt.GetFontOffsetForIndex" },
+
 		{ "kPasteboardClipboard", "ios.kPasteboardClipboard" },
 		{ "kCFAllocatorDefault", "ios.kCFAllocatorDefault" },
 		{ "noErr", "ios.noErr" },

@@ -1508,8 +1508,23 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 			forward_declaration := ctx.ast[forward_declared_context.node]
 			assert(forward_declaration.kind == .Struct || forward_declaration.kind == .Union)
 
-			forward_comments := forward_declaration.structure.attached_comments
-			inject_at(&structure.attached_comments, 0, ..forward_comments[:])
+			if .IsForwardDeclared in structure.flags && .IsForwardDeclared not_in forward_declaration.structure.flags {
+				if len(structure.attached_comments) != 0 {
+					log.warnf("Skipping a forward declaration for '%v' after already writing a proper declaration, but that forward decl had attached comments:", last_or_nil(structure.name))
+					for ci in structure.attached_comments {
+						if ctx.ast[ci].kind == .Comment {
+							log.warn('\t', ctx.ast[ci].literal.source, sep = "")
+						}
+					}
+				}
+
+				swallow_paragraph = true
+				return
+			}
+			else {
+				forward_comments := forward_declaration.structure.attached_comments
+				inject_at(&structure.attached_comments, 0, ..forward_comments[:])
+			}
 		}
 
 		if .IsForwardDeclared in structure.flags {
@@ -2274,8 +2289,22 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 			forward_declaration := ctx.ast[forward_declared_context.node]
 			assert_eq(forward_declaration.kind, AstNodeKind.FunctionDefinition)
 
-			forward_comments := forward_declaration.function_def.attached_comments
-			inject_at(&fn_node.attached_comments, 0, ..forward_comments[:])
+			if .IsForwardDeclared in fn_node.flags && .IsForwardDeclared not_in forward_declaration.structure.flags {
+				if len(fn_node.attached_comments) != 0 {
+					log.warnf("Skipping a forward declaration for '%v' after already writing a proper declaration, but that forward decl had attached comments:", last_or_nil(fn_node.function_name))
+					for ci in fn_node.attached_comments {
+						if ctx.ast[ci].kind == .Comment {
+							log.warn('\t', ctx.ast[ci].literal.source, sep = "")
+						}
+					}
+				}
+
+				return
+			}
+			else {
+				forward_comments := forward_declaration.function_def.attached_comments
+				inject_at(&fn_node.attached_comments, 0, ..forward_comments[:])
+			}
 		}
 
 		scope := scope
@@ -3248,7 +3277,7 @@ try_find_definition_for :: proc(ctx : ^ConverterContext, start_context : ScopeIn
 	flaten_loop: for type := type; type != {}; {
 		#partial switch frag in ctx.type_heap[type] {
 			case AstTypeFragment:
-				inject_at(&flattened_type, 0, frag)
+				inject_at(&flattened_type, 0, frag) // TODO(Rennorb) @explain: Why is this reversed
 				type = frag.parent_fragment
 
 			case AstTypePointer:

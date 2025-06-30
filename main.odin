@@ -73,8 +73,16 @@ main :: proc()
 	converter_context : ConverterContext = { ast = ast, type_heap = ast_context.type_heap, root_sequence = root_sequence[:] }
 	replaced_names := [][2]string {
 		{ "INT_MAX", "max(i32)" },
+		{ "INT_MIN", "min(i32)" },
+		{ "UINT_MAX", "max(u32)" },
+		{ "UINT_MIN", "min(u32)" },
+		{ "LLONG_MAX", "max(i64)" },
+		{ "LLONG_MIN", "min(i64)" },
+		{ "ULLONG_MAX", "max(u64)" },
 		{ "FLT_MAX", "max(f32)" },
 		{ "FLT_MIN", "min(f32)" },
+		{ "DBL_MAX", "max(f64)" },
+		{ "DBL_MIN", "min(f64)" },
 		{ "CP_UTF8", "win32.CP_UTF8" },
 		{ "FILENAME_MAX", "win32.FILENAME_MAX" },
 		{ "CF_UNICODETEXT", "win32.CF_UNICODETEXT" },

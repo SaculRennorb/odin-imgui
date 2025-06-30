@@ -3211,9 +3211,16 @@ fmt_asttypeidx :: proc(fi: ^fmt.Info, idx: ^AstTypeIndex, verb: rune) -> bool
 		io.write_string(fi.writer, "TypeIndex <nil>")
 		return true
 	}
-	if idx^ == 0 {
-		io.write_string(fi.writer, "TypeIndex 0")
-		return true
+	switch idx^ {
+		case  0: io.write_string(fi.writer, "TypeIndex 0");      return true
+		case -1: io.write_string(fi.writer, "TYPE_LIT_NULL");    return true
+		case -2: io.write_string(fi.writer, "TYPE_LIT_BOOL");    return true
+		case -3: io.write_string(fi.writer, "TYPE_LIT_INT32");   return true
+		case -4: io.write_string(fi.writer, "TYPE_LIT_INT64");   return true
+		case -5: io.write_string(fi.writer, "TYPE_LIT_FLOAT32"); return true
+		case -6: io.write_string(fi.writer, "TYPE_LIT_FLOAT64"); return true
+		case -7: io.write_string(fi.writer, "TYPE_LIT_STRING");  return true
+		case -8: io.write_string(fi.writer, "TYPE_LIT_CHAR");    return true
 	}
 	
 	io.write_string(fi.writer, fmt.tprintf("TypeIndex %v -> ", transmute(int) idx^))
@@ -3264,6 +3271,15 @@ AstType :: union { AstTypeInlineStructure, AstTypeFunction, AstTypePointer, AstT
 
 
 AstTypeIndex :: distinct int 
+
+TYPE_LIT_NULL    : AstTypeIndex : -1
+TYPE_LIT_BOOL    : AstTypeIndex : -2
+TYPE_LIT_INT32   : AstTypeIndex : -3
+TYPE_LIT_INT64   : AstTypeIndex : -4
+TYPE_LIT_FLOAT32 : AstTypeIndex : -5
+TYPE_LIT_FLOAT64 : AstTypeIndex : -6
+TYPE_LIT_STRING  : AstTypeIndex : -7
+TYPE_LIT_CHAR    : AstTypeIndex : -8
 
 ast_append_type :: #force_inline proc(ctx : ^AstContext, frag : AstType) -> AstTypeIndex
 {

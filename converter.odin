@@ -570,6 +570,44 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 						write_node(ctx, current_node.unary_left.right, scope_persistence, scope)
 
 					case .Dereference:
+						inspected_expression := current_node.unary_left.right
+						multipointer_test_loop: for {
+							expr := ctx.ast[inspected_expression];
+							#partial switch expr.kind {
+								case .ExprBacketed:
+									inspected_expression = expr.inner
+									continue multipointer_test_loop
+
+								case .ExprBinary:
+									tl, sl := resolve_type(ctx, expr.binary.left, scope)
+									tr, sr := resolve_type(ctx, expr.binary.right, scope)
+									etype, escope := get_resulting_type_for_binary_expr(tl, sl, tr, sr)
+									assert(is_variant(ctx.type_heap[etype], AstTypePointer))
+
+									if etype == tl && ctx.ast[expr.binary.left].kind != .ExprBinary {
+										write_node(ctx, expr.binary.left, .Temporary, scope)
+										str.write_byte(&ctx.result, '[')
+										write_node(ctx, expr.binary.right, .Temporary, scope)
+										str.write_byte(&ctx.result, ']')
+									}
+									else if etype == tr && ctx.ast[expr.binary.right].kind != .ExprBinary {
+										write_node(ctx, expr.binary.right, .Temporary, scope)
+										str.write_byte(&ctx.result, '[')
+										write_node(ctx, expr.binary.left, .Temporary, scope)
+										str.write_byte(&ctx.result, ']')
+									}
+									else {
+										break multipointer_test_loop
+									}
+
+									break node_kind_switch
+
+								case:
+									break multipointer_test_loop
+							}
+							break
+						}
+
 						write_node(ctx, current_node.unary_left.right, scope_persistence, scope)
 						str.write_byte(&ctx.result, '^')
 
@@ -2684,7 +2722,12 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 				}
 			
 			case .ExprUnaryLeft:
-				return resolve_type(ctx, current_node.unary_left.right, scope, loc)
+				#partial switch current_node.unary_left.operator {
+					case .Not:
+						return TYPE_LIT_BOOL, {}
+					case:
+						return resolve_type(ctx, current_node.unary_left.right, scope, loc)
+				}
 
 			case .ExprUnaryRight:
 				return resolve_type(ctx, current_node.unary_right.left, scope, loc)
@@ -2771,8 +2814,9 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 
 				stemmed := stemm_type(ctx, def_node.type)
 				#partial switch _ in ctx.type_heap[stemmed] {
-					case AstTypePrimitive, AstTypeVoid:
+					case AstTypePrimitive, AstTypeVoid: // pointer to primitive
 						/**/
+
 					case:
 						type_context : ^Scope
 						_, type_context_idx, type_context = try_find_definition_for(ctx, scope, def_node.type)
@@ -2809,9 +2853,63 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 			case .ExprBacketed:
 				return resolve_type(ctx, current_node.inner, scope, loc)
 
+			case .ExprBinary:
+				#partial switch current_node.binary.operator {
+					case .LogicAnd, .LogicOr, .Equals, .NotEquals:
+						return TYPE_LIT_BOOL, {}
+
+					case:
+						tl, sl := resolve_type(ctx, current_node.binary.left, scope, loc)
+						tr, sr := resolve_type(ctx, current_node.binary.right, scope, loc)
+						return get_resulting_type_for_binary_expr(tl, sl, tr, sr)
+				}
+
+			case .ExprTenary:
+				return resolve_type(ctx, current_node.tenary.true_expression, scope, loc)
+
+			case .LiteralNull: return TYPE_LIT_NULL, {}
+			case .LiteralBool: return TYPE_LIT_BOOL, {}
+			case .LiteralInteger: return str.ends_with(current_node.literal.source, "LL") || str.ends_with(current_node.literal.source, "ll") ? TYPE_LIT_INT64 : TYPE_LIT_INT32, {}
+			case .LiteralFloat: return str.ends_with(current_node.literal.source, "L") || str.ends_with(current_node.literal.source, "l") ? TYPE_LIT_FLOAT64 : TYPE_LIT_FLOAT32, {}
+			case .LiteralCharacter: return TYPE_LIT_CHAR, {}
+			case .LiteralString: return TYPE_LIT_STRING, {}
+
 			case:
 				panic(fmt.tprintf("Not implemented %#v", current_node))
 		}
+	}
+
+	get_resulting_type_for_binary_expr :: proc(t1 : AstTypeIndex, s1 : ScopeIndex, t2 : AstTypeIndex, s2 : ScopeIndex) -> (type : AstTypeIndex, scope : ScopeIndex)
+	{
+		switch {
+			case t1 == TYPE_LIT_INT32 && t2 == TYPE_LIT_CHAR: return TYPE_LIT_INT32, {}
+			case t1 == TYPE_LIT_CHAR && t2 == TYPE_LIT_INT32: return TYPE_LIT_INT32, {}
+
+			case t1 == TYPE_LIT_INT64 && t2 == TYPE_LIT_CHAR: return TYPE_LIT_INT64, {}
+			case t1 == TYPE_LIT_INT64 && t2 == TYPE_LIT_INT32: return TYPE_LIT_INT64, {}
+			case t1 == TYPE_LIT_CHAR  && t2 == TYPE_LIT_INT64: return TYPE_LIT_INT64, {}
+			case t1 == TYPE_LIT_INT32 && t2 == TYPE_LIT_INT64: return TYPE_LIT_INT64, {}
+
+			case t1 == TYPE_LIT_FLOAT32 && t2 == TYPE_LIT_CHAR:  return TYPE_LIT_FLOAT32, {}
+			case t1 == TYPE_LIT_FLOAT32 && t2 == TYPE_LIT_INT32: return TYPE_LIT_FLOAT32, {}
+			case t1 == TYPE_LIT_FLOAT32 && t2 == TYPE_LIT_INT64: return TYPE_LIT_FLOAT32, {}
+			case t2 == TYPE_LIT_CHAR    && t1 == TYPE_LIT_FLOAT32: return TYPE_LIT_FLOAT32, {}
+			case t2 == TYPE_LIT_INT32   && t1 == TYPE_LIT_FLOAT32: return TYPE_LIT_FLOAT32, {}
+			case t2 == TYPE_LIT_INT64   && t1 == TYPE_LIT_FLOAT32: return TYPE_LIT_FLOAT32, {}
+
+			case t1 == TYPE_LIT_FLOAT64 && t2 == TYPE_LIT_CHAR:    return TYPE_LIT_FLOAT64, {}
+			case t1 == TYPE_LIT_FLOAT64 && t2 == TYPE_LIT_INT32:   return TYPE_LIT_FLOAT64, {}
+			case t1 == TYPE_LIT_FLOAT64 && t2 == TYPE_LIT_INT64:   return TYPE_LIT_FLOAT64, {}
+			case t1 == TYPE_LIT_FLOAT64 && t2 == TYPE_LIT_FLOAT32: return TYPE_LIT_FLOAT64, {}
+			case t2 == TYPE_LIT_CHAR    && t1 == TYPE_LIT_FLOAT64: return TYPE_LIT_FLOAT64, {}
+			case t2 == TYPE_LIT_INT32   && t1 == TYPE_LIT_FLOAT64: return TYPE_LIT_FLOAT64, {}
+			case t2 == TYPE_LIT_INT64   && t1 == TYPE_LIT_FLOAT64: return TYPE_LIT_FLOAT64, {}
+			case t2 == TYPE_LIT_FLOAT32 && t1 == TYPE_LIT_FLOAT64: return TYPE_LIT_FLOAT64, {}
+
+			case t1 >= 0: return t1, s1 // a + 1   where a = int*
+			case t2 >= 0: return t2, s1 // 1 + a   where a = int*
+		}
+		return t1, s1
 	}
 
 	generate_instantiated_structure_context :: proc(ctx : ^ConverterContext, generic_structure_context : ScopeIndex, instantiated_structure : AstNodeIndex) -> ScopeIndex

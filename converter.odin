@@ -775,13 +775,13 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 			case .MemberAccess:
 				member := ctx.ast[current_node.member_access.member]
 
-				expression_type, expression_type_context_idx := resolve_type(ctx, current_node.member_access.expression, scope)
-				expression_type_context := get_scope(ctx, expression_type_context_idx)
+				expression_type, expression_type_scope_idx := resolve_type(ctx, current_node.member_access.expression, scope)
+				expression_type_scope := get_scope(ctx, expression_type_scope_idx)
 
 				if member.kind == .FunctionCall {
 					fncall := member.function_call
 
-					expression_type_node := ctx.ast[expression_type_context.node]
+					expression_type_node := ctx.ast[expression_type_scope.node]
 					structure_name : []Token
 					#partial switch expression_type_node.kind { // TODO(Rennorb) @cleanup
 						case .Struct, .Union:
@@ -806,8 +806,8 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 							requires_termination = true
 							break
 						}
-						else if expression_type_context.parent.index != 0 {
-							containing_scope := ctx.ast[get_scope(ctx, expression_type_context.parent).node]
+						else if expression_type_scope.parent.index != 0 {
+							containing_scope := ctx.ast[get_scope(ctx, expression_type_scope.parent).node]
 							if containing_scope.kind == .Namespace {
 								str.write_string(&ctx.result, containing_scope.namespace.name.source)
 								str.write_byte(&ctx.result, '_')
@@ -837,9 +837,12 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 					write_node(ctx, current_node.member_access.expression, scope_persistence, scope)
 					str.write_byte(&ctx.result, '.')
 
-					_, _, actual_member_context := try_find_definition_for_name(ctx, expression_type_context_idx, member.identifier[:])
+					_, _, actual_member_context := try_find_definition_for_name(ctx, expression_type_scope_idx, member.identifier[:])
 
-					this_type := ctx.ast[expression_type_context.node]
+					this_type := ctx.ast[expression_type_scope.node]
+					if this_type.kind == .Typedef {
+						this_type = ctx.ast[this_type.typedef.type]
+					}
 					if this_type.kind != .Struct && this_type.kind != .Union && this_type.kind != .Enum \
 						&& this_type.kind != .TemplateVariableDeclaration {
 						panic(fmt.tprintf("Unexpected member access expression type %#v with member %v", this_type, member.identifier))
@@ -3410,9 +3413,29 @@ try_find_definition_for :: proc(ctx : ^ConverterContext, start_context : ScopeIn
 
 		current_context := get_scope(ctx, current_context_idx)
 		if current_context.node != 0 {
-			#partial switch ctx.ast[current_context.node].kind {
-				case .Namespace, .Struct, .Union, .Enum, .Type, .TemplateVariableDeclaration, .Typedef:
+			context_node := ctx.ast[current_context.node]
+			#partial switch context_node.kind {
+				case .Namespace, .Struct, .Union, .Enum, .Type, .TemplateVariableDeclaration:
 					/**/
+
+				case .Typedef:
+					deffed_node := ctx.ast[context_node.typedef.type]
+					s1: #partial switch deffed_node.kind {
+						case .Struct, .Union, .Enum:
+							/**/
+
+						case .Type:
+							stemmed := stemm_type(ctx, deffed_node.type, )
+							#partial switch _ in ctx.type_heap[stemmed] {
+								case (AstTypeFunction), (AstTypePrimitive), (AstTypeVoid):
+									break s1
+							}
+							// do one more dereference from the point of the typedef
+							_, current_context_idx, current_context = find_definition_for(ctx, current_context.parent, deffed_node.type)
+
+						case:
+							unreachable()
+					}
 
 				case: // something else
 					if current_root_context_idx.index == 0 { break ctx_stack }

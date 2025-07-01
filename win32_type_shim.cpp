@@ -115,6 +115,7 @@ struct stbtt_pack_context {
 
 // BEGIN WIN32 STRUCT SHIM
 
+typedef void* FILE;
 typedef void* HANDLE;
 typedef unsigned int DWORD;
 typedef int LONG;

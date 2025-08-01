@@ -169,7 +169,7 @@ ast_parse_filescope_sequence :: proc(ctx : ^AstContext, tokens_ : []Token) -> (s
 			case:
 				was_preproc := #force_inline ast_try_parse_preproc_statement(ctx, tokens, &sequence, token, tokenss)
 				if !was_preproc {
-					panic(fmt.tprintf("Unknown token %v for sequence.", token))
+					panic(fmt.tprintf("Unknown token %v for sequence, last parsed:\n%#v.", token, last(ctx.ast^)))
 				}
 		}
 	}
@@ -723,7 +723,7 @@ ast_parse_declaration :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[
 		next, _ = peek_token(tokens)
 
 		if next.kind == .BracketRoundOpen {
-			fndef_node := ast_parse_function_def_no_return_type_and_name(ctx, tokens) or_return
+			fndef_node := ast_parse_function_def_no_return_type_and_name(ctx, tokens, detected_ctor) or_return
 			fndef_node.function_def.template_spec = template_spec
 			fndef_node.function_def.return_type =  type
 			fndef_node.function_def.function_name = name

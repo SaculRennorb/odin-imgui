@@ -1744,8 +1744,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 					frag, is_frag := ctx.type_heap[stemmed].(AstTypeFragment)
 					if !is_frag || len(frag.generic_parameters) == 0 { break }
 
-					
-					stemmed_type_idx := find_definition_for(ctx, scope_node, stemmed)
+					stemmed_type_idx := find_definition_for(ctx, scope_node, stemmed, false)
 					#partial switch stemmed_node := &ctx.ast[stemmed_type_idx]; stemmed_node.kind {
 						case .Struct, .Union:
 							type_key := format_instantiated_structure_name_key(ctx, type_idx) // @perf duplicates work for pointer to structure
@@ -1837,7 +1836,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 			for ti, i in structure.template_spec {
 				if i > 0 { str.write_string(&ctx.result, ", ") }
 				str.write_byte(&ctx.result, '$')
-				c, _, _, _ := write_node(ctx, ti, scope_node); did_clobber |= c
+				c, _, _, _ := write_node(ctx, ti, structure_node_index); did_clobber |= c
 			}
 			str.write_byte(&ctx.result, ')')
 		}
@@ -1966,6 +1965,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 					// Bleed members of anonymous structures into parent scope.
 					//TODO(rennorb) @corectness: Does this also apply to static variables ?
 					if bleed_scope != -1 {
+						log.debugf("bleeding %v into parent scope %v", member.var_name.source, get_simple_name_string(ctx, bleed_scope))
 						cvt_get_declared_names(ctx, bleed_scope)[member.var_name.source] = ci
 					}
 
@@ -1999,7 +1999,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 						structure_node := ctx.ast[structure_node_index]
 						structure := &structure_node.structure
 					}
-					
+
 					str.write_byte(&ctx.result, ',')
 
 					last_was_newline = false
@@ -2952,7 +2952,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 	{
 		frag, is_frag := ctx.type_heap[stemmed_arg_source].(AstTypeFragment)
 		assert(is_frag, "wrong type fragment passed", loc)
-		og_struct_idx := find_definition_for(ctx, scope_node, stemmed_arg_source, loc)
+		og_struct_idx := find_definition_for(ctx, scope_node, stemmed_arg_source, false, loc)
 		og_structure := ctx.ast[og_struct_idx].structure
 
 		replacements : TemplateReplacements
@@ -2977,7 +2977,8 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 			case .Struct, .Union:
 				assert(len(ctx.ast[structure].structure.template_spec) > 0)
 				/*ok*/
-			case: panic(fmt.tprintf("Unexpected astnode for baking: %#v", structure))
+			case:
+				panic(fmt.tprintf("Unexpected astnode for baking: %#v", structure))
 		}
 
 		og_structure := ctx.ast[structure].structure
@@ -3111,9 +3112,9 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 	}
 }
 
-find_definition_for :: proc(ctx : ^ConverterContext, start_context_node : AstNodeIndex, type : AstTypeIndex, loc := #caller_location) -> (definition : AstNodeIndex)
+find_definition_for :: proc(ctx : ^ConverterContext, start_context_node : AstNodeIndex, type : AstTypeIndex, resolve_generic := true, loc := #caller_location) -> (definition : AstNodeIndex)
 {
-	definition = try_find_definition_for(ctx, start_context_node, type)
+	definition = try_find_definition_for(ctx, start_context_node, type, resolve_generic)
 	if definition != 0 { return }
 
 	err := fmt.tprintf("Type not found in context: %#v", ctx.type_heap[type])
@@ -3123,9 +3124,9 @@ find_definition_for :: proc(ctx : ^ConverterContext, start_context_node : AstNod
 	panic(err, loc)
 }
 
-try_find_definition_for_or_warn :: proc(ctx : ^ConverterContext, start_context_node : AstNodeIndex, type : AstTypeIndex, loc := #caller_location) -> (definition : AstNodeIndex)
+try_find_definition_for_or_warn :: proc(ctx : ^ConverterContext, start_context_node : AstNodeIndex, type : AstTypeIndex, resolve_generic := true, loc := #caller_location) -> (definition : AstNodeIndex)
 {
-	definition = try_find_definition_for(ctx, start_context_node, type)
+	definition = try_find_definition_for(ctx, start_context_node, type, resolve_generic)
 	if definition != 0 { return }
 
 	stemmed := stemm_type(ctx, type)
@@ -3138,7 +3139,7 @@ try_find_definition_for_or_warn :: proc(ctx : ^ConverterContext, start_context_n
 	return
 }
 
-try_find_definition_for :: proc(ctx : ^ConverterContext, start_scope_node : AstNodeIndex, type : AstTypeIndex) -> (definition : AstNodeIndex)
+try_find_definition_for :: proc(ctx : ^ConverterContext, start_scope_node : AstNodeIndex, type : AstTypeIndex, resolve_generic := true) -> (definition : AstNodeIndex)
 {
 	flattened_type := make([dynamic]string, context.temp_allocator)
 	flaten_loop: for type := type; type != {}; {
@@ -3162,14 +3163,16 @@ try_find_definition_for :: proc(ctx : ^ConverterContext, start_scope_node : AstN
 
 	definition, _ = try_find_definition_for_name_preflattened(ctx, start_scope_node, flattened_type[:], { .Type })
 
-	stemmed := stemm_type(ctx, type)
-	if frag, is_frag := ctx.type_heap[stemmed].(AstTypeFragment); is_frag && len(frag.generic_parameters) > 0 {
-		#partial switch def := &ctx.ast[definition]; def.kind {
-			case .Struct, .Union, .Enum:
-				key := format_instantiated_structure_name_key(ctx, type)
-				if baked, exists := def.structure.generic_instantiations[key]; exists {
-					definition = baked
-				}
+	if resolve_generic {
+		stemmed := stemm_type(ctx, type)
+		if frag, is_frag := ctx.type_heap[stemmed].(AstTypeFragment); is_frag && len(frag.generic_parameters) > 0 {
+			#partial switch def := &ctx.ast[definition]; def.kind {
+				case .Struct, .Union, .Enum:
+					key := format_instantiated_structure_name_key(ctx, type)
+					if baked, exists := def.structure.generic_instantiations[key]; exists {
+						definition = baked
+					}
+			}
 		}
 	}
 

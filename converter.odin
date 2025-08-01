@@ -32,8 +32,14 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 		current_types = &ctx.type_heap
 
 		for pair in implicit_names {
-			//push_name(ctx, pair[0], Name{ parent = { index = 0, persistence = .Persistent }, translated_name = pair[1] })
+			idx := cvt_append_node(ctx, { kind = .PreprocDefine, preproc_define = {
+				name = { kind = .Identifier, source = pair[0] },
+				expansion_tokens = { { kind = .Identifier, source = pair[1] } }
+			}})
+			ctx.ast[0].sequence.declared_names[pair[0]] = idx
 		}
+
+
 
 		str.write_string(&ctx.result, "package test\n\n")
 		write_node_sequence(ctx, ctx.root_sequence, 0, "")
@@ -3836,6 +3842,6 @@ cvt_get_parent_scope :: proc(ctx : ^ConverterContext, target_node : AstNodeIndex
 		case .Branch:
 			return &node.branch.parent_scope
 		case:
-			panic(fmt.tprintf("%v is not a valid scope node.", node.kind), loc)
+			panic(fmt.tprintf("%v is not a valid scope node.\n%#v", node.kind, node), loc)
 	}
 }

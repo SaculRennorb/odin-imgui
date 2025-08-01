@@ -487,7 +487,7 @@ fmt_token_a : fmt.User_Formatter : proc(fi: ^fmt.Info, arg: any, verb: rune) -> 
 
 fmt_token :: proc(fi: ^fmt.Info, token: ^Token, verb: rune) -> bool
 {
-	fmt.fmt_string(fi, fmt.tprintf("%v:%v @ %v", token.kind, token.source, token.location), 'v')
+	fmt.wprintf(fi.writer, "%v:\"%v\" @ %v", token.kind, token.source, token.location)
 	return true
 }
 

@@ -1268,43 +1268,10 @@ ImGuiMemFreeFunc :: proc(ptr : rawptr, user_data : rawptr)// Function signature 
 
 // ImVec2: 2D vector used to store positions, sizes etc. [Compile-time configurable type]
 
-ImVec2 :: struct {
-	x : f32, y : f32,
-}
-
-ImVec2_init_0 :: proc(this : ^ImVec2)
-{
-	this.x = 0.0
-	this.y = 0.0
-}
-
-ImVec2_init_1 :: proc(this : ^ImVec2, _x : f32, _y : f32)
-{
-	this.x = _x
-	this.y = _y
-}
+ImVec2 :: [2]f32
 
 // ImVec4: 4D vector used to store clipping rectangles, colors etc. [Compile-time configurable type]
-ImVec4 :: struct {
-	x : f32, y : f32, z : f32, w : f32,
-}
-
-ImVec4_init_0 :: proc(this : ^ImVec4)
-{
-	this.x = 0.0
-	this.y = 0.0
-	this.z = 0.0
-	this.w = 0.0
-}
-
-ImVec4_init_1 :: proc(this : ^ImVec4, _x : f32, _y : f32, _z : f32, _w : f32)
-{
-	this.x = _x
-	this.y = _y
-	this.z = _z
-	this.w = _w
-}
-
+ImVec4 :: [4]f32
 
 //-----------------------------------------------------------------------------
 // [SECTION] Dear ImGui end-user API functions
@@ -2218,11 +2185,9 @@ ImGuiTableBgTarget_ :: enum i32 {
 ImGuiTableSortSpecs :: struct {
 	Specs : ^ImGuiTableColumnSortSpecs, // Pointer to sort spec array.
 	SpecsCount : i32, // Sort spec count. Most often 1. May be > 1 when ImGuiTableFlags_SortMulti is enabled. May be == 0 when ImGuiTableFlags_SortTristate is enabled.
-	SpecsDirty : bool, }
+	SpecsDirty : bool, // Set to true when specs have changed since last time! Use this to sort again, then clear the flag.
+}
 
-// Set to true when specs have changed since last time! Use this to sort again, then clear the flag.
-
-ImGuiTableSortSpecs_init :: proc(this : ^ImGuiTableSortSpecs) { memset(this, 0, size_of(this)) }
 
 // Sorting specifications for a table (often handling sort specs for a single column, occasionally more)
 // Sorting specification for one column of a table (sizeof == 12 bytes)
@@ -2230,11 +2195,8 @@ ImGuiTableColumnSortSpecs :: struct {
 	ColumnUserID : ImGuiID, // User id of the column (if specified by a TableSetupColumn() call)
 	ColumnIndex : ImS16, // Index of the column
 	SortOrder : ImS16, // Index within parent ImGuiTableSortSpecs (always stored in order starting from 0, tables sorted on a single criteria will always have a 0 here)
-	SortDirection : ImGuiSortDirection, }
-
-// ImGuiSortDirection_Ascending or ImGuiSortDirection_Descending
-
-ImGuiTableColumnSortSpecs_init :: proc(this : ^ImGuiTableColumnSortSpecs) { memset(this, 0, size_of(this)) }
+	SortDirection : ImGuiSortDirection, // ImGuiSortDirection_Ascending or ImGuiSortDirection_Descending
+}
 
 //-----------------------------------------------------------------------------
 // [SECTION] Helpers: Debug log, memory allocations macros, ImVector<>
@@ -3064,30 +3026,27 @@ IM_COL32_BLACK_TRANS : ImU32 : (0   << IM_COL32_R_SHIFT)|(0   << IM_COL32_G_SHIF
 // **Avoid storing ImColor! Store either u32 of ImVec4. This is not a full-featured color class. MAY OBSOLETE.
 // **None of the ImGui API are using ImColor directly but you can use it as a convenience to pass colors in either ImU32 or ImVec4 formats. Explicitly cast to ImU32 or ImVec4 if needed.
 ImColor :: struct {
-	Value : ImVec4,
-
+	using Value : ImVec4,
 }
-
-ImColor_init_0 :: proc(this : ^ImColor) { }
 
 ImColor_init_1 :: proc(this : ^ImColor, r : f32, g : f32, b : f32, a : f32 = 1.0)
 {
-	init(&this.Value, r, g, b, a)
+	this.Value.rgba = {r, g, b, a}
 }
 
 ImColor_init_2 :: proc(this : ^ImColor, col : ^ImVec4)
 {
-	init(&this.Value, col)
+	this.Value = col^
 }
 
 ImColor_init_3 :: proc(this : ^ImColor, r : i32, g : i32, b : i32, a : i32 = 255)
 {
-	init(&this.Value, cast(f32) r * (1.0 / 255.0), cast(f32) g * (1.0 / 255.0), cast(f32) b * (1.0 / 255.0), cast(f32) a * (1.0 / 255.0))
+	this.Value.rgba = {cast(f32)r, cast(f32)g, cast(f32)b, cast(f32)a} * 1.0/255.0
 }
 
 ImColor_init_4 :: proc(this : ^ImColor, rgba : ImU32)
 {
-	init(&this.Value, cast(f32) ((rgba >> IM_COL32_R_SHIFT) & 0xFF) * (1.0 / 255.0), cast(f32) ((rgba >> IM_COL32_G_SHIFT) & 0xFF) * (1.0 / 255.0), cast(f32) ((rgba >> IM_COL32_B_SHIFT) & 0xFF) * (1.0 / 255.0), cast(f32) ((rgba >> IM_COL32_A_SHIFT) & 0xFF) * (1.0 / 255.0))
+	this.Value = {cast(f32) ((rgba >> IM_COL32_R_SHIFT) & 0xFF) * (1.0 / 255.0), cast(f32) ((rgba >> IM_COL32_G_SHIFT) & 0xFF) * (1.0 / 255.0), cast(f32) ((rgba >> IM_COL32_B_SHIFT) & 0xFF) * (1.0 / 255.0), cast(f32) ((rgba >> IM_COL32_A_SHIFT) & 0xFF) * (1.0 / 255.0)}
 }
 
 // FIXME-OBSOLETE: May need to obsolete/cleanup those helpers.
@@ -3325,12 +3284,10 @@ ImDrawChannel :: struct {
 ImDrawListSplitter :: struct {
 	_Current : i32, // Current channel number (0)
 	_Count : i32, // Number of active channels (1+)
-	_Channels : ImVector(ImDrawChannel), }
+	_Channels : ImVector(ImDrawChannel), // Draw channels (not resized down so _Count might be < Channels.Size)
+}
 
-ImDrawListSplitter_deinit :: proc(this : ^ImDrawListSplitter)
-{ClearFreeMemory()}
-
-// Draw channels (not resized down so _Count might be < Channels.Size)
+ImDrawListSplitter_deinit :: proc(this : ^ImDrawListSplitter) { ClearFreeMemory(this) }
 
 ImDrawListSplitter_init :: #force_inline proc(this : ^ImDrawListSplitter) { memset(this, 0, size_of(this)) }
 
@@ -4004,7 +3961,7 @@ ImGuiLogFlags :: i32// -> enum ImGuiLogFlags_           // Flags: for LogBegin()
 ImGuiNavRenderCursorFlags :: i32// -> enum ImGuiNavRenderCursorFlags_//Flags: for RenderNavCursor()
 ImGuiNavMoveFlags :: i32// -> enum ImGuiNavMoveFlags_       // Flags: for navigation requests
 ImGuiNextItemDataFlags :: i32// -> enum ImGuiNextItemDataFlags_  // Flags: for SetNextItemXXX() functions
-ImGuiNextWindowDataFlags :: i32// -> enum ImGuiNextWindowDataFlags_// Flags: for SetNextWindowXXX() functions
+ImGuiNextWindowDataFlags :: ImGuiNextWindowDataFlags_// -> enum ImGuiNextWindowDataFlags_// Flags: for SetNextWindowXXX() functions
 ImGuiScrollFlags :: i32// -> enum ImGuiScrollFlags_        // Flags: for ScrollToItem() and navigation requests
 ImGuiSeparatorFlags :: i32// -> enum ImGuiSeparatorFlags_     // Flags: for SeparatorEx()
 ImGuiTextFlags :: i32// -> enum ImGuiTextFlags_          // Flags: for TextEx()
@@ -4324,32 +4281,25 @@ ImVec2ih_init_2 :: proc(this : ^ImVec2ih, rhs : ^ImVec2)
 // NB: we can't rely on ImVec2 math operators being available here!
 ImRect :: struct {
 	Min : ImVec2, // Upper-left
-	Max : ImVec2, }
-
-// Lower-right
-
-ImRect_init_0 :: proc(this : ^ImRect)
-{
-	init(&this.Min, 0.0, 0.0)
-	init(&this.Max, 0.0, 0.0)
+	Max : ImVec2, // Lower-right
 }
 
-ImRect_init_1 :: proc(this : ^ImRect, min : ^ImVec2, max : ^ImVec2)
+ImRect_init_1 :: proc(this : ^ImRect, min : ImVec2, max : ImVec2)
 {
-	init(&this.Min, min)
-	init(&this.Max, max)
+	this.Min = min
+	this.Max = max
 }
 
-ImRect_init_2 :: proc(this : ^ImRect, v : ^ImVec4)
+ImRect_init_2 :: proc(this : ^ImRect, v : ImVec4)
 {
-	init(&this.Min, v.x, v.y)
-	init(&this.Max, v.z, v.w)
+	this.Min.xy = { v.x, v.y }
+	this.Max.xy = { v.z, v.w }
 }
 
 ImRect_init_3 :: proc(this : ^ImRect, x1 : f32, y1 : f32, x2 : f32, y2 : f32)
 {
-	init(&this.Min, x1, y1)
-	init(&this.Max, x2, y2)
+	this.Min.xy = { x1, y1 }
+	this.Max.xy = { x2, y2 }
 }
 
 ImRect_GetCenter :: proc(this : ^ImRect) -> ImVec2 { return ImVec2((this.Min.x + this.Max.x) * 0.5, (this.Min.y + this.Max.y) * 0.5) }
@@ -4580,14 +4530,6 @@ ImSpan_set_1 :: #force_inline proc(this : ^ImSpan($T), data : ^T, data_end : ^T)
 ImSpan_size :: #force_inline proc(this : ^ImSpan($T)) -> i32 { return cast(i32) cast(int) (this.DataEnd - this.Data) }
 
 ImSpan_size_in_bytes :: #force_inline proc(this : ^ImSpan($T)) -> i32 { return cast(i32) cast(int) (this.DataEnd - this.Data) * cast(i32) size_of(T) }
-
-ImSpan_begin_0 :: #force_inline proc(this : ^ImSpan($T)) -> ^T { return this.Data }
-
-ImSpan_begin_1 :: #force_inline proc(this : ^ImSpan($T)) -> ^T { return this.Data }
-
-ImSpan_end_0 :: #force_inline proc(this : ^ImSpan($T)) -> ^T { return this.DataEnd }
-
-ImSpan_end_1 :: #force_inline proc(this : ^ImSpan($T)) -> ^T { return this.DataEnd }
 
 // Utilities
 ImSpan_index_from_ptr :: #force_inline proc(this : ^ImSpan($T), it : ^T) -> i32
@@ -8612,8 +8554,8 @@ GCrc32LookupTable : [256]ImU32 = {
 ImHashData :: proc(data_p : rawptr, data_size : uint, seed : ImGuiID) -> ImGuiID
 {
 	crc : ImU32 = ~seed
-	data : ^u8 = cast(^u8) data_p
-	data_end : ^u8 = cast(^u8) data_p + data_size
+	data := cast([^]u8) data_p
+	data_end := cast([^]u8) data_p + data_size
 	when ! IMGUI_ENABLE_SSE4_2_CRC { /* @gen ifndef */
 	crc32_lut : ^ImU32 = GCrc32LookupTable
 	for data < data_end { crc = (crc >> 8) ~ crc32_lut[(crc & 0xFF) ~ post_incr(&data)^] }
@@ -8639,7 +8581,7 @@ ImHashData :: proc(data_p : rawptr, data_size : uint, seed : ImGuiID) -> ImGuiID
 // FIXME-OPT: Replace with e.g. FNV1a hash? CRC32 pretty much randomly access 1KB. Need to do proper measurements.
 ImHashStr :: proc(data_p : ^u8, data_size : uint, seed : ImGuiID) -> ImGuiID
 {
-	seed = ~seed
+	seed := ~seed
 	crc : ImU32 = seed
 	data : ^u8 = cast(^u8) data_p
 	when ! IMGUI_ENABLE_SSE4_2_CRC { /* @gen ifndef */
@@ -16744,23 +16686,16 @@ Shortcut_1 :: proc(key_chord : ImGuiKeyChord, flags : ImGuiInputFlags, owner_id 
 //   Which is why it is required you put them in your imconfig file (and NOT only before including imgui.h).
 //   Otherwise it is possible that different compilation units would see different structure layout.
 //   If you don't want to modify imconfig.h you can use the IMGUI_USER_CONFIG define to change filename.
-DebugCheckVersionAndDataLayout :: proc(version : ^u8, sz_io : uint, sz_style : uint, sz_vec2 : uint, sz_vec4 : uint, sz_vert : uint, sz_idx : uint) -> bool
+DebugCheckVersionAndDataLayout :: proc(version : string, sz_io : uint, sz_style : uint, sz_vec2 : uint, sz_vec4 : uint, sz_vert : uint, sz_idx : uint) -> bool
 {
 	error : bool = false
-	if strcmp(version, IMGUI_VERSION) != 0 {error = true; IM_ASSERT(strcmp(version, IMGUI_VERSION) == 0 && "Mismatched version string!")
-	}
-	if sz_io != size_of(ImGuiIO) {error = true; IM_ASSERT(sz_io == size_of(ImGuiIO) && "Mismatched struct layout!")
-	}
-	if sz_style != size_of(ImGuiStyle) {error = true; IM_ASSERT(sz_style == size_of(ImGuiStyle) && "Mismatched struct layout!")
-	}
-	if sz_vec2 != size_of(ImVec2) {error = true; IM_ASSERT(sz_vec2 == size_of(ImVec2) && "Mismatched struct layout!")
-	}
-	if sz_vec4 != size_of(ImVec4) {error = true; IM_ASSERT(sz_vec4 == size_of(ImVec4) && "Mismatched struct layout!")
-	}
-	if sz_vert != size_of(ImDrawVert) {error = true; IM_ASSERT(sz_vert == size_of(ImDrawVert) && "Mismatched struct layout!")
-	}
-	if sz_idx != size_of(ImDrawIdx) {error = true; IM_ASSERT(sz_idx == size_of(ImDrawIdx) && "Mismatched struct layout!")
-	}
+	if version == IMGUI_VERSION {error = true; IM_ASSERT(version == IMGUI_VERSION, "Mismatched version string!") }
+	if sz_io != size_of(ImGuiIO) {error = true; IM_ASSERT(sz_io == size_of(ImGuiIO), "Mismatched struct layout!") }
+	if sz_style != size_of(ImGuiStyle) {error = true; IM_ASSERT(sz_style == size_of(ImGuiStyle), "Mismatched struct layout!") }
+	if sz_vec2 != size_of(ImVec2) {error = true; IM_ASSERT(sz_vec2 == size_of(ImVec2), "Mismatched struct layout!") }
+	if sz_vec4 != size_of(ImVec4) {error = true; IM_ASSERT(sz_vec4 == size_of(ImVec4), "Mismatched struct layout!") }
+	if sz_vert != size_of(ImDrawVert) {error = true; IM_ASSERT(sz_vert == size_of(ImDrawVert), "Mismatched struct layout!") }
+	if sz_idx != size_of(ImDrawIdx) {error = true; IM_ASSERT(sz_idx == size_of(ImDrawIdx), "Mismatched struct layout!") }
 	return !error
 }
 
@@ -27478,7 +27413,7 @@ StackToolFormatLevelInfo :: proc(tool : ^ImGuiIDStackTool, n : i32, format_for_u
 ShowIDStackToolWindow :: proc(p_open : ^bool)
 {
 	g : ^ImGuiContext = GImGui
-	if (g.NextWindowData.Flags & ImGuiNextWindowDataFlags_.ImGuiNextWindowDataFlags_HasSize) == 0 { SetNextWindowSize(ImVec2(0.0, GetFontSize() * 8.0), ImGuiCond_.ImGuiCond_FirstUseEver) }
+	if (g.NextWindowData.Flags & ImGuiNextWindowDataFlags_.ImGuiNextWindowDataFlags_HasSize) == {} { SetNextWindowSize(ImVec2{0.0, GetFontSize() * 8.0}, ImGuiCond_.ImGuiCond_FirstUseEver) }
 	if !Begin("Dear ImGui ID Stack Tool", p_open) || GetCurrentWindow().BeginCount > 1 {
 		End()
 		return

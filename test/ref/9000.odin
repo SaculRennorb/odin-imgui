@@ -2,6 +2,8 @@ package test
 
 ImGuiDockNodeFlags :: i32
 
+ImGuiWindow :: struct { /**/ }
+
 // Flags for ImGui::DockSpace(), shared/inherited by child nodes.
 // (Some flags can be applied to individual nodes directly)
 // FIXME-DOCK: Also see ImGuiDockNodeFlagsPrivate_ which may involve using the WIP and internal DockBuilder api.
@@ -42,14 +44,14 @@ ImGuiDockNodeFlagsPrivate_ :: enum i32 {
 	ImGuiDockNodeFlags_NoDockingOverMe = 1 << 20, //       // Disable other windows/nodes from being docked over this node.
 	ImGuiDockNodeFlags_NoDockingOverOther = 1 << 21, //       // Disable this node from being docked over another window or non-empty node.
 	ImGuiDockNodeFlags_NoDockingOverEmpty = 1 << 22, //       // Disable this node from being docked over an empty node (e.g. DockSpace with no other windows)
-	ImGuiDockNodeFlags_NoDocking = ImGuiDockNodeFlags_NoDockingOverMe | ImGuiDockNodeFlags_NoDockingOverOther | ImGuiDockNodeFlags_NoDockingOverEmpty | ImGuiDockNodeFlags_NoDockingSplit | ImGuiDockNodeFlags_NoDockingSplitOther,
+	ImGuiDockNodeFlags_NoDocking = ImGuiDockNodeFlags_NoDockingOverMe | ImGuiDockNodeFlags_NoDockingOverOther | ImGuiDockNodeFlags_NoDockingOverEmpty | ImGuiDockNodeFlags_.ImGuiDockNodeFlags_NoDockingSplit | ImGuiDockNodeFlags_NoDockingSplitOther,
 
 	// Masks
 	ImGuiDockNodeFlags_SharedFlagsInheritMask_ = ~0,
-	ImGuiDockNodeFlags_NoResizeFlagsMask_ = cast(i32) ImGuiDockNodeFlags_NoResize | ImGuiDockNodeFlags_NoResizeX | ImGuiDockNodeFlags_NoResizeY,
+	ImGuiDockNodeFlags_NoResizeFlagsMask_ = cast(i32) ImGuiDockNodeFlags_.ImGuiDockNodeFlags_NoResize | ImGuiDockNodeFlags_NoResizeX | ImGuiDockNodeFlags_NoResizeY,
 
 	// When splitting, those local flags are moved to the inheriting child, never duplicated
-	ImGuiDockNodeFlags_LocalFlagsTransferMask_ = cast(i32) ImGuiDockNodeFlags_NoDockingSplit | ImGuiDockNodeFlags_NoResizeFlagsMask_ | cast(i32) ImGuiDockNodeFlags_AutoHideTabBar | ImGuiDockNodeFlags_CentralNode | ImGuiDockNodeFlags_NoTabBar | ImGuiDockNodeFlags_HiddenTabBar | ImGuiDockNodeFlags_NoWindowMenuButton | ImGuiDockNodeFlags_NoCloseButton,
+	ImGuiDockNodeFlags_LocalFlagsTransferMask_ = cast(i32) ImGuiDockNodeFlags_.ImGuiDockNodeFlags_NoDockingSplit | ImGuiDockNodeFlags_NoResizeFlagsMask_ | cast(i32) ImGuiDockNodeFlags_.ImGuiDockNodeFlags_AutoHideTabBar | ImGuiDockNodeFlags_CentralNode | ImGuiDockNodeFlags_NoTabBar | ImGuiDockNodeFlags_HiddenTabBar | ImGuiDockNodeFlags_NoWindowMenuButton | ImGuiDockNodeFlags_NoCloseButton,
 	ImGuiDockNodeFlags_SavedFlagsMask_ = ImGuiDockNodeFlags_NoResizeFlagsMask_ | ImGuiDockNodeFlags_DockSpace | ImGuiDockNodeFlags_CentralNode | ImGuiDockNodeFlags_NoTabBar | ImGuiDockNodeFlags_HiddenTabBar | ImGuiDockNodeFlags_NoWindowMenuButton | ImGuiDockNodeFlags_NoCloseButton,
 }
 

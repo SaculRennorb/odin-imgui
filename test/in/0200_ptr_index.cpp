@@ -1,9 +1,9 @@
 struct A0200 {
-	int a;
+	int b;
 };
 
 void fn0200()
 {
 	A0200* a;
-	int b = a[2].a;
+	int c = a[2].b;
 }

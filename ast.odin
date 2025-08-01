@@ -72,7 +72,7 @@ ast_parse_filescope_sequence :: proc(ctx : ^AstContext, tokens_ : []Token) -> (s
 	current_ast   = ctx.ast
 	current_types = &ctx.type_heap
 
-	if len(ctx.ast) == 0 { append(ctx.ast, AstNode{ }) } // dummy ast0 node
+	if len(ctx.ast) == 0 { append(ctx.ast, AstNode{ kind = .Sequence }) } // dummy ast0 node
 	if len(ctx.type_heap) == 0 { append(&ctx.type_heap, AstTypeVoid{ }) } // dummy type0 node
 	template_spec: [dynamic]AstNodeIndex
 
@@ -130,49 +130,8 @@ ast_parse_filescope_sequence :: proc(ctx : ^AstContext, tokens_ : []Token) -> (s
 				}
 
 			case .Namespace, .Identifier:
-				parent_type : AstNode = --- // TODO(Rennorb) @cleanup: ast_parse_declaration is not meant to take a pointer to a live ast parent element, so we need to clone the existing one to a stack var and paste it into the correct slot when we get it back.
-				parent_type_ref : ^AstNode; parent_type_idx : AstNodeIndex
-				if token.kind == .Identifier {
-					// detect out of band constructor. likely super @brittle
-					detect_ctor_dtor :: proc(ctx : ^AstContext, tokens : ^[]Token) -> (is_ctor_dtor : bool, detected_name : string)
-					{
-						r := tokens^
-						// S123::S123(
-						if qname, qerr := ast_parse_qualified_name(tokens); qerr == nil && len(qname) >= 3 && qname[len(qname) - 3].source == qname[len(qname) - 1].source && tokens[0].kind == .BracketRoundOpen {
-
-							tokens^ = r[len(qname) - 1:] // reset to just after the last :: for proper parsing
-							return true, last(qname).source
-						}
-						else if n, ns := peek_token(tokens); n.kind == .Tilde {
-							// we are at the correct place already, dont reset
-							assert_eq(ns[0].kind, TokenKind.Identifier)
-							return true, ns[0].source
-						}
-
-						tokens^ = r
-						return
-					}
-					// S123::S123(
-					if is_ctor_dtor, detected_name := detect_ctor_dtor(ctx, tokens); is_ctor_dtor {
-
-						// questionable, but we don't have type context in the ast phase.. maybe i should change that 
-						#reverse for node, i in ctx.ast {
-							if node.kind == .Struct && len(node.structure.name) > 0 && last(node.structure.name).source == detected_name {
-								parent_type = node
-								parent_type_ref = &parent_type
-								parent_type_idx = transmute(AstNodeIndex) i
-								break
-							}
-						}
-					}
-				}
-
 				decl_error : [dynamic]AstErrorFrame
-				if node_idx, eat_paragraph, _ := ast_parse_declaration(ctx, tokens, &sequence, parent_type_ref); !has_error__clone_reset(ctx, &decl_error) {
-					if parent_type_ref != nil {
-						append(&sequence, node_idx) // Freestanding initializers need to be appended manually.
-					}
-
+				if node_idx, eat_paragraph, _ := ast_parse_declaration(ctx, tokens, &sequence); !has_error__clone_reset(ctx, &decl_error) {
 					#partial switch ctx.ast[node_idx].kind {
 						case .FunctionDefinition:
 							ctx.ast[node_idx].function_def.template_spec = template_spec
@@ -406,12 +365,9 @@ ast_parse_structure :: proc(ctx: ^AstContext, tokens : ^[]Token, loc := #caller_
 		case: panic(fmt.tprintf("Invalid keyword to parse structure: %v.", keyword))
 	}
 
-	next_, nexts := peek_token_ptr(tokens)
-	next := next_[0]
-
+	next, nexts := peek_token(tokens)
 	if next.kind == .Identifier { // type name is optional
-		tokens^ = nexts // eat the name 
-		node.structure.name = next_[:1]
+		node.structure.name, _ = ast_try_parse_qualified_name(ctx, tokens)
 
 		next, nexts = peek_token(tokens)
 		if next.kind == .Colon {
@@ -455,8 +411,13 @@ ast_parse_structure :: proc(ctx: ^AstContext, tokens : ^[]Token, loc := #caller_
 	parsed_node = ast_append_node(ctx, node)
 
 	synthetic_structure_type : AstTypeIndex
-	for frag in node.structure.name {
-		synthetic_structure_type = ast_append_type(ctx, AstTypeFragment{ identifier = frag, parent_fragment = synthetic_structure_type })
+	for name_frag := node.structure.name; name_frag != {}; {
+		name_frag_node := ctx.ast[name_frag]
+		synthetic_structure_type = ast_append_type(ctx, AstTypeFragment{
+			identifier = name_frag_node.identifier.token,
+			parent_fragment = synthetic_structure_type,
+		})
+		name_frag = name_frag_node.identifier.parent
 	}
 
 	var := ast_append_node(ctx, AstNode{ kind = .VariableDeclaration, var_declaration = {
@@ -527,17 +488,17 @@ ast_parse_declaration :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[
 
 	storage := ast_parse_storage_modifier(tokens)
 
-	if parent_type != nil && len(parent_type.structure.name) != 0 /* anonymous types don't have a name */ {
+	if parent_type != nil && parent_type.structure.name != 0 /* anonymous types don't have a name */ {
 		n, ss := peek_token(tokens)
 
-		if n.kind == .Identifier && n.source == last(parent_type.structure.name).source {
+		if n.kind == .Identifier && n.source == ctx.ast[parent_type.structure.name].identifier.token.source {
 			nn, nns := peek_token(&ss)
 			if nn.kind == .BracketRoundOpen {
 				tokens^ = ss // eat initializer "name"
 
 				initializer := ast_parse_function_def_no_return_type_and_name(ctx, tokens, true) or_return
 				initializer.function_def.flags |= transmute(AstFunctionDefFlags) storage  | {.IsCtor}
-				initializer.function_def.function_name = make_one(n)
+				initializer.function_def.function_name = append_simple_identifier(ctx, n)
 
 				ast_attach_comments(ctx, sequence, &initializer)
 
@@ -547,14 +508,14 @@ ast_parse_declaration :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[
 		}
 		else if n.kind == .Tilde {
 			nn, nns := peek_token(&ss)
-			if nn.kind == .Identifier && nn.source == last(parent_type.structure.name).source  {
+			if nn.kind == .Identifier && nn.source == ctx.ast[parent_type.structure.name].identifier.token.source  {
 				nnn, nnns := peek_token(&nns)
 				if nnn.kind == .BracketRoundOpen {
 					tokens^ = nns // eat deinitializer "~name"
 
 					deinitializer := ast_parse_function_def_no_return_type_and_name(ctx, tokens) or_return
 					deinitializer.function_def.flags |= transmute(AstFunctionDefFlags) storage | {.IsDtor}
-					deinitializer.function_def.function_name = make_one(nn)
+					deinitializer.function_def.function_name = append_simple_identifier(ctx, nn)
 
 					ast_attach_comments(ctx, sequence, &deinitializer)
 
@@ -600,8 +561,7 @@ ast_parse_declaration :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[
 			if n, ns := peek_token(tokens); n.kind == .Identifier {
 				tokens^ = ns
 
-				node.structure.name = make(TokenRange, 1)
-				node.structure.name[0] = n
+				node.structure.name = ast_append_node(ctx, { kind = .Identifier, identifier = { token = n } })
 			}
 
 			eat_token_expect_push_err(ctx, tokens, .BracketCurlyOpen) or_return
@@ -635,8 +595,8 @@ ast_parse_declaration :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[
 
 			eat_token_expect_push_err(ctx, tokens, .BracketCurlyOpen) or_return
 
-			defer if err != .None && len(node.namespace.sequence) > 0 { delete(node.namespace.sequence) }
-			ast_parse_scoped_sequence_no_open_brace(ctx, tokens, ast_parse_declaration, &node.namespace.sequence) or_return
+			defer if err != .None && len(node.namespace.member_sequence) > 0 { delete(node.namespace.member_sequence) }
+			ast_parse_scoped_sequence_no_open_brace(ctx, tokens, ast_parse_declaration, &node.namespace.member_sequence) or_return
 
 			parsed_node = ast_append_node(ctx, node)
 			append(sequence, parsed_node)
@@ -658,8 +618,13 @@ ast_parse_declaration :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[
 			return
 	}
 
-	// var or fn def must have return type
-	type := ast_parse_type(ctx, tokens) or_return
+	before_type := tokens^
+	// var or fn def must have return type, exceptions are out of like ctors / dtors...
+	type, _ := ast_parse_type(ctx, tokens)
+	if has_error(ctx) { // specifically out of band for dtor parsing
+		type = 0
+		tokens^ = before_type
+	}
 
 	storage |= ast_parse_storage_modifier(tokens) // mods after return type   static void inline fn()
 
@@ -737,16 +702,34 @@ ast_parse_declaration :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[
 		return
 	}
 
+	detected_ctor := false
+	if tokens[0].kind == .BracketRoundOpen {
+		// detect out of band constructor without a type   e.g.     A::A()
+		if f, e := ctx.type_heap[type].(AstTypeFragment); e && f.parent_fragment != 0 {
+			if p, e := ctx.type_heap[f.parent_fragment].(AstTypeFragment); e && p.identifier.source == f.identifier.source {
+				tokens^ = before_type
+				type = 0
+				detected_ctor = true
+			}
+		}
+	}
+
 	before_name := tokens^
-	if name, name_err := ast_parse_qualified_name(tokens); name_err == nil {
+	name, detected_dtor := ast_try_parse_qualified_name(ctx, tokens, true)
+
+	if name != 0 {
+		reset_error(ctx) // reset potential error from type parsing
+
 		next, _ = peek_token(tokens)
 
 		if next.kind == .BracketRoundOpen {
 			fndef_node := ast_parse_function_def_no_return_type_and_name(ctx, tokens) or_return
 			fndef_node.function_def.template_spec = template_spec
 			fndef_node.function_def.return_type =  type
-			fndef_node.function_def.function_name = ast_filter_qualified_name(name)
+			fndef_node.function_def.function_name = name
 			fndef_node.function_def.flags |= transmute(AstFunctionDefFlags) storage;
+			if detected_ctor { fndef_node.function_def.flags |= { .IsCtor } }
+			if detected_dtor { fndef_node.function_def.flags |= { .IsDtor } }
 	
 			ast_attach_comments(ctx, sequence, &fndef_node)
 	
@@ -754,6 +737,11 @@ ast_parse_declaration :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[
 			append(sequence, parsed_node)
 			return
 		}
+	}
+	else if has_error(ctx) {
+		// no type and no name -> error
+		err = .Some
+		return
 	}
 
 	
@@ -824,13 +812,14 @@ ast_parse_function_def :: proc(ctx: ^AstContext, tokens : ^[]Token) -> (node : A
 	storage := ast_parse_storage_modifier(tokens)
 
 	return_type := ast_parse_type(ctx, tokens) or_return // int
-	name := ast_parse_qualified_name(ctx, tokens) or_return // main
+	name, was_dtor := ast_parse_qualified_name(ctx, tokens, true) or_return // main
 
 	node = ast_parse_function_def_no_return_type_and_name(ctx, tokens) or_return // (int a[3]) {}
 
-	node.function_def.function_name = ast_filter_qualified_name(name)
+	node.function_def.function_name = name
 	node.function_def.return_type =  return_type
 	node.function_def.flags = transmute(AstFunctionDefFlags) storage
+	if was_dtor { node.function_def.flags |= { .IsDtor } }
 
 	return
 }
@@ -987,10 +976,7 @@ ast_parse_function_def_no_return_type_and_name :: proc(ctx: ^AstContext, tokens 
 					
 					initialized_member := node.function_call.expression
 
-					node.function_call.expression = ast_append_node(ctx, AstNode{
-						kind       = .Identifier,
-						identifier = make_one(Token{ kind = .Identifier, source = "init" }),
-					})
+					node.function_call.expression = append_simple_identifier(ctx, Token{ kind = .Identifier, source = "init" })
 
 					call := AstNode{ kind = .MemberAccess, member_access = {
 						expression = initialized_member,
@@ -1260,67 +1246,79 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 
 			eat_token_expect_push_err(ctx, tokens, .BracketRoundClose) or_return // closing )
 
+			true_branch_sequence : [dynamic]AstNodeIndex
+			scoped_true_branch := false
+
 			// @brittle
 			eol_comment, eol_comment_err := eat_token_expect_direct(tokens, .Comment)
 			if eol_comment_err == nil  {
-				append(&node.branch.true_branch_sequence, ast_append_node(ctx, AstNode{ kind = .NewLine }))
-				append(&node.branch.true_branch_sequence, ast_append_node(ctx, AstNode{ kind = .Comment, literal = eol_comment }))
+				append(&true_branch_sequence, ast_append_node(ctx, AstNode{ kind = .NewLine }))
+				append(&true_branch_sequence, ast_append_node(ctx, AstNode{ kind = .Comment, literal = eol_comment }))
 			}
 
-			eol_coment_insertion_point := len(node.branch.true_branch_sequence)
+			eol_coment_insertion_point := len(true_branch_sequence)
 
 			if n, ns := peek_token(tokens); n.kind == .BracketCurlyOpen {
+				scoped_true_branch = true
 				tokens^ = ns // {
-				ast_parse_scoped_sequence_no_open_brace(ctx, tokens, ast_parse_statement, &node.branch.true_branch_sequence) or_return
+				ast_parse_scoped_sequence_no_open_brace(ctx, tokens, ast_parse_statement, &true_branch_sequence) or_return
 			}
 			else {
 				n, ns := peek_token(tokens)
-				ast_try_parse_preproc_statement(ctx, tokens, &node.branch.true_branch_sequence, n, ns) // can also exist between branches if its not wrapped in curly braces
+				ast_try_parse_preproc_statement(ctx, tokens, &true_branch_sequence, n, ns) // can also exist between branches if its not wrapped in curly braces
 
-				ast_parse_statement(ctx, tokens, &node.branch.true_branch_sequence) or_return
+				ast_parse_statement(ctx, tokens, &true_branch_sequence) or_return
 				eat_token_expect(tokens, .Semicolon)
 			}
 
 			// @brittle
 			eol_comment, eol_comment_err = eat_token_expect_direct(tokens, .Comment, false)
 			if eol_comment_err == nil {
-				inject_at(&node.branch.true_branch_sequence, eol_coment_insertion_point + 0, ast_append_node(ctx, AstNode{ kind = .NewLine }))
-				inject_at(&node.branch.true_branch_sequence, eol_coment_insertion_point + 1, ast_append_node(ctx, AstNode{ kind = .Comment, literal = eol_comment }))
-				inject_at(&node.branch.true_branch_sequence, eol_coment_insertion_point + 2, ast_append_node(ctx, AstNode{ kind = .NewLine }))
+				inject_at(&true_branch_sequence, eol_coment_insertion_point + 0, ast_append_node(ctx, AstNode{ kind = .NewLine }))
+				inject_at(&true_branch_sequence, eol_coment_insertion_point + 1, ast_append_node(ctx, AstNode{ kind = .Comment, literal = eol_comment }))
+				inject_at(&true_branch_sequence, eol_coment_insertion_point + 2, ast_append_node(ctx, AstNode{ kind = .NewLine }))
 			}
-			if len(node.branch.true_branch_sequence) > 1 && ctx.ast[last(node.branch.true_branch_sequence)^].kind != .NewLine {
-				append(&node.branch.true_branch_sequence, ast_append_node(ctx, AstNode{ kind = .NewLine }))
+			if len(true_branch_sequence) > 1 && ctx.ast[last(true_branch_sequence)^].kind != .NewLine {
+				append(&true_branch_sequence, ast_append_node(ctx, AstNode{ kind = .NewLine })) //TODO(Rennorb) @cleanup
 			}
+
+			false_branch_sequence : [dynamic]AstNodeIndex
+			scoped_false_branch := false
 
 			// @brittle
 			before_comment := tokens^
 			comment_above_else, else_comment_err := eat_token_expect_direct(tokens, .Comment)
 
 			if n, ns := peek_token(tokens); n.kind == .Else {
-				false_branch_sequence := &node.branch.false_branch_sequence
+				chained_branch : AstNodeIndex = 0
+
 				if nn, nns := peek_token(&ns); nn.kind == .BracketCurlyOpen {
+					scoped_false_branch = true
+
 					tokens^ = nns // {
 
-					eol_coment_insertion_point = len(node.branch.false_branch_sequence)
+					eol_coment_insertion_point = len(false_branch_sequence)
 
-					ast_parse_scoped_sequence_no_open_brace(ctx, tokens, ast_parse_statement, &node.branch.false_branch_sequence) or_return
+					ast_parse_scoped_sequence_no_open_brace(ctx, tokens, ast_parse_statement, &false_branch_sequence) or_return
 				}
 				else {
 					tokens^ = ns // else
 
 					n, ns := peek_token(tokens)
-					ast_try_parse_preproc_statement(ctx, tokens, &node.branch.false_branch_sequence, n, ns) // can also exist between branches if its not wrapped in curly braces
+					ast_try_parse_preproc_statement(ctx, tokens, &false_branch_sequence, n, ns) // can also exist between branches if its not wrapped in curly braces
 
-					ast_parse_statement(ctx, tokens, &node.branch.false_branch_sequence) or_return
+					ast_parse_statement(ctx, tokens, &false_branch_sequence) or_return
 					eat_token_expect(tokens, .Semicolon) // might have a semicolon from single statement or nothing in case of ifelse chain
 
 					eol_coment_insertion_point = 0
-					skip_preproc_loop: for fi in node.branch.false_branch_sequence {
+					skip_preproc_loop: for fi in false_branch_sequence {
 						#partial switch ctx.ast[fi].kind {
 							case .PreprocDefine, .PreprocElse, .PreprocEndif, .PreprocIf, .PreprocMacro:
 								/**/
 							case .Branch:
-								false_branch_sequence = &ctx.ast[fi].branch.true_branch_sequence
+								//NOTE(Rennorb): If a ifelse is chained to the first branch, comments that should be placed in the else branch sequence
+								// instead should be palced inside the true branch of the chaned if.
+								chained_branch = fi
 								break skip_preproc_loop
 							case:
 								break skip_preproc_loop
@@ -1328,26 +1326,88 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 					}
 				}
 
+				false_branch_sequence_ : [dynamic]AstNodeIndex
+				if chained_branch == 0 {
+					false_branch_sequence_ = false_branch_sequence
+				}
+				else {
+					chained := ctx.ast[chained_branch].branch
+					if true_branch := ctx.ast[chained.true_branch]; true_branch.kind == .Sequence {
+						false_branch_sequence_ = true_branch.sequence.members
+					}
+					else {
+						append(&false_branch_sequence_, chained.true_branch)
+					}
+				}
+
 				if else_comment_err == nil {
-					inject_at(false_branch_sequence, eol_coment_insertion_point + 0, ast_append_node(ctx, AstNode{ kind = .NewLine }))
-					inject_at(false_branch_sequence, eol_coment_insertion_point + 1, ast_append_node(ctx, AstNode{ kind = .Comment, literal = comment_above_else }))
+					inject_at(&false_branch_sequence_, eol_coment_insertion_point + 0, ast_append_node(ctx, AstNode{ kind = .NewLine }))
+					inject_at(&false_branch_sequence_, eol_coment_insertion_point + 1, ast_append_node(ctx, AstNode{ kind = .Comment, literal = comment_above_else }))
 					eol_coment_insertion_point += 2
 				}
 
 				// @brittle
 				eol_comment, eol_comment_err = eat_token_expect_direct(tokens, .Comment, false)
 				if eol_comment_err == nil {
-					inject_at(false_branch_sequence, eol_coment_insertion_point + 0, ast_append_node(ctx, AstNode{ kind = .NewLine }))
-					inject_at(false_branch_sequence, eol_coment_insertion_point + 1, ast_append_node(ctx, AstNode{ kind = .Comment, literal = eol_comment }))
-					inject_at(false_branch_sequence, eol_coment_insertion_point + 2, ast_append_node(ctx, AstNode{ kind = .NewLine }))
+					inject_at(&false_branch_sequence_, eol_coment_insertion_point + 0, ast_append_node(ctx, AstNode{ kind = .NewLine }))
+					inject_at(&false_branch_sequence_, eol_coment_insertion_point + 1, ast_append_node(ctx, AstNode{ kind = .Comment, literal = eol_comment }))
+					inject_at(&false_branch_sequence_, eol_coment_insertion_point + 2, ast_append_node(ctx, AstNode{ kind = .NewLine }))
 				}
-				if len(false_branch_sequence) > 1 && ctx.ast[last(false_branch_sequence^)^].kind != .NewLine {
-					append(false_branch_sequence, ast_append_node(ctx, AstNode{ kind = .NewLine }))
+				if len(false_branch_sequence_) > 1 && ctx.ast[last(false_branch_sequence_)^].kind != .NewLine {
+					append(&false_branch_sequence_, ast_append_node(ctx, AstNode{ kind = .NewLine }))
+				}
+
+
+				if chained_branch == 0 {
+					false_branch_sequence = false_branch_sequence_
+				}
+				else {
+					if len(false_branch_sequence_) > 1 {
+						chained := ctx.ast[chained_branch].branch
+						if true_branch := &ctx.ast[chained.true_branch]; true_branch.kind == .Sequence {
+							true_branch.sequence.members = false_branch_sequence_
+						}
+						else {
+							sequence := ast_append_node(ctx, { kind = .Sequence, sequence = { braced = true, members = false_branch_sequence_ }})
+							ctx.ast[chained_branch].branch.true_branch = sequence
+						}
+					}
 				}
 			}
 			else {
 				// reset before eaten comment
 				tokens^ = before_comment
+			}
+
+			if scoped_true_branch {
+				node.branch.true_branch = ast_append_node(ctx, AstNode{ kind = .Sequence, sequence = { braced = true, members = true_branch_sequence } })
+			}
+			else {
+				switch len(true_branch_sequence) {
+					case 1:
+						node.branch.true_branch = true_branch_sequence[0]
+						delete(true_branch_sequence)
+
+					case:
+						node.branch.true_branch = ast_append_node(ctx, AstNode{ kind = .Sequence, sequence = { braced = true, members = true_branch_sequence } })
+				}
+			}
+
+			if scoped_false_branch {
+				node.branch.false_branch = ast_append_node(ctx, AstNode{ kind = .Sequence, sequence = { braced = true, members = false_branch_sequence } })
+			}
+			else {
+				switch len(false_branch_sequence) {
+					case 0:
+						/**/
+
+					case 1:
+						node.branch.false_branch = false_branch_sequence[0]
+						delete(false_branch_sequence)
+
+					case:
+						node.branch.false_branch = ast_append_node(ctx, AstNode{ kind = .Sequence, sequence = { braced = true, members = false_branch_sequence } })
+				}
 			}
 
 			parsed_node = ast_append_node(ctx, node)
@@ -1382,7 +1442,7 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 						eate_curly_brace := ast_parse_scoped_sequence_no_open_brace(ctx, tokens, ast_parse_statement, &case_body_sequence) or_return
 
 						append_nothing(&node.switch_.cases)
-						last(node.switch_.cases[:])^ = { match_expression, case_body_sequence }
+						last(node.switch_.cases[:])^ = { match_expression = match_expression, body_sequence = case_body_sequence }
 
 						if eate_curly_brace { break cases_loop }
 
@@ -1434,9 +1494,9 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 
 			eat_token_expect_push_err(ctx, tokens, .Namespace) or_return
 
-			namespace := ast_parse_qualified_name(ctx, tokens) or_return
+			parsed_node, _ = ast_parse_qualified_name(ctx, tokens) or_return
+			ctx.ast[parsed_node].kind = .UsingNamespace
 
-			parsed_node = ast_append_node(ctx, AstNode{ kind = .UsingNamespace, using_namespace = { namespace } })
 			append(sequence, parsed_node)
 			return
 
@@ -1722,17 +1782,13 @@ ast_parse_var_declaration_no_type :: proc(ctx: ^AstContext, tokens : ^[]Token, p
 		if next.kind == .BracketRoundOpen { //  S123  a(1, 2, 3) type of initializer
 			// dont eat opeing (, it will get eaten by ast_aprse_function_call_arguments
 
-			ident := make_one(name)
-
-			fn_identifier := make_one(Token{ kind = .Identifier, source = "init", location = next.location })
-
 			call := AstNode{ kind = .FunctionCall, function_call = {
-				expression = ast_append_node(ctx, AstNode{ kind = .Identifier, identifier = fn_identifier }),
+				expression = append_simple_identifier(ctx, { kind = .Identifier, source = "init", location = next.location }),
 			}}
 			ast_parse_function_call_arguments(ctx, tokens, &call.function_call.arguments) or_return
 
 			synthesized_initializer := AstNode{ kind = .MemberAccess, member_access = {
-				expression = ast_append_node(ctx, AstNode{ kind = .Identifier, identifier = ident }),
+				expression = append_simple_identifier(ctx, name),
 				member = ast_append_node(ctx, call),
 			}}
 
@@ -1773,7 +1829,7 @@ ast_parse_function_call :: proc(ctx: ^AstContext, tokens : ^[]Token, loc := #cal
 	}
 
 
-	qualified_name := ast_parse_qualified_name(ctx, tokens) or_return
+	qualified_name, _ := ast_parse_qualified_name(ctx, tokens) or_return
 
 	template_arguments : [dynamic]AstNodeIndex
 	if n, ns := peek_token(tokens); n.kind == .BracketTriangleOpen {
@@ -1783,7 +1839,7 @@ ast_parse_function_call :: proc(ctx: ^AstContext, tokens : ^[]Token, loc := #cal
 
 	// Some special parsing for specific functions...
 	// Ually this would have to be way more complicated to handle macros, but ill jsut hardcode this.
-	switch last_or_nil(qualified_name).source {
+	switch ctx.ast[qualified_name].identifier.token.source {
 		case "va_arg":
 			eat_token_expect_push_err(ctx, tokens, .BracketRoundOpen) or_return
 			resize(&arguments, 2)
@@ -1816,15 +1872,14 @@ ast_parse_function_call :: proc(ctx: ^AstContext, tokens : ^[]Token, loc := #cal
 			arguments[0] = ast_append_node(ctx, expr)
 			eat_token_expect_push_err(ctx, tokens, .Comma) or_return
 			field := eat_token_expect_push_err(ctx, tokens, .Identifier) or_return
-			arguments[1] = ast_append_node(ctx, AstNode{ kind = .Identifier, identifier = make_one(field) })
+			arguments[1] = append_simple_identifier(ctx, field)
 			eat_token_expect_push_err(ctx, tokens, .BracketRoundClose) or_return
 
 		case:
 			ast_parse_function_call_arguments(ctx, tokens, &arguments) or_return
 	}
-	expression_node := AstNode{ kind = .Identifier, identifier = ast_filter_qualified_name(qualified_name) }
 	node = AstNode{ kind = .FunctionCall, function_call = {
-		expression = ast_append_node(ctx, expression_node),
+		expression = qualified_name,
 		template_arguments = template_arguments,
 		arguments = arguments,
 	}}
@@ -2116,59 +2171,81 @@ ast_parse_generic_arguments_no_opening_bracket :: proc(ctx : ^AstContext, tokens
 	}
 }
 
-ast_parse_qualified_name :: proc{ ast_parse_qualified_name_direct, ast_parse_qualified_name_push_error }
-
-ast_parse_qualified_name_push_error :: proc(ctx : ^AstContext, tokens : ^[]Token, loc := #caller_location) -> (r : TokenRange, err : AstError)
+ast_parse_qualified_name :: proc(ctx : ^AstContext, tokens : ^[]Token, accept_dtor := false, loc := #caller_location) -> (name_head : AstNodeIndex, was_dtor : bool, err : AstError)
 {
-	err_ : Maybe(AstErrorFrame)
-	r, err_ = ast_parse_qualified_name_direct(tokens, loc)
-	if e, err := err_.?; err {
-		push_error(ctx, e, loc)
+	name_head, was_dtor = ast_try_parse_qualified_name(ctx, tokens, accept_dtor)
+	if name_head != 0 { return }
+
+	push_error(ctx, { expected = { kind = .Identifier }, actual = tokens[0], code_location = loc })
+	err = .Some
+	return
+}
+
+ast_try_parse_qualified_name :: proc(ctx : ^AstContext, tokens : ^[]Token, accept_dtor := false) -> (name_head : AstNodeIndex, was_dtor : bool)
+{
+	node : AstNode
+	node, was_dtor = #force_inline ast_try_parse_qualified_name_incomplete(ctx, tokens, accept_dtor)
+	if node.kind != {} {
+		name_head = ast_append_node(ctx, node)
 	}
 	return
 }
 
-ast_parse_qualified_name_direct :: proc(tokens : ^[]Token, loc := #caller_location) -> (r : TokenRange, err : Maybe(AstErrorFrame))
+ast_try_parse_qualified_name_incomplete :: proc(ctx : ^AstContext, tokens : ^[]Token, accept_dtor := false) -> (node : AstNode, was_dtor : bool)
 {
-	start := find_next_actual_token(tokens)
-
-	last_comp_was_ident := false
-	loop: for {
-		t, s := peek_token(tokens)
-		#partial switch t.kind {
+	next_can_be_tilde := true
+	for {
+		n, ns := peek_token(tokens)
+		#partial switch n.kind {
 			case .StaticScopingOperator:
-				tokens^ = s
-				last_comp_was_ident = false
-
+				tokens^ = ns
+				next_can_be_tilde = true
+			
 			case .Identifier:
-				if last_comp_was_ident { break loop }
-				tokens^ = s
-				last_comp_was_ident = true
+				tokens^ = ns
+
+				parent : AstNodeIndex
+				if node.kind != {} { parent = ast_append_node(ctx, node) }
+
+				node = { kind = .Identifier, identifier = { parent = parent, token = n } }
+
+				next_can_be_tilde = false
+
+			case .Tilde:
+				if !accept_dtor || !next_can_be_tilde { return }
+
+				tokens^ = ns
+
+				was_dtor = true
 
 			case:
-				break loop
+				return
 		}
 	}
-
-	end := raw_data(tokens^)
-	if start > end {
-		err = AstErrorFrame{ actual = start[0], message = "Expected qualified name", code_location = loc }
-		return
-	}
-
-	range := slice_from_se(start, end)
-	return range, len(range) > 0 ? nil : AstErrorFrame{ actual = start[0], message = "Expected qualified name", code_location = loc }
 }
 
-ast_filter_qualified_name :: proc(tokens : TokenRange) -> (dest : [dynamic]Token)
+ast_try_parse_out_of_band_dtor_name :: proc(ctx : ^AstContext, tokens : ^[]Token) -> (name : AstNodeIndex)
 {
-	reserve(&dest, len(tokens))
-	for segment in tokens {
-		if segment.kind == .StaticScopingOperator { continue }
-		append(&dest, segment)
+	for {
+		n, ns := peek_token(tokens)
+		#partial switch n.kind {
+			case .StaticScopingOperator:
+				tokens^ = ns
+			
+			case .Identifier:
+				tokens^ = ns
+
+				name = ast_append_node(ctx, { kind = .Identifier, identifier = { parent = name, token = n } })
+
+			case .Tilde:
+				/**/
+
+			case:
+				return
+		}
 	}
-	return
 }
+
 
 OperatorPresedence :: enum {
 	_1               = 1,
@@ -2263,7 +2340,7 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 					else {
 						tokens^ = ns // eat member name
 
-						member_node = AstNode { kind = .Identifier, identifier = make_one(member_name) }
+						member_node = AstNode { kind = .Identifier, identifier = { token = member_name }}
 					}
 
 					node = AstNode{ kind = .MemberAccess, member_access = {
@@ -2451,7 +2528,7 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 
 				if tokens[1].kind == .Star && tokens[2].kind == .Identifier && tokens[3].kind == .BracketRoundClose && tokens[4].kind == .BracketRoundOpen { // fnptr call: (*fnptr)(a, b, c)
 
-					ident := ast_append_node(ctx, AstNode{ kind = .Identifier, identifier = make_one(tokens[2]) })
+					ident := append_simple_identifier(ctx, tokens[2])
 
 					tokens^ = tokens[4:] // eat everythign upt ot the '(a, b, ...'  args
 
@@ -2566,8 +2643,13 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 				continue
 		}
 
-		simple, simple_err := ast_parse_qualified_name(tokens) 
-		if simple_err != nil {
+		tok_reset := tokens^
+		ast_reset := len(ctx.ast)
+		simple, _ := ast_try_parse_qualified_name_incomplete(ctx, tokens)
+		if simple.kind == {} {
+			resize(ctx.ast, ast_reset)
+			tokens^ = tok_reset
+
 			if err == .None { fixup_sequence(&node, ctx, &sequence) }
 			return // keep the ok state
 		}
@@ -2579,7 +2661,7 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 			return
 		}
 
-		node = AstNode{ kind = .Identifier, identifier = ast_filter_qualified_name(simple) }
+		node = simple
 		err = .None
 
 		next, nexts = peek_token(tokens)
@@ -2850,6 +2932,7 @@ AstNodeKind :: enum {
 	LiteralFloat,
 	LiteralBool,
 	LiteralNull,
+	//ScopeAccess,
 	Identifier,
 	Sequence,
 	Namespace,
@@ -2905,7 +2988,10 @@ AstNode :: struct {
 	using _ : struct #raw_union {
 		literal : Token,
 		inner : AstNodeIndex,
-		identifier : [dynamic]Token,
+		identifier : struct {
+			token : Token,
+			parent : AstNodeIndex,
+		},
 		unary_left : struct {
 			operator : AstUnaryOp,
 			right : AstNodeIndex,
@@ -2925,15 +3011,16 @@ AstNode :: struct {
 		},
 		sequence : struct {
 			members : [dynamic]AstNodeIndex,
-			braced : bool, //TODO(Rennorb) @cleanup
+			declared_names : map[string]AstNodeIndex,
+			parent_scope : AstNodeIndex,
+			braced : bool,
 		},
 		token_sequence : [dynamic]Token,
 		namespace : struct {
 			name     : Token,
-			sequence : [dynamic]AstNodeIndex,
-		},
-		using_namespace : struct {
-			namespace : TokenRange,
+			member_sequence : [dynamic]AstNodeIndex,
+			declared_names : map[string]AstNodeIndex,
+			parent_scope : AstNodeIndex,
 		},
 		function_call : struct {
 			expression : AstNodeIndex,
@@ -2959,16 +3046,20 @@ AstNode :: struct {
 			var_name : Token,
 			initializer_expression : AstNodeIndex,
 			width_expression : AstNodeIndex,
+			parent_structure : AstNodeIndex,
 			flags : AstVariableDefFlags,
 		},
 		function_def : struct {
-			function_name : [dynamic]Token,
+			function_name : AstNodeIndex,
 			return_type : AstTypeIndex,
 			arguments : [dynamic]AstNodeIndex,
 			body_sequence : [dynamic]AstNodeIndex,
 			attached_comments : [dynamic]AstNodeIndex,
 			template_spec : [dynamic]AstNodeIndex,
 			flags : AstFunctionDefFlags,
+			declared_names : map[string]AstNodeIndex,
+			parent_scope : AstNodeIndex,
+			parent_structure : AstNodeIndex,
 		},
 		operator_def : struct {
 			kind : AstOverloadedOp,
@@ -2988,14 +3079,18 @@ AstNode :: struct {
 		},
 		label : Token,
 		structure : struct {
-			name : TokenRange,
+			name : AstNodeIndex,
 			base_type : AstTypeIndex,
 			members : [dynamic]AstNodeIndex,
 			deinitializer : AstNodeIndex,
 			attached_comments : [dynamic]AstNodeIndex,
 			template_spec : [dynamic]AstNodeIndex,
+			generic_instantiations : map[string]AstNodeIndex,
 			flags : AstStructureFlags,
 			synthetic_this_var : AstNodeIndex,
+			declared_names : map[string]AstNodeIndex,
+			parent_scope : AstNodeIndex,
+			parent_structure : AstNodeIndex,
 		},
 		member_access : struct {
 			expression, member : AstNodeIndex,
@@ -3014,10 +3109,14 @@ AstNode :: struct {
 			initializer, condition, loop_statement : [dynamic]AstNodeIndex,
 			body_sequence : [dynamic]AstNodeIndex,
 			is_foreach : bool,
+			declared_names : map[string]AstNodeIndex,
+			parent_scope : AstNodeIndex,
 		},
 		branch : struct {
 			condition : [dynamic]AstNodeIndex,
-			true_branch_sequence, false_branch_sequence : [dynamic]AstNodeIndex,
+			true_branch, false_branch : AstNodeIndex,
+			declared_names : map[string]AstNodeIndex, // used for the scope of teh condition itself
+			parent_scope : AstNodeIndex,
 		},
 		switch_ : struct {
 			expression : AstNodeIndex,
@@ -3114,6 +3213,10 @@ fmt_astnode :: proc(fi: ^fmt.Info, node: ^AstNode, verb: rune) -> bool
 
 	io.write_string(fi.writer, fmt.tprintf("AstNode <%v>", node.kind))
 
+	if node.attached {
+		io.write_string(fi.writer, " [attached] ")
+	}
+
 	if fi.record_level > 3 {
 		io.write_string(fi.writer, " { ... }")
 		return true
@@ -3144,7 +3247,7 @@ fmt_astnode :: proc(fi: ^fmt.Info, node: ^AstNode, verb: rune) -> bool
 		case .Identifier         : fmt.fmt_arg(fi, node.identifier, 'v')
 		case .Sequence           : fmt.fmt_arg(fi, node.sequence, 'v')
 		case .Namespace          : fmt.fmt_arg(fi, node.namespace, 'v')
-		case .UsingNamespace     : fmt.fmt_arg(fi, node.using_namespace, 'v')
+		case .UsingNamespace     : fmt.fmt_arg(fi, node.identifier, 'v')
 		case .ExprUnaryLeft      : fmt.fmt_arg(fi, node.unary_left, 'v')
 		case .ExprUnaryRight     : fmt.fmt_arg(fi, node.unary_right, 'v')
 		case .ExprBinary         : fmt.fmt_arg(fi, node.binary, 'v')
@@ -3242,18 +3345,18 @@ AstTypeFunction :: struct {
 	return_type : AstTypeIndex,
 }
 AstTypePointer :: struct {
-	destination_type : AstTypeIndex,
 	flags            : bit_set[enum{ Const, Reference }],
+	destination_type : AstTypeIndex,
 }
 AstTypeArray :: struct {
 	element_type      : AstTypeIndex,
 	length_expression : AstNodeIndex, // can be empty
 }
 AstTypeFragment :: struct {
-	parent_fragment    : AstTypeIndex,
 	identifier         : Token,
 	generic_parameters : []AstNodeIndex, // can by type or expression
 	flags              : bit_set[enum{ Const }],
+	parent_fragment    : AstTypeIndex,
 }
 AstTypePrimitive :: struct {
 	fragments : []Token,
@@ -3289,4 +3392,14 @@ ast_append_type :: #force_inline proc(ctx : ^AstContext, frag : AstType) -> AstT
 ast_append_node :: #force_inline proc(ctx : ^AstContext, node : AstNode) -> AstNodeIndex
 {
 	return transmute(AstNodeIndex) append_return_index(ctx.ast, node)
+}
+
+append_simple_identifier :: #force_inline proc(ctx : ^$Ctx, identifier : Token) -> AstNodeIndex
+{
+	when Ctx == AstContext {
+		return ast_append_node(ctx, { kind = .Identifier, identifier = { token = identifier } })
+	}
+	else {
+		return cvt_append_node(ctx, { kind = .Identifier, identifier = { token = identifier } })
+	}
 }

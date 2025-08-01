@@ -102,22 +102,10 @@ _set_user_formatters :: proc()
 	formatters[typeid_of(AstNodeIndex)] = fmt_astindex_a
 	formatters[typeid_of(AstNode)] = fmt_astnode_a
 	formatters[typeid_of(TokenRange)] = fmt_token_range_a
-	formatters[typeid_of(ScopeIndex)] = fmt_scope_idx_a
 	formatters[typeid_of(AstTypeIndex)] = fmt_asttypeidx_a
 
 	fmt.set_user_formatters(&formatters)
 }
-
-PersistenceKind :: enum uint {
-	Temporary = 0,
-	Persistent = 1,
-}
-
-SplitIndex :: bit_field uint {
-	index : uint | size_of(uint) * 8 - 1,
-	persistence : PersistenceKind | 1,
-}
-
 
 
 import win32 "core:sys/windows"

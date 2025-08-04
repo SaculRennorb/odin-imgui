@@ -815,17 +815,21 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 							requires_termination = true
 							break
 						}
-						else if containing_scope_idx := cvt_get_parent_scope(ctx, expression_type_node)^; containing_scope_idx != 0 {
-							containing_scope := ctx.ast[containing_scope_idx]
-							if containing_scope.kind == .Namespace {
-								str.write_string(&ctx.result, containing_scope.namespace.name.source)
-								str.write_byte(&ctx.result, '_')
-							}
+						else {
+							expression_type_node := maybe_follow_typedef(ctx, scope_node /*@correctness wrong*/, expression_type_node)
 
-							write_folded_identifier(ctx, &ctx.result, member.function_call.expression)
-						}
-						else{
-							write_folded_identifier(ctx, &ctx.result, member.function_call.expression)
+							if containing_scope_idx := cvt_get_parent_scope(ctx, expression_type_node)^; containing_scope_idx != 0 {
+								containing_scope := ctx.ast[containing_scope_idx]
+								if containing_scope.kind == .Namespace {
+									str.write_string(&ctx.result, containing_scope.namespace.name.source)
+									str.write_byte(&ctx.result, '_')
+								}
+	
+								write_folded_identifier(ctx, &ctx.result, member.function_call.expression)
+							}
+							else{
+								write_folded_identifier(ctx, &ctx.result, member.function_call.expression)
+							}
 						}
 					}
 

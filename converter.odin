@@ -107,11 +107,11 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 
 			case .Typedef:
 				typedef := current_node.typedef
-				
-				str.write_string(&ctx.result, typedef.name.source)
+
 				type := &ctx.ast[typedef.type]
 				#partial switch type.kind {
 					case .Type:
+						str.write_string(&ctx.result, typedef.name.source)
 						str.write_string(&ctx.result, " :: ")
 						//TODO maybe bake
 						cvt_get_declared_names(ctx, scope_node)[typedef.name.source] = current_node_index
@@ -123,7 +123,19 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 						did_clobber = write_type(ctx, scope_node, type.type, indent_str, indent_str)
 
 					case .Struct, .Union:
-						cvt_get_declared_names(ctx, scope_node)[typedef.name.source] = current_node_index
+						if typedef.name.source != get_simple_name_string(ctx, type.structure.name) {
+							// Only push this name if its not the same as they type itself, otherwise this will case lookup issues.
+							// Also a typedefed named struct is the same as a normal struct declaration, we don't care about that detail.
+							cvt_get_declared_names(ctx, scope_node)[typedef.name.source] = current_node_index
+							
+							if type.structure.name == 0 {
+								str.write_string(&ctx.result, typedef.name.source)
+							}
+							else {
+								unimplemented("Struct typeddef aliasing not implemented")
+							}
+						}
+
 						#partial switch scope := &ctx.ast[scope_node]; scope.kind {
 							case .Struct, .Union, .Enum:
 								type.structure.parent_scope = scope_node
@@ -135,6 +147,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 						did_clobber, _, _, _ = write_node(ctx, typedef.type, scope_node, indent_str)
 
 					case .FunctionDefinition:
+						str.write_string(&ctx.result, typedef.name.source)
 						cvt_get_declared_names(ctx, scope_node)[typedef.name.source] = current_node_index
 						#partial switch scope := &ctx.ast[scope_node]; scope.kind {
 							case .Struct, .Union, .Enum:
@@ -1580,7 +1593,9 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 		forward_declared_name, _ := try_find_definition_for_name(ctx, parent_scope, structure.name)
 		if forward_declared_name != 0 {
 			forward_declaration := ctx.ast[forward_declared_name]
-			assert(forward_declaration.kind == .Struct || forward_declaration.kind == .Union)
+			if forward_declaration.kind != .Struct && forward_declaration.kind != .Union {
+				panic(fmt.tprintf("[%v] Found forward declared struct of unexpected type %v @ %v", cvt_get_location(ctx, structure_node_index), forward_declaration.kind, cvt_get_location(ctx, forward_declared_name)))
+			}
 
 			if .IsForwardDeclared in structure.flags && .IsForwardDeclared not_in forward_declaration.structure.flags {
 				if len(structure.attached_comments) != 0 {
@@ -2967,7 +2982,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 	{
 		frag, is_frag := ctx.type_heap[stemmed_arg_source].(AstTypeFragment)
 		assert(is_frag, "wrong type fragment passed", loc)
-		og_struct_idx := find_definition_for(ctx, scope_node, stemmed_arg_source, false, loc)
+		og_struct_idx := find_definition_for(ctx, scope_node, stemmed_arg_source, false, loc = loc)
 		og_structure := ctx.ast[og_struct_idx].structure
 
 		replacements : TemplateReplacements
@@ -3047,7 +3062,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 					stemmed := stemm_type(ctx, node.type)
 					if !is_variant(ctx.type_heap[stemmed], AstTypeFragment) { break }
 
-					def_idx := find_definition_for(ctx, scope_node, stemmed)
+					def_idx := find_definition_for(ctx, scope_node, stemmed, filter = { .Type, .Variable }) // @hack becasue constants sometimes get parsed as types
 
 					name : []string = { get_simple_name_string(ctx, def_idx) }
 					if def, _ := try_find_definition_for_name(ctx, structure, name, { .Type }); def == 0 { // cant see this def from the structure
@@ -3127,9 +3142,9 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 	}
 }
 
-find_definition_for :: proc(ctx : ^ConverterContext, start_context_node : AstNodeIndex, type : AstTypeIndex, resolve_generic := true, loc := #caller_location) -> (definition : AstNodeIndex)
+find_definition_for :: proc(ctx : ^ConverterContext, start_context_node : AstNodeIndex, type : AstTypeIndex, resolve_generic := true, filter := DefinitionFilter{ .Type }, loc := #caller_location) -> (definition : AstNodeIndex)
 {
-	definition = try_find_definition_for(ctx, start_context_node, type, resolve_generic)
+	definition = try_find_definition_for(ctx, start_context_node, type, resolve_generic, filter, loc)
 	if definition != 0 { return }
 
 	err := fmt.tprintf("Type not found in context: %#v", ctx.type_heap[type])
@@ -3154,7 +3169,7 @@ try_find_definition_for_or_warn :: proc(ctx : ^ConverterContext, start_context_n
 	return
 }
 
-try_find_definition_for :: proc(ctx : ^ConverterContext, start_scope_node : AstNodeIndex, type : AstTypeIndex, resolve_generic := true) -> (definition : AstNodeIndex)
+try_find_definition_for :: proc(ctx : ^ConverterContext, start_scope_node : AstNodeIndex, type : AstTypeIndex, resolve_generic := true, filter := DefinitionFilter{ .Type }, loc := #caller_location) -> (definition : AstNodeIndex)
 {
 	flattened_type := make([dynamic]string, context.temp_allocator)
 	flaten_loop: for type := type; type != {}; {
@@ -3176,7 +3191,7 @@ try_find_definition_for :: proc(ctx : ^ConverterContext, start_scope_node : AstN
 
 	if len(flattened_type) == 0 { return }
 
-	definition, _ = try_find_definition_for_name_preflattened(ctx, start_scope_node, flattened_type[:], { .Type })
+	definition, _ = try_find_definition_for_name_preflattened(ctx, start_scope_node, flattened_type[:], filter, loc)
 
 	if resolve_generic {
 		stemmed := stemm_type(ctx, type)
@@ -3856,4 +3871,47 @@ cvt_get_parent_scope :: proc(ctx : ^ConverterContext, target_node : AstNodeIndex
 		case:
 			panic(fmt.tprintf("%v is not a valid scope node.\n%#v", node.kind, node), loc)
 	}
+}
+
+cvt_get_location :: proc(ctx : ^ConverterContext, target_node : AstNodeIndex, loc := #caller_location) -> SourceLocation
+{
+	node := &ctx.ast[target_node]
+	#partial switch node.kind {
+		case .Identifier:
+			return node.identifier.token.location
+		case .Sequence:
+			if len(node.sequence.members) > 0 {
+				return cvt_get_location(ctx, node.sequence.members[0], loc)
+			}
+		case .For, .While, .Do:
+			if len(node.loop.body_sequence) > 0 {
+				return cvt_get_location(ctx, node.loop.body_sequence[0], loc)
+			}
+		case .Namespace:
+			if node.namespace.name.location.file_path != "" {
+				return node.namespace.name.location
+			}
+			else if len(node.namespace.member_sequence) > 0 {
+				return cvt_get_location(ctx, node.namespace.member_sequence[0], loc)
+			}
+		case .Struct, .Enum, .Union:
+			if node.structure.name != 0 {
+				return cvt_get_location(ctx, node.structure.name, loc)
+			}
+			else if len(node.structure.members) > 0 {
+				return cvt_get_location(ctx, node.structure.members[0], loc)
+			}
+		case .FunctionDefinition:
+			if node.function_def.function_name != 0 {
+				return cvt_get_location(ctx, node.function_def.function_name, loc)
+			}
+			else if len(node.function_def.body_sequence) > 0 {
+				return cvt_get_location(ctx, node.function_def.body_sequence[0], loc)
+			}
+		case .Branch:
+			return cvt_get_location(ctx, node.branch.condition[0], loc)
+		case .Typedef:
+			return node.typedef.name.location
+		}
+	return {}
 }

@@ -248,7 +248,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 				if current_node.function_def.function_name != 0 {
 					if ctx.ast[current_node.function_def.function_name].identifier.parent == 0 {
 						#partial switch ctx.ast[scope_node].kind {
-							case .Struct, .Union, .Enum:
+							case .Struct, .Union, .Enum, .Namespace:
 								current_node.function_def.parent_structure = scope_node
 						}
 					}
@@ -914,10 +914,9 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 				fncall := current_node.function_call
 
 				if expr := ctx.ast[fncall.expression]; expr.kind == .Identifier {
-					// @hardcoded: Print indents directly so we don't have to add all std functions to the name resolver.
-					fn_name := get_simple_name_string(ctx, expr)
 					// convert some top level function names
-					switch fn_name {
+					simple_name := get_simple_name_string(ctx, expr)
+					switch simple_name {
 						case "sizeof":
 							str.write_string(&ctx.result, "size_of")
 
@@ -941,7 +940,13 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 							break node_kind_switch
 
 						case:
-							str.write_string(&ctx.result, fn_name)
+							definition, _ := try_find_definition_for_name(ctx, scope_node, fncall.expression)
+							if definition != 0 {
+								write_complete_name_string(ctx, &ctx.result, definition)
+							}
+							else {
+								str.write_string(&ctx.result, simple_name)
+							}
 					}
 				}
 				else {
@@ -979,14 +984,14 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 				ns.parent_scope = scope_node
 
 				if ns.name.source != "" {
-					cvt_get_declared_names(ctx, scope_node)[ns.name.source] = current_node_index
-				}
+					// try merging the namespace with an existing one
+					previous_declaration, _ := try_find_definition_for_name_preflattened(ctx, scope_node, { ns.name.source }, { .Namespace })
+					if previous_declaration != 0 {
+						//NOTE(Rennorb): Future writes to this namespace invalidate the old map, but I think this is fine?
+						ns.declared_names = ctx.ast[previous_declaration].namespace.declared_names
+					}
 
-				// try merging the namespace with an existing one
-				previous_declaration, _ := try_find_definition_for_name_preflattened(ctx, scope_node, { ns.name.source }, { .Namespace })
-				if previous_declaration == 0 {
-					//NOTE(Rennorb): Future writes to this namespace invalidate the old map, but I think this is fine?
-					ns.declared_names = ctx.ast[previous_declaration].namespace.declared_names
+					cvt_get_declared_names(ctx, scope_node)[ns.name.source] = current_node_index
 				}
 
 				write_node_sequence(ctx, trim_newlines_start(ctx, ns.member_sequence[:]), current_node_index, indent_str)
@@ -3366,6 +3371,9 @@ get_simple_name_string_node :: proc(ctx : ^ConverterContext, node : AstNode) -> 
 
 		case .Identifier:
 			return node.identifier.token.source
+
+		case .Namespace:
+			return node.namespace.name.source
 
 		case .Type:
 			type := ctx.type_heap[node.type]

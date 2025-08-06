@@ -103,7 +103,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 						write_token_range(&ctx.result, define.expansion_tokens, "")
 				}
 
-				cvt_get_declared_names(ctx, scope_node)[define.name.source] = current_node_index
+				cvt_get_declared_names(ctx, 0)[define.name.source] = current_node_index
 
 			case .Typedef:
 				typedef := current_node.typedef

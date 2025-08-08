@@ -926,6 +926,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 			case .FunctionCall:
 				fncall := current_node.function_call
 
+				definition : AstNodeIndex
 				if expr := ctx.ast[fncall.expression]; expr.kind == .Identifier {
 					// convert some top level function names
 					simple_name := get_simple_name_string(ctx, expr)
@@ -953,7 +954,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 							break node_kind_switch
 
 						case:
-							definition, _ := try_find_definition_for_name(ctx, scope_node, fncall.expression)
+							definition, _ = try_find_definition_for_name(ctx, scope_node, fncall.expression)
 							if definition != 0 {
 								write_complete_name_string(ctx, &ctx.result, definition)
 							}
@@ -971,6 +972,17 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 					if arg_index != 0 { str.write_string(&ctx.result, ", ") }
 					c, _, _, _ := write_node(ctx, aidx, scope_node); did_clobber |= c
 					arg_index += 1
+				}
+				if definition != 0 {
+					definition_node := ctx.ast[definition]
+					if definition_node.kind == .FunctionDefinition && .Static not_in definition_node.function_def.flags {
+						#partial switch ctx.ast[definition_node.function_def.parent_structure].kind {
+							case .Struct, .Union:
+								if arg_index != 0 { str.write_string(&ctx.result, ", ") }
+								str.write_string(&ctx.result, "this")
+								arg_index += 1
+						}
+					}
 				}
 				for aidx in fncall.arguments {
 					if arg_index != 0 { str.write_string(&ctx.result, ", ") }

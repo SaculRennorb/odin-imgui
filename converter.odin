@@ -3384,8 +3384,14 @@ get_simple_name_string_node :: proc(ctx : ^ConverterContext, node : AstNode) -> 
 				return node.identifier.token.source
 			}
 
+		case .PreprocMacro:
+			return node.preproc_macro.name.source
+
 		case .Identifier:
 			return node.identifier.token.source
+
+		case .PreprocDefine:
+			return node.preproc_define.name.source
 
 		case .Namespace:
 			return node.namespace.name.source
@@ -3483,8 +3489,14 @@ write_complete_name_string_node :: proc(ctx : ^ConverterContext, sb : ^str.Build
 				str.write_string(sb, ctx.ast[node.function_def.function_name].identifier.token.source)
 			}
 
+		case .PreprocMacro:
+			str.write_string(sb, node.preproc_macro.name.source)
+
 		case .VariableDeclaration, .TemplateVariableDeclaration:
 			str.write_string(sb, node.var_declaration.var_name.source)
+
+		case .PreprocDefine:
+			str.write_string(sb, node.preproc_define.name.source)
 
 		case .Typedef:
 			str.write_string(sb, node.typedef.name.source)

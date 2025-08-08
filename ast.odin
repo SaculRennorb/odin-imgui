@@ -436,8 +436,19 @@ ast_attach_comments :: proc(ctx: ^AstContext, sequence : ^[dynamic]AstNodeIndex,
 		#partial switch ctx.ast[sid].kind {
 			case .Comment, .NewLine:
 				continue loop
+
 			case:
-				start_index = sidi + 1
+				if len(sequence) > sidi && ctx.ast[sequence[sidi + 1]].kind != .NewLine {
+					// check for the case of 
+					//  int i; // some comment for i
+					//  // some attached comment
+					//  function()
+					// and don't attach  "some comment for i"
+					start_index = sidi + 2
+				}
+				else {
+					start_index = sidi + 1
+				}
 				break loop
 		}
 	}

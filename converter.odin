@@ -3837,6 +3837,8 @@ cvt_get_declared_names :: proc(ctx : ^ConverterContext, scope_index : AstNodeInd
 			return &scope_node.namespace.declared_names
 		case .Struct, .Enum, .Union:
 			return &scope_node.structure.declared_names
+		case .LambdaDefinition:
+			return cvt_get_declared_names(ctx, scope_node.lambda_def.underlying_function) // TODO @correctness @completeness: Add proper scoping for lambda captures, wil lneed additional scope o nthe lambda itself probably.+
 		case .FunctionDefinition:
 			return &scope_node.function_def.declared_names
 		case .Branch:

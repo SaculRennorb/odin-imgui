@@ -124,6 +124,15 @@ ast_parse_filescope_sequence :: proc(ctx : ^AstContext, tokens_ : []Token) -> (s
 					if _, err := eat_token_expect(tokens, .Semicolon); err != nil {
 						panic(fmt.tprintf("Unexpected token after %v def: %v.", token.source, err))
 					}
+
+					if n, ns := peek_token(tokens, false); n.kind == .Comment {
+						tokens^ = ns
+	
+						x := ast_append_node(ctx, AstNode { kind = .Comment, attached = true, literal = n })
+						append(&node.structure.attached_comments, x)
+						y := ast_append_node(ctx, AstNode { kind = .NewLine, attached = true })
+						append(&node.structure.attached_comments, y)
+					}
 				}
 				else {
 					panic(format_error(ctx, fmt.tprintf("Failed to parse %v", token.source)))
@@ -136,11 +145,32 @@ ast_parse_filescope_sequence :: proc(ctx : ^AstContext, tokens_ : []Token) -> (s
 						case .FunctionDefinition:
 							ctx.ast[node_idx].function_def.template_spec = template_spec
 							template_spec = make([dynamic]AstNodeIndex)
-
+							
 							eat_token_expect(tokens, .Semicolon)
+							
+							if n, ns := peek_token(tokens, false); n.kind == .Comment {
+								tokens^ = ns
+								
+								x := ast_append_node(ctx, AstNode { kind = .Comment, attached = true, literal = n })
+								y := ast_append_node(ctx, AstNode { kind = .NewLine, attached = true })
+								fndef := &ctx.ast[node_idx].function_def
+								append(&fndef.attached_comments, x)
+								append(&fndef.attached_comments, y)
+							}
 
 						case .OperatorDefinition:
 							eat_token_expect(tokens, .Semicolon)
+
+							if n, ns := peek_token(tokens, false); n.kind == .Comment {
+								tokens^ = ns
+
+								
+								x := ast_append_node(ctx, AstNode { kind = .Comment, attached = true, literal = n })
+								y := ast_append_node(ctx, AstNode { kind = .NewLine, attached = true })
+								underlying_fn := &ctx.ast[ctx.ast[node_idx].operator_def.underlying_function].function_def
+								append(&underlying_fn.attached_comments, x)
+								append(&underlying_fn.attached_comments, y)
+							}
 
 						case .Namespace:
 							/**/
@@ -1491,6 +1521,17 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 			ast_attach_comments(ctx, sequence, &ctx.ast[parsed_node])
 
 			if n, _ := peek_token(tokens); n.kind == .Semicolon { // normal declaration
+
+				if n, ns := peek_token(tokens, false); n.kind == .Comment {
+					tokens^ = ns
+
+					x := ast_append_node(ctx, AstNode { kind = .Comment, attached = true, literal = n })
+					y := ast_append_node(ctx, AstNode { kind = .NewLine, attached = true })
+					structure := &ctx.ast[parsed_node].structure
+					append(&structure.attached_comments, x)
+					append(&structure.attached_comments, y)
+				}
+
 				append(sequence, parsed_node)
 				return
 			}

@@ -2468,6 +2468,14 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 			else {
 				forward_comments := forward_declaration.function_def.attached_comments
 				inject_at(&fn_node.attached_comments, 0, ..forward_comments[:])
+
+				// copy over default args from forward declaration
+				for argni, argi in forward_declaration.function_def.arguments {
+					arg := &ctx.ast[argni].var_declaration
+					if arg.initializer_expression != 0 {
+						ctx.ast[fn_node.arguments[argi]].var_declaration.initializer_expression = arg.initializer_expression
+					}
+				}
 			}
 		}
 

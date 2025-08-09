@@ -129,6 +129,10 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 							cvt_get_declared_names(ctx, scope_node)[typedef.name.source] = current_node_index
 							
 							if type.structure.name == 0 {
+								if scope_node != 0 {
+									write_complete_name_string(ctx, &ctx.result, scope_node)
+									str.write_byte(&ctx.result, '_')
+								}
 								str.write_string(&ctx.result, typedef.name.source)
 							}
 							else {
@@ -1598,7 +1602,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 	{
 		structure := &structure_node.structure
 
-		complete_structure_name := str.join(fold_complete_name(ctx, structure_node^, context.temp_allocator)[:], "_", context.temp_allocator)
+		complete_structure_name := structure.name != 0 ? get_complete_name_string(ctx, structure_node^, context.temp_allocator) : ""
 
 		parent_scope := structure.parent_scope
 
@@ -3465,13 +3469,19 @@ write_complete_name_string_idx :: #force_inline proc(ctx : ^ConverterContext, sb
 
 write_complete_name_string_node :: proc(ctx : ^ConverterContext, sb : ^str.Builder, node : AstNode)
 {
+	is_not_imgui_namespace :: proc(ctx : ^ConverterContext, node : AstNodeIndex) -> bool
+	{
+		n := ctx.ast[node]
+		return n.kind != .Namespace || n.namespace.name.source != "ImGui"
+	}
+
 	#partial switch node.kind {
 		case .Struct, .Enum, .Union:
-			if node.structure.parent_structure != 0 {
+			if node.structure.parent_structure != 0 && is_not_imgui_namespace(ctx, node.structure.parent_structure) {
 				write_complete_name_string_idx(ctx, sb, node.structure.parent_structure)
 				str.write_byte(sb, '_')
 			}
-			else if ctx.ast[node.structure.parent_scope].kind == .Namespace {
+			else if ctx.ast[node.structure.parent_scope].kind == .Namespace && is_not_imgui_namespace(ctx, node.structure.parent_scope) {
 				write_complete_name_string_idx(ctx, sb, node.structure.parent_scope)
 				str.write_byte(sb, '_')
 			}
@@ -3480,7 +3490,7 @@ write_complete_name_string_node :: proc(ctx : ^ConverterContext, sb : ^str.Build
 			}
 
 		case .Namespace:
-			if ctx.ast[node.structure.parent_scope].kind == .Namespace {
+			if ctx.ast[node.namespace.parent_scope].kind == .Namespace && is_not_imgui_namespace(ctx, node.namespace.parent_scope) {
 				write_complete_name_string_idx(ctx, sb, node.structure.parent_scope)
 				str.write_byte(sb, '_')
 			}
@@ -3489,11 +3499,11 @@ write_complete_name_string_node :: proc(ctx : ^ConverterContext, sb : ^str.Build
 			}
 
 		case .FunctionDefinition:
-			if node.function_def.parent_structure != 0 {
+			if node.function_def.parent_structure != 0 && is_not_imgui_namespace(ctx, node.function_def.parent_structure) {
 				write_complete_name_string_idx(ctx, sb, node.function_def.parent_structure)
 				str.write_byte(sb, '_')
 			}
-			else if ctx.ast[node.function_def.parent_scope].kind == .Namespace {
+			else if ctx.ast[node.function_def.parent_scope].kind == .Namespace && is_not_imgui_namespace(ctx, node.function_def.parent_scope) {
 				write_complete_name_string_idx(ctx, sb, node.namespace.parent_scope)
 				str.write_byte(sb, '_')
 			}
@@ -3541,12 +3551,18 @@ append_folded_complete_name_idx :: #force_inline proc(ctx : ^ConverterContext, d
 
 append_folded_complete_name_node :: proc(ctx : ^ConverterContext, destination : ^[dynamic]string, node : AstNode)
 {
+	is_not_imgui_namespace :: proc(ctx : ^ConverterContext, node : AstNodeIndex) -> bool
+	{
+		n := ctx.ast[node]
+		return n.kind != .Namespace || n.namespace.name.source != "ImGui"
+	}
+
 	#partial switch node.kind {
 		case .Struct, .Enum, .Union:
-			if node.structure.parent_structure != 0 {
+			if node.structure.parent_structure != 0 && is_not_imgui_namespace(ctx, node.structure.parent_structure) {
 				append_folded_complete_name(ctx, destination, node.structure.parent_structure)
 			}
-			else if ctx.ast[node.structure.parent_scope].kind == .Namespace {
+			else if ctx.ast[node.structure.parent_scope].kind == .Namespace && is_not_imgui_namespace(ctx, node.structure.parent_scope) {
 				append_folded_complete_name(ctx, destination, node.structure.parent_scope)
 			}
 			if node.structure.name != 0 {
@@ -3554,10 +3570,10 @@ append_folded_complete_name_node :: proc(ctx : ^ConverterContext, destination : 
 			}
 
 		case .FunctionDefinition:
-			if node.function_def.parent_structure != 0 {
+			if node.function_def.parent_structure != 0 && is_not_imgui_namespace(ctx, node.function_def.parent_structure) {
 				append_folded_complete_name(ctx, destination, node.function_def.parent_structure)
 			}
-			else if ctx.ast[node.function_def.parent_scope].kind == .Namespace {
+			else if ctx.ast[node.function_def.parent_scope].kind == .Namespace && is_not_imgui_namespace(ctx, node.function_def.parent_scope) {
 				append_folded_complete_name(ctx, destination, node.function_def.parent_scope)
 			}
 			if node.function_def.function_name != 0 {
@@ -3565,7 +3581,7 @@ append_folded_complete_name_node :: proc(ctx : ^ConverterContext, destination : 
 			}
 
 		case .Namespace:
-			if ctx.ast[node.namespace.parent_scope].kind == .Namespace {
+			if ctx.ast[node.namespace.parent_scope].kind == .Namespace && is_not_imgui_namespace(ctx, node.namespace.parent_scope) {
 				append_folded_complete_name(ctx, destination, node.namespace.parent_scope)
 			}
 			append(destination, node.namespace.name.source)

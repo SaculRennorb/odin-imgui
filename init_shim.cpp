@@ -1,3 +1,11 @@
+//
+// shim
+//
+#define int int
+#define bool bool
+//
+// win32
+//
 #include "win32_type_shim.cpp"
 //
 // imgui.cpp

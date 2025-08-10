@@ -13,6 +13,11 @@ typedef signed short int int16_t;
 typedef signed int int32_t;
 typedef signed long long int int64_t;
 
+int strlen(char*);
+int strcmp(const char* lhs, const char* rhs);
+int memcmp(const void* lhs, const void* rhs, size_t count);
+int strncmp(const char* lhs, const char* rhs, size_t count);
+
 // END STD SHIM
 
 // BEGIN STB SHIM
@@ -141,12 +146,18 @@ namespace ImStb
 #define STB_TEXTEDIT_K_SHIFT        0x400000
 }
 
+int stbtt_InitFont(stbtt_fontinfo *info, const unsigned char *data, int offset);
+int stbtt_FindGlyphIndex(const stbtt_fontinfo *info, int unicode_codepoint);
+
+static bool STB_TEXTEDIT_INSERTCHARS(void* obj, int pos, const char* new_text, int new_text_len);
+
 // END STB SHIM
 
 // BEGIN WIN32 STRUCT SHIM
 
 typedef void* FILE;
 typedef void* HANDLE;
+typedef HANDLE HWND;
 typedef unsigned int DWORD;
 typedef int LONG;
 typedef unsigned short WCHAR;
@@ -171,5 +182,7 @@ struct CANDIDATEFORM {
 	POINT ptCurrentPos;
 	RECT  rcArea;
 };
+
+bool OpenClipboard(HWND hWndNewOwner);
 
 // END WIN32 STRUCT SHIM

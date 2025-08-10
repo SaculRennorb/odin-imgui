@@ -258,7 +258,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 				if !last_broke_line { str.write_byte(&ctx.result, '\n') }
 				str.write_string(&ctx.result, indent_str); str.write_string(&ctx.result, "}\n")
 
-				cvt_get_declared_names(ctx, scope_node)[macro.name.source] = current_node_index 
+				cvt_get_declared_names(ctx, 0)[macro.name.source] = current_node_index 
 
 			case .FunctionDefinition:
 				current_node.function_def.parent_scope = scope_node
@@ -1211,6 +1211,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 					str.write_string(&ctx.result, " }")
 				}
 				else {
+					true_branch.sequence.parent_scope = current_node_index
 					switch len(true_branch.sequence.members) {
 						case 0:
 							str.write_string(&ctx.result, " { }")
@@ -1223,7 +1224,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 						case:
 							str.write_string(&ctx.result, " {")
 							body_indent_str = str.concatenate({ indent_str, ONE_INDENT }, context.temp_allocator)
-							write_node_sequence(ctx, true_branch.sequence.members[:], current_node_index, body_indent_str)
+							write_node_sequence(ctx, true_branch.sequence.members[:], branch.true_branch, body_indent_str)
 							if ctx.ast[last(true_branch.sequence.members[:])^].kind == .NewLine {
 								str.write_string(&ctx.result, indent_str);
 							}
@@ -1234,6 +1235,8 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 				if branch.false_branch == 0 {
 					return
 				}
+
+				if did_clobber { branch = &ctx.ast[current_node_index].branch }
 
 				@(require_results)
 				write_single_else_detect_chaining :: proc(ctx : ^ConverterContext, scope_node : AstNodeIndex, node : AstNodeIndex, kind : AstNodeKind, indent_str : string) -> (did_clobber : bool)
@@ -1258,6 +1261,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 					did_clobber |= write_single_else_detect_chaining(ctx, current_node_index, branch.false_branch, false_branch.kind, indent_str)
 				}
 				else {
+					false_branch.sequence.parent_scope = current_node_index
 					switch len(false_branch.sequence.members) {
 						case 0:
 							 /**/
@@ -1271,7 +1275,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 							str.write_string(&ctx.result, indent_str)
 							str.write_string(&ctx.result, "else {")
 							if body_indent_str == "" { body_indent_str = str.concatenate({ indent_str, ONE_INDENT }, context.temp_allocator) }
-							write_node_sequence(ctx, false_branch.sequence.members[:], current_node_index, body_indent_str)
+							write_node_sequence(ctx, false_branch.sequence.members[:], branch.false_branch, body_indent_str)
 							str.write_string(&ctx.result, indent_str)
 							str.write_byte(&ctx.result, '}')
 					}
@@ -1543,7 +1547,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 		return
 	}
 
-	write_node_sequence :: proc(ctx : ^ConverterContext, sequence : []AstNodeIndex, scope_node : AstNodeIndex, indent_str : string, termination := ";", always_terminate := false)
+	write_node_sequence :: proc(ctx : ^ConverterContext, sequence : []AstNodeIndex, elements_scope_node : AstNodeIndex, indent_str : string, termination := ";", always_terminate := false)
 	{
 		previous_requires_termination := false
 		previous_requires_new_paragraph := false
@@ -1583,7 +1587,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 				str.write_string(&ctx.result, ctx.ast[ci].label.source)
 				str.write_string(&ctx.result, ": for {\n")
 
-				write_node_sequence(ctx, sequence[cii + 1:], scope_node, member_indent_str, termination, always_terminate)
+				write_node_sequence(ctx, sequence[cii + 1:], elements_scope_node, member_indent_str, termination, always_terminate)
 
 				str.write_byte(&ctx.result, '\n')
 				str.write_string(&ctx.result, member_indent_str)
@@ -1594,7 +1598,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 				return
 			}
 
-			_, previous_requires_termination, previous_requires_new_paragraph, should_swallow_paragraph = write_node(ctx, ci, scope_node, indent_str)
+			_, previous_requires_termination, previous_requires_new_paragraph, should_swallow_paragraph = write_node(ctx, ci, elements_scope_node, indent_str)
 			previous_node_kind = node_kind
 		}
 	}
@@ -2829,8 +2833,39 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 						return fn_def.return_type, type_name_idx
 
 					case .Struct, .Union: // structure constructor     Rect(1, 2, 1, 2)
-						struct_this := ctx.ast[definition_idx].structure.synthetic_this_var
+						struct_this := definition.structure.synthetic_this_var
 						return ctx.ast[struct_this].var_declaration.type, definition_idx
+
+					case .PreprocMacro:
+						// not feasable in general
+
+						switch definition.preproc_macro.name.source {  // @hack
+							case "ImDrawCmd_HeaderCompare":
+								return TYPE_LIT_INT32, {}
+							case "stb__in2", "stb__in3", "stb__in4":
+								return TYPE_LIT_INT32, {}
+							case "STB_TEXT_HAS_SELECTION":
+								return TYPE_LIT_BOOL, {}
+							case "IM_BITARRAY_TESTBIT":
+								return TYPE_LIT_BOOL, {}
+						}
+						
+
+						panic(fmt.tprintf("[%v] Unexpected identifier type '%v' for %v: %#v", loc, definition.kind, current_node.identifier, definition_idx))
+
+					case .PreprocDefine:
+						if len(definition.preproc_define.expansion_tokens) == 1 {
+							#partial switch definition.preproc_define.expansion_tokens[0].kind {
+								case .LiteralNull: return TYPE_LIT_NULL, {}
+								case .LiteralBool: return TYPE_LIT_BOOL, {}
+								case .LiteralInteger: return TYPE_LIT_INT32, {}
+								case .LiteralFloat: return TYPE_LIT_BOOL, {}
+								case .LiteralCharacter: return TYPE_LIT_CHAR, {}
+								case .LiteralString: return TYPE_LIT_STRING, {}
+							}
+						}
+
+						fallthrough
 
 					case:
 						panic(fmt.tprintf("[%v] Unexpected identifier type '%v' for %v: %#v", loc, definition.kind, current_node.identifier, definition_idx))
@@ -3020,40 +3055,42 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 		else if condition_node.kind == .ExprUnaryLeft && condition_node.unary_left.operator == .Not {
 			// might still be fake   int a;  if (!a) ... 
 			type, _ = resolve_type(ctx, condition_node.unary_left.right, scope_node)
+			if type > 0 { // @hack :ExplicitBuiltinTypes
 
-			condition := condition_node.unary_left.right
-			#partial switch ctx.ast[condition].kind {
-				case .Identifier, .ExprBacketed, .ExprIndex, .ExprUnaryLeft, .ExprUnaryRight:
-					requires_brackets = false
-			}
+				condition := condition_node.unary_left.right
+				#partial switch ctx.ast[condition].kind {
+					case .Identifier, .ExprBacketed, .ExprIndex, .ExprUnaryLeft, .ExprUnaryRight:
+						requires_brackets = false
+				}
 
-			#partial switch frag in ctx.type_heap[type] {
-				case (AstTypePrimitive):
-					if frag.fragments[0].source == "bool" {
-						/* ok, can write the given type */
-						break
-					}
-					else {
+				#partial switch frag in ctx.type_heap[type] {
+					case (AstTypePrimitive):
+						if frag.fragments[0].source == "bool" {
+							/* ok, can write the given type */
+							break
+						}
+						else {
+							if requires_brackets { str.write_byte(&ctx.result, '(') }
+							did_clobber, _, _, _ = write_node(ctx, condition, scope_node)
+							if requires_brackets { str.write_byte(&ctx.result, ')') }
+							str.write_string(&ctx.result, " == 0")
+							return
+						}
+
+					case (AstTypePointer):
 						if requires_brackets { str.write_byte(&ctx.result, '(') }
 						did_clobber, _, _, _ = write_node(ctx, condition, scope_node)
 						if requires_brackets { str.write_byte(&ctx.result, ')') }
-						str.write_string(&ctx.result, " == 0")
+						str.write_string(&ctx.result, " == nil")
 						return
-					}
 
-				case (AstTypePointer):
-					if requires_brackets { str.write_byte(&ctx.result, '(') }
-					did_clobber, _, _, _ = write_node(ctx, condition, scope_node)
-					if requires_brackets { str.write_byte(&ctx.result, ')') }
-					str.write_string(&ctx.result, " == nil")
-					return
-
-				case (AstTypeFragment), (AstTypeInlineStructure):
-					if requires_brackets { str.write_byte(&ctx.result, '(') }
-					did_clobber, _, _, _ = write_node(ctx, condition, scope_node)
-					if requires_brackets { str.write_byte(&ctx.result, ')') }
-					str.write_string(&ctx.result, " == {}")
-					return
+					case (AstTypeFragment), (AstTypeInlineStructure):
+						if requires_brackets { str.write_byte(&ctx.result, '(') }
+						did_clobber, _, _, _ = write_node(ctx, condition, scope_node)
+						if requires_brackets { str.write_byte(&ctx.result, ')') }
+						str.write_string(&ctx.result, " == {}")
+						return
+				}
 			}
 		}
 
@@ -3069,32 +3106,36 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 						if nl := &ctx.ast[condition_node.binary.left]; \
 								nl.kind == .LiteralInteger && nl.literal.source == "0" {
 							type, _ = resolve_type(ctx, condition_node.binary.right, scope_node)
-							#partial switch frag in ctx.type_heap[type] {
-								case (AstTypePointer):
-									str.write_string(&ctx.result, eq ? "nil == " : "nil != ")
-									did_clobber, _, _, _ = write_node(ctx, condition_node.binary.right, scope_node)
-									return
+							if type > 0 { // @hack :ExplicitBuiltinTypes
+								#partial switch frag in ctx.type_heap[type] {
+									case (AstTypePointer):
+										str.write_string(&ctx.result, eq ? "nil == " : "nil != ")
+										did_clobber, _, _, _ = write_node(ctx, condition_node.binary.right, scope_node)
+										return
 
-								case (AstTypeFragment), (AstTypeInlineStructure):
-									str.write_string(&ctx.result, eq ? "{} == " : "{} != ")
-									did_clobber, _, _, _ = write_node(ctx, condition_node.binary.right, scope_node)
-									return
+									case (AstTypeFragment), (AstTypeInlineStructure):
+										str.write_string(&ctx.result, eq ? "{} == " : "{} != ")
+										did_clobber, _, _, _ = write_node(ctx, condition_node.binary.right, scope_node)
+										return
+								}
 							}
 						}
 						else if nl := &ctx.ast[condition_node.binary.right]; \
 								nl.kind == .LiteralInteger && nl.literal.source == "0" {
 
 							type, _ = resolve_type(ctx, condition_node.binary.left, scope_node)
-							#partial switch frag in ctx.type_heap[type] {
-								case (AstTypePointer):
-									did_clobber, _, _, _ = write_node(ctx, condition_node.binary.left, scope_node)
-									str.write_string(&ctx.result, eq ? " == nil" : " != nil")
-									return
+							if type > 0 { // @hack :ExplicitBuiltinTypes
+								#partial switch frag in ctx.type_heap[type] {
+									case (AstTypePointer):
+										did_clobber, _, _, _ = write_node(ctx, condition_node.binary.left, scope_node)
+										str.write_string(&ctx.result, eq ? " == nil" : " != nil")
+										return
 
-								case (AstTypeFragment), (AstTypeInlineStructure):
-									did_clobber, _, _, _ = write_node(ctx, condition_node.binary.left, scope_node)
-									str.write_string(&ctx.result, eq ? " == {}" : " != {}")
-									return
+									case (AstTypeFragment), (AstTypeInlineStructure):
+										did_clobber, _, _, _ = write_node(ctx, condition_node.binary.left, scope_node)
+										str.write_string(&ctx.result, eq ? " == {}" : " != {}")
+										return
+								}
 							}
 						}
 				}
@@ -3344,6 +3385,10 @@ try_find_definition_for :: proc(ctx : ^ConverterContext, start_scope_node : AstN
 
 			case AstTypeArray:
 				type = frag.element_type
+
+			case AstTypePrimitive: // @hack with the type shim
+				inject_at(&flattened_type, 0, last(frag.fragments).source)
+				break flaten_loop
 
 			case:
 				break flaten_loop

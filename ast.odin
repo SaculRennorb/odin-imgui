@@ -3232,6 +3232,7 @@ fmt_astindex_a : fmt.User_Formatter : proc(fi: ^fmt.Info, arg: any, verb: rune) 
 }
 
 @(thread_local) current_ast: ^[dynamic]AstNode
+@(thread_local) displayed_nodes : map[AstNodeIndex]struct{}
 fmt_astindex :: proc(fi: ^fmt.Info, idx: ^AstNodeIndex, verb: rune) -> bool
 {
 	if current_ast == nil { return false }
@@ -3245,7 +3246,14 @@ fmt_astindex :: proc(fi: ^fmt.Info, idx: ^AstNodeIndex, verb: rune) -> bool
 	}
 	
 	io.write_string(fi.writer, fmt.tprintf("NodeIndex %v -> ", transmute(int) idx^))
-	fmt.fmt_arg(fi, current_ast[idx^], verb)
+
+	if _, _, not_yet_shown, _ := map_entry(&displayed_nodes, idx^); not_yet_shown {
+		fmt.fmt_arg(fi, current_ast[idx^], verb)
+	}
+	else {
+		fmt.wprintf(fi.writer, "AstNode <%v> <repeat>", current_ast[idx^].kind)
+	}
+
 	return true
 }
 
@@ -3269,7 +3277,7 @@ fmt_astnode :: proc(fi: ^fmt.Info, node: ^AstNode, verb: rune) -> bool
 		io.write_string(fi.writer, " [attached] ")
 	}
 
-	if fi.record_level > 3 {
+	if fi.record_level > 10 {
 		io.write_string(fi.writer, " { ... }")
 		return true
 	}
@@ -3368,6 +3376,7 @@ fmt_asttypeidx :: proc(fi: ^fmt.Info, idx: ^AstTypeIndex, verb: rune) -> bool
 	}
 	switch idx^ {
 		case  0: io.write_string(fi.writer, "TypeIndex 0");      return true
+		// :ExplicitBuiltinTypes
 		case -1: io.write_string(fi.writer, "TYPE_LIT_NULL");    return true
 		case -2: io.write_string(fi.writer, "TYPE_LIT_BOOL");    return true
 		case -3: io.write_string(fi.writer, "TYPE_LIT_INT32");   return true
@@ -3427,6 +3436,7 @@ AstType :: union { AstTypeInlineStructure, AstTypeFunction, AstTypePointer, AstT
 
 AstTypeIndex :: distinct int 
 
+// :ExplicitBuiltinTypes
 TYPE_LIT_NULL    : AstTypeIndex : -1
 TYPE_LIT_BOOL    : AstTypeIndex : -2
 TYPE_LIT_INT32   : AstTypeIndex : -3

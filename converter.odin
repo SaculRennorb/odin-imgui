@@ -1016,12 +1016,16 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 					// try merging the namespace with an existing one
 					previous_declaration, _ := try_find_definition_for_name_preflattened(ctx, scope_node, { ns.name.source }, { .Namespace })
 					if previous_declaration != 0 {
+						prev := &ctx.ast[previous_declaration].namespace
 						//NOTE(Rennorb): Future writes to this namespace invalidate the old map, but I think this is fine?
-						ns.declared_names = ctx.ast[previous_declaration].namespace.declared_names
+						ns.declared_names = prev.declared_names
+						ns.merged_member_sequence = prev.merged_member_sequence
 					}
 
 					cvt_get_declared_names(ctx, scope_node)[ns.name.source] = current_node_index
 				}
+
+				append(&ns.merged_member_sequence, ..ns.member_sequence[:])
 
 				write_node_sequence(ctx, trim_newlines_start(ctx, ns.member_sequence[:]), current_node_index, indent_str)
 
@@ -2448,7 +2452,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 					case .Struct, .Enum, .Union:
 						scope_members = parent.structure.members
 					case .Namespace:
-						scope_members = parent.namespace.member_sequence
+						scope_members = parent.namespace.merged_member_sequence
 					case .Sequence:
 						scope_members = parent.sequence.members
 					case:

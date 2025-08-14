@@ -3075,6 +3075,7 @@ AstNode :: struct {
 			member_sequence : [dynamic]AstNodeIndex,
 			declared_names : map[string]AstNodeIndex,
 			parent_scope : AstNodeIndex,
+			merged_member_sequence : [dynamic]AstNodeIndex, // @hack used for overload detection
 		},
 		function_call : struct {
 			expression : AstNodeIndex,

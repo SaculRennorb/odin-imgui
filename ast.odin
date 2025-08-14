@@ -204,6 +204,8 @@ ast_parse_filescope_sequence :: proc(ctx : ^AstContext, tokens_ : []Token) -> (s
 		}
 	}
 
+	ctx.ast[0].sequence.members = sequence
+
 	return
 }
 

@@ -2455,7 +2455,8 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 						unreachable()
 				}
 
-				//TODO(rennorb): For soem reason the root level scope doenst have members.
+				seen_members := make_map(map[string]struct{}, context.temp_allocator)
+
 				for mi in scope_members {
 					member := ctx.ast[mi]
 					if member.kind != .FunctionDefinition { continue }
@@ -2463,8 +2464,12 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 					if get_identifier_string(ctx, member.function_def.function_name) == fn_baseanme {
 						// @perf
 						// Cannot just compare the indices, because when looking for forward declaraions we might not find the actual node.
-						if format_function_type(ctx, &member.function_def) == function_type_name { overload_index = overload_count }
-						overload_count += 1
+						member_type_name := format_function_type(ctx, &member.function_def)
+						_ ,_, new_entry, _ := map_entry(&seen_members, member_type_name)
+						if new_entry {
+							if member_type_name == function_type_name { overload_index = overload_count }
+							overload_count += 1
+						}
 					}
 				}
 

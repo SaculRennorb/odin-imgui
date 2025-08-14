@@ -1799,7 +1799,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 					stemmed_type_idx := find_definition_for(ctx, scope_node, stemmed, false)
 					#partial switch stemmed_node := &ctx.ast[stemmed_type_idx]; stemmed_node.kind {
 						case .Struct, .Union:
-							type_key := format_instantiated_structure_name_key(ctx, type_idx) // @perf duplicates work for pointer to structure
+							type_key := format_complete_type_string(ctx, type_idx) // @perf duplicates work for pointer to structure
 							
 							if instantiation, instance_exists := stemmed_node.structure.generic_instantiations[type_key]; !instance_exists {
 								log.debugf("[%v] baking generic %v", frag.identifier.location, type_key)
@@ -2379,9 +2379,27 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 		fn_node := &function_node_.function_def
 		parent_type := fn_node.parent_structure == 0 ? nil : &ctx.ast[fn_node.parent_structure]
 
-		overloaded_name : string
+		format_function_type :: proc(ctx : ^ConverterContext, fn_node : ^type_of(AstNode{}.function_def)) -> string
+		{
+			type_name := str.builder_make(context.temp_allocator)
+			write_complete_type(ctx, &type_name, fn_node.return_type)
+			if fn_node.function_name != 0 {
+				str.write_string(&type_name, get_identifier_string(ctx, fn_node.function_name))
+			}
+			str.write_byte(&type_name, '(')
+			for argi, i in fn_node.arguments {
+				if i > 0 { str.write_byte(&type_name, ',') }
+				write_complete_type(ctx, &type_name, ctx.ast[argi].var_declaration.type)
+			}
+			str.write_byte(&type_name, ')')
 
-		flat_function_name : []string
+			return str.to_string(type_name)
+		}
+
+		function_type_name := format_function_type(ctx, fn_node)
+
+		overloaded_name : string
+		flat_function_name : [dynamic]string
 		switch {
 			case .IsCtor in fn_node.flags:
 				overload_index := 0
@@ -2410,24 +2428,42 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 					append(&flat_name, replaced_fn_name)
 				}
 
-				flat_function_name = flat_name[:]
+				flat_function_name = flat_name
 
 			case .IsDtor in fn_node.flags:
 				flat_name := fold_complete_name(ctx, function_node_^, context.temp_allocator)
 				last(flat_name)^ = "deinit"
-				flat_function_name = flat_name[:]
+				flat_function_name = flat_name
 
-			case parent_type != nil && parent_type.kind != .Namespace:
+			case:
 				fn_baseanme := get_identifier_string(ctx, fn_node.function_name)
 
 				overload_index := 0
 				overload_count := 0
-				for mi in parent_type.structure.members {
+
+				scope_members : [dynamic]AstNodeIndex
+
+				parent_idx := fn_node.parent_structure != 0 ? fn_node.parent_structure : fn_node.parent_scope
+				#partial switch parent := ctx.ast[parent_idx]; parent.kind {
+					case .Struct, .Enum, .Union:
+						scope_members = parent.structure.members
+					case .Namespace:
+						scope_members = parent.namespace.member_sequence
+					case .Sequence:
+						scope_members = parent.sequence.members
+					case:
+						unreachable()
+				}
+
+				//TODO(rennorb): For soem reason the root level scope doenst have members.
+				for mi in scope_members {
 					member := ctx.ast[mi]
 					if member.kind != .FunctionDefinition { continue }
 
 					if get_identifier_string(ctx, member.function_def.function_name) == fn_baseanme {
-						if mi == function_node_idx { overload_index = overload_count }
+						// @perf
+						// Cannot just compare the indices, because when looking for forward declaraions we might not find the actual node.
+						if format_function_type(ctx, &member.function_def) == function_type_name { overload_index = overload_count }
 						overload_count += 1
 					}
 				}
@@ -2438,20 +2474,20 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 					overloaded_name = fn_baseanme
 					last(flat_name)^ = fmt.tprintf("%v_%v", fn_baseanme, overload_index)
 				}
-				flat_function_name = flat_name[:]
-
-			case:
-				flat_function_name = fold_complete_name(ctx, function_node_^, context.temp_allocator)[:]
+				flat_function_name = flat_name
 		}
 
-		joined_name := str.join(flat_function_name, "_")
+		joined_name := str.join(flat_function_name[:], "_")
 
 		if overloaded_name != "" {
 			insert_new_overload(ctx, overloaded_name, joined_name)
 		}
 
+		last(flat_function_name)^ = function_type_name
+
 		// fold attached comments form forward declaration. This also works when chaining forward declarations
-		forward_declared_name, _ := try_find_definition_for_name(ctx, fn_node.parent_scope, flat_function_name, { .Function })
+		forward_declared_name, _ := try_find_definition_for_name(ctx, fn_node.parent_scope, flat_function_name[:], { .Function })
+
 		if forward_declared_name != 0 && \
 		 // Prevent detecting member function as its own forward declaration.
 		 // This can could happen, because the type writer for fucntions already inserts the name of the fucntion into the structure scope without actually calling this function here (so it can be referenced by later variables).
@@ -2477,9 +2513,11 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 
 				// copy over default args from forward declaration
 				for argni, argi in forward_declaration.function_def.arguments {
-					arg := &ctx.ast[argni].var_declaration
-					if arg.initializer_expression != 0 {
-						ctx.ast[fn_node.arguments[argi]].var_declaration.initializer_expression = arg.initializer_expression
+					farg := &ctx.ast[argni].var_declaration
+					if farg.initializer_expression != 0 {
+						arg := &ctx.ast[fn_node.arguments[argi]];
+						assert_node_kind(arg^, .VariableDeclaration)
+						arg.var_declaration.initializer_expression = farg.initializer_expression
 					}
 				}
 			}
@@ -2487,7 +2525,9 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 
 		if fn_node.function_name != 0 {
 			function_scope := fn_node.parent_structure != 0 ? fn_node.parent_structure : fn_node.parent_scope
-			cvt_get_declared_names(ctx, function_scope)[get_identifier_string(ctx, fn_node.function_name)] = function_node_idx
+			scope := cvt_get_declared_names(ctx, function_scope)
+			scope[get_identifier_string(ctx, fn_node.function_name)] = function_node_idx
+			scope[function_type_name] = function_node_idx
 		}
 
 		if .IsForwardDeclared in fn_node.flags && !write_forward_declared {
@@ -3015,7 +3055,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 
 		requires_brackets := true
 		#partial switch condition_node.kind {
-			case .Identifier, .ExprBacketed, .ExprIndex, .ExprUnaryLeft, .ExprUnaryRight:
+			case .Identifier, .ExprBacketed, .ExprIndex, .ExprUnaryLeft, .ExprUnaryRight, .MemberAccess, .FunctionCall:
 				requires_brackets = false
 		}
 
@@ -3059,7 +3099,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 
 				condition := condition_node.unary_left.right
 				#partial switch ctx.ast[condition].kind {
-					case .Identifier, .ExprBacketed, .ExprIndex, .ExprUnaryLeft, .ExprUnaryRight:
+					case .Identifier, .ExprBacketed, .ExprIndex, .ExprUnaryLeft, .ExprUnaryRight, .MemberAccess, .FunctionCall:
 						requires_brackets = false
 				}
 
@@ -3404,7 +3444,7 @@ try_find_definition_for :: proc(ctx : ^ConverterContext, start_scope_node : AstN
 		if frag, is_frag := ctx.type_heap[stemmed].(AstTypeFragment); is_frag && len(frag.generic_parameters) > 0 {
 			#partial switch def := &ctx.ast[definition]; def.kind {
 				case .Struct, .Union, .Enum:
-					key := format_instantiated_structure_name_key(ctx, type)
+					key := format_complete_type_string(ctx, type)
 					if baked, exists := def.structure.generic_instantiations[key]; exists {
 						definition = baked
 					}
@@ -3415,49 +3455,77 @@ try_find_definition_for :: proc(ctx : ^ConverterContext, start_scope_node : AstN
 	return
 }
 
-format_instantiated_structure_name_key :: proc(ctx : ^ConverterContext, type : AstTypeIndex, b : ^str.Builder = nil) -> string
+format_complete_type_string :: proc(ctx : ^ConverterContext, type : AstTypeIndex, include_const_qualifiers := false, alloc := context.allocator) -> string
 {
-	b := b
-	b_ : str.Builder
-	if b == nil { b = &b_ }
+	sb := str.builder_make(alloc)
+	write_complete_type_idx(ctx, &sb, type, include_const_qualifiers)
+	return str.to_string(sb)
+}
 
+write_complete_type :: proc { write_complete_type_idx }
+
+write_complete_type_idx :: proc(ctx : ^ConverterContext, sb : ^str.Builder, type : AstTypeIndex, include_const_qualifiers := false)
+{
 	switch frag in ctx.type_heap[type] {
 		case AstTypeInlineStructure:
-			unimplemented()
+			str.write_string(sb, "#s")
+
 		case AstTypeFunction:
-			unimplemented()
+			write_complete_type_idx(ctx, sb, frag.return_type)
+			str.write_byte(sb, '(')
+			for aidx, i in frag.arguments {
+				if i > 0 { str.write_byte(sb, ',') }
+				write_complete_type_idx(ctx, sb, ctx.ast[aidx].var_declaration.type)
+			}
+			str.write_byte(sb, ')')
+
 		case AstTypePointer:
-			str.write_byte(b, '^')
-			format_instantiated_structure_name_key(ctx, frag.destination_type, b)
+			if include_const_qualifiers && .Const in frag.flags {
+				str.write_string(sb, "c:")
+			}
+			str.write_byte(sb, '^')
+			write_complete_type_idx(ctx, sb, frag.destination_type)
+
 		case AstTypeArray:
-			str.write_byte(b, '[')
-			str.write_byte(b, ']')
-			format_instantiated_structure_name_key(ctx, frag.element_type, b)
+			str.write_byte(sb, '[')
+			str.write_byte(sb, ']')
+			write_complete_type_idx(ctx, sb, frag.element_type)
+
 		case AstTypeFragment:
-			str.write_string(b, frag.identifier.source)
+			if frag.parent_fragment != 0 {
+				write_complete_type_idx(ctx, sb, frag.parent_fragment)
+				str.write_byte(sb, '_')
+			}
+
+			if frag.identifier.source == "ImGui" { break }
+
+			str.write_string(sb, frag.identifier.source)
 			if len(frag.generic_parameters) > 0 {
-				str.write_byte(b, '(')
+				str.write_byte(sb, '(')
 				for pi, i in frag.generic_parameters {
-					if i > 0 { str.write_byte(b, ',') }
-					param := ctx.ast[pi]
-					if param.kind == .Type {
-						format_instantiated_structure_name_key(ctx, param.type, b)
+					if i > 0 { str.write_byte(sb, ',') }
+					if param := ctx.ast[pi]; param.kind == .Type {
+						write_complete_type_idx(ctx, sb, param.type)
 					}
 				}
-				str.write_byte(b, ')')
+				str.write_byte(sb, ')')
 			}
-		case AstTypePrimitive:
-			for f, i in frag.fragments {
-				if i > 0 { str.write_byte(b, ':') }
-				str.write_string(b, f.source)
-			}
-		case AstTypeAuto:
-			str.write_string(b, "auto")
-		case AstTypeVoid:
-			str.write_string(b, "void")
-	}
 
-	return str.to_string(b^)
+		case AstTypePrimitive:
+			if include_const_qualifiers && .Const in frag.flags {
+				str.write_string(sb, "c:")
+			}
+			for f, i in frag.fragments {
+				if i > 0 { str.write_byte(sb, ':') }
+				str.write_string(sb, f.source)
+			}
+
+		case AstTypeAuto:
+			str.write_string(sb, "auto")
+
+		case AstTypeVoid:
+			str.write_string(sb, "void")
+	}
 }
 
 stemm_type :: proc(ctx : ^ConverterContext, type : AstTypeIndex, loc := #caller_location) -> AstTypeIndex
@@ -3743,31 +3811,41 @@ append_folded_complete_name_node :: proc(ctx : ^ConverterContext, destination : 
 {
 	is_not_imgui_namespace :: proc(ctx : ^ConverterContext, node : AstNodeIndex) -> bool
 	{
-		n := ctx.ast[node]
+		n := &ctx.ast[node]
 		return n.kind != .Namespace || n.namespace.name.source != "ImGui"
+	}
+
+	// @correctness @hack: This is a bit of a hack, and could run into issues in complex cases
+	has_simple_name :: proc(ctx : ^ConverterContext, name : AstNodeIndex) -> bool
+	{
+		return name == 0 || ctx.ast[name].identifier.parent == 0
 	}
 
 	#partial switch node.kind {
 		case .Struct, .Enum, .Union:
 			if node.structure.parent_structure != 0 && is_not_imgui_namespace(ctx, node.structure.parent_structure) {
-				append_folded_complete_name(ctx, destination, node.structure.parent_structure)
+				if has_simple_name(ctx, node.structure.name) {
+					append_folded_complete_name(ctx, destination, node.structure.parent_structure)
+				}
 			}
 			else if ctx.ast[node.structure.parent_scope].kind == .Namespace && is_not_imgui_namespace(ctx, node.structure.parent_scope) {
 				append_folded_complete_name(ctx, destination, node.structure.parent_scope)
 			}
 			if node.structure.name != 0 {
-				append(destination, ctx.ast[node.structure.name].identifier.token.source)
+				append_folded_complete_name(ctx, destination, node.structure.name)
 			}
 
 		case .FunctionDefinition:
 			if node.function_def.parent_structure != 0 && is_not_imgui_namespace(ctx, node.function_def.parent_structure) {
-				append_folded_complete_name(ctx, destination, node.function_def.parent_structure)
+				if has_simple_name(ctx, node.function_def.function_name) {
+					append_folded_complete_name(ctx, destination, node.function_def.parent_structure)
+				}
 			}
 			else if ctx.ast[node.function_def.parent_scope].kind == .Namespace && is_not_imgui_namespace(ctx, node.function_def.parent_scope) {
 				append_folded_complete_name(ctx, destination, node.function_def.parent_scope)
 			}
 			if node.function_def.function_name != 0 {
-				append(destination, ctx.ast[node.function_def.function_name].identifier.token.source)
+				append_folded_complete_name(ctx, destination, node.function_def.function_name)
 			}
 
 		case .Namespace:
@@ -3783,7 +3861,63 @@ append_folded_complete_name_node :: proc(ctx : ^ConverterContext, destination : 
 			append(destination, node.typedef.name.source)
 
 		case .Identifier:
+			if node.identifier.parent != 0 {
+				append_folded_complete_name(ctx, destination, node.identifier.parent)
+			}
+
+			if node.identifier.token.source == "ImGui" { break }
+
 			append(destination, node.identifier.token.source)
+	}
+}
+
+append_folded_complete_name_type_idx :: proc(ctx : ^ConverterContext, destination : ^[dynamic]string, type : AstTypeIndex)
+{
+	switch frag in ctx.type_heap[type] {
+		case (AstTypeInlineStructure):
+			append(destination, fmt.tprintf("s#%v", int(frag)))
+
+		case (AstTypeFunction):
+			if frag.name.source != "" {
+				append(destination, frag.name.source)
+			}
+			else {
+				append(destination, fmt.tprintf("f#%v", int(type)))
+			}
+
+		case (AstTypePointer):
+			append(destination, "^")
+			append_folded_complete_name_type_idx(ctx, destination, frag.destination_type)
+
+		case (AstTypeArray):
+			//TODO(Rennorb) @correctness @completeness: This techincally needs to use the array length as different types,
+			// ignored for now.
+			append(destination, "[]")
+			append_folded_complete_name_type_idx(ctx, destination, frag.element_type)
+
+		case (AstTypeFragment):
+			append_folded_complete_name_type_idx(ctx, destination, frag.parent_fragment)
+
+			if frag.identifier.source == "ImGui" { break }
+
+			if .Const in frag.flags {
+				append(destination, "c")
+			}
+			append(destination, frag.identifier.source)
+
+		case (AstTypePrimitive):
+			if .Const in frag.flags {
+				append(destination, "c")
+			}
+			for f in frag.fragments {
+				append(destination, f.source)
+			}
+
+		case (AstTypeAuto):
+			append(destination, "auto")
+
+		case (AstTypeVoid):
+			append(destination, "void")
 	}
 }
 
@@ -3796,30 +3930,40 @@ write_folded_complete_name_idx :: #force_inline proc(ctx : ^ConverterContext, sb
 
 write_folded_complete_name_node :: proc(ctx : ^ConverterContext, sb : ^str.Builder, node : AstNode)
 {
+	// @correctness @hack: This is a bit of a hack, and could run into issues in complex cases
+	has_simple_name :: proc(ctx : ^ConverterContext, name : AstNodeIndex) -> bool
+	{
+		return name == 0 || ctx.ast[name].identifier.parent == 0
+	}
+
 	#partial switch node.kind {
 		case .Struct, .Enum, .Union:
 			if node.structure.parent_structure != 0 {
-				write_folded_complete_name(ctx, sb, node.structure.parent_structure)
-				str.write_byte(sb, '_')
+				if has_simple_name(ctx, node.structure.name) {
+					write_folded_complete_name(ctx, sb, node.structure.parent_structure)
+					str.write_byte(sb, '_')
+				}
 			}
 			else if ctx.ast[node.structure.parent_scope].kind == .Namespace {
 				write_folded_complete_name(ctx, sb, node.structure.parent_scope)
 				str.write_byte(sb, '_')
 			}
 			if node.structure.name != 0 {
-				str.write_string(sb, ctx.ast[node.structure.name].identifier.token.source)
+				write_folded_complete_name(ctx, sb, node.structure.name)
 			}
 		case .FunctionDefinition:
 			if node.function_def.parent_structure != 0 {
-				write_folded_complete_name(ctx, sb, node.function_def.parent_structure)
-				str.write_byte(sb, '_')
+				if has_simple_name(ctx, node.function_def.function_name) {
+					write_folded_complete_name(ctx, sb, node.function_def.parent_structure)
+					str.write_byte(sb, '_')
+				}
 			}
 			else if ctx.ast[node.function_def.parent_scope].kind == .Namespace {
 				write_folded_complete_name(ctx, sb, node.function_def.parent_scope)
 				str.write_byte(sb, '_')
 			}
 			if node.function_def.function_name != 0 {
-				str.write_string(sb, ctx.ast[node.function_def.function_name].identifier.token.source)
+				write_folded_complete_name(ctx, sb, node.function_def.function_name)
 			}
 		case .Namespace:
 			if ctx.ast[node.namespace.parent_scope].kind == .Namespace {
@@ -3832,14 +3976,24 @@ write_folded_complete_name_node :: proc(ctx : ^ConverterContext, sb : ^str.Build
 		case.Typedef:
 			str.write_string(sb, node.typedef.name.source)
 		case.Identifier:
+			if node.identifier.parent != 0 {
+				write_folded_complete_name(ctx, sb, node.identifier.parent)
+				str.write_byte(sb, '_')
+			}
+
+			if node.identifier.token.source == "ImGui" { break }
+
 			str.write_string(sb, node.identifier.token.source)
 	}
 }
 
 insert_new_overload :: proc(ctx : ^ConverterContext, name, overload : string)
 {
-	_, overlaods, _, _ := map_entry(&ctx.overload_resolver, name)
-	append(overlaods, overload)
+	_, overloads, _, _ := map_entry(&ctx.overload_resolver, name)
+	for o in overloads {  // @perf
+		if o == overload { return }
+	}
+	append(overloads, overload)
 }
 
 get_identifier_string :: #force_inline proc(ctx : ^ConverterContext, identifier : AstNodeIndex) -> string
@@ -4105,7 +4259,7 @@ cvt_get_parent_scope :: proc(ctx : ^ConverterContext, target_node : AstNodeIndex
 	}
 }
 
-cvt_get_location :: proc(ctx : ^ConverterContext, target_node : AstNodeIndex, loc := #caller_location) -> SourceLocation
+cvt_get_location :: proc(ctx : ^$Ctx, target_node : AstNodeIndex, loc := #caller_location) -> SourceLocation
 {
 	node := &ctx.ast[target_node]
 	#partial switch node.kind {
@@ -4144,6 +4298,8 @@ cvt_get_location :: proc(ctx : ^ConverterContext, target_node : AstNodeIndex, lo
 			return cvt_get_location(ctx, node.branch.condition[0], loc)
 		case .Typedef:
 			return node.typedef.name.location
+		case .VariableDeclaration:
+			return node.var_declaration.var_name.location
 		}
 	return {}
 }

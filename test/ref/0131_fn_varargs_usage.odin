@@ -1,6 +1,6 @@
 package test
 
-fn0131 :: proc(a : i32, args : ..[]any)
+fn0131 :: proc(a : i32, args : ..any)
 {
 	args : []any
 	va_start(args, a)

@@ -210,7 +210,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 				for arg in macro.args {
 					if arg.kind == .Ellipsis {
 						if arg_count > 0 { str.write_string(&ctx.result, ", ") }
-						str.write_string(&ctx.result, "args : ..[]any")
+						str.write_string(&ctx.result, "args : ..any")
 					}
 
 					arg_count += 1
@@ -2423,7 +2423,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 
 			#partial switch ctx.ast[aidx].kind {
 				case .Varargs:
-					str.write_string(&ctx.result, "args : ..[]any")
+					str.write_string(&ctx.result, "args : ..any")
 
 					arg_count += 1
 
@@ -3956,6 +3956,21 @@ append_folded_complete_name_node :: proc(ctx : ^ConverterContext, destination : 
 	}
 }
 
+is_const :: proc(ctx : ^ConverterContext, type : AstTypeIndex) -> bool
+{
+	switch frag in ctx.type_heap[type] {
+		case (AstTypeInlineStructure): return true
+		case (AstTypeFunction): return true
+		case (AstTypePointer): return .Const in frag.flags
+		case (AstTypeArray): return false
+		case (AstTypeFragment): return .Const in frag.flags
+		case (AstTypePrimitive): return .Const in frag.flags
+		case (AstTypeAuto): return false
+		case (AstTypeVoid):  return .Const in frag.flags
+		case: unreachable()
+	}
+}
+
 append_folded_complete_name_type_idx :: proc(ctx : ^ConverterContext, destination : ^[dynamic]string, type : AstTypeIndex)
 {
 	switch frag in ctx.type_heap[type] {
@@ -3971,7 +3986,7 @@ append_folded_complete_name_type_idx :: proc(ctx : ^ConverterContext, destinatio
 			}
 
 		case (AstTypePointer):
-			append(destination, "^")
+			if .Reference not_in frag.flags || !is_const(ctx, frag.destination_type) { append(destination, "^") }
 			append_folded_complete_name_type_idx(ctx, destination, frag.destination_type)
 
 		case (AstTypeArray):

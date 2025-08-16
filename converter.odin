@@ -632,7 +632,14 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 									str.write_string(&ctx.result, " == nil")
 									break operator_switch
 			
-								case (AstTypeFragment), (AstTypeInlineStructure):
+								case (AstTypeFragment):
+									if requires_brackets { str.write_byte(&ctx.result, '(') }
+									did_clobber, _, _, _ = write_node(ctx, condition, scope_node)
+									if requires_brackets { str.write_byte(&ctx.result, ')') }
+									str.write_string(&ctx.result, is_imgui_scalar(frag.identifier.source) ? " == 0" : " == {}")
+									break operator_switch
+
+								case (AstTypeInlineStructure):
 									if requires_brackets { str.write_byte(&ctx.result, '(') }
 									did_clobber, _, _, _ = write_node(ctx, condition, scope_node)
 									if requires_brackets { str.write_byte(&ctx.result, ')') }
@@ -823,7 +830,13 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 										did_clobber, _, _, _ = write_node(ctx, binary.right, scope_node)
 										break node_kind_switch
 
-									case (AstTypeFragment), (AstTypeInlineStructure):
+									case (AstTypeFragment):
+										str.write_string(&ctx.result, is_imgui_scalar(frag.identifier.source) ? "0" : "{}")
+										str.write_string(&ctx.result, eq ? " == " : " != ")
+										did_clobber, _, _, _ = write_node(ctx, binary.right, scope_node)
+										break node_kind_switch
+
+									case (AstTypeInlineStructure):
 										str.write_string(&ctx.result, eq ? "{} == " : "{} != ")
 										did_clobber, _, _, _ = write_node(ctx, binary.right, scope_node)
 										break node_kind_switch
@@ -841,7 +854,17 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 										str.write_string(&ctx.result, eq ? " == nil" : " != nil")
 										break node_kind_switch
 
-									case (AstTypeFragment), (AstTypeInlineStructure):
+									case (AstTypeFragment):
+										did_clobber, _, _, _ = write_node(ctx, binary.left, scope_node)
+										if is_imgui_scalar(frag.identifier.source) {
+											str.write_string(&ctx.result, eq ? " == 0" : " != 0")
+										}
+										else {
+											str.write_string(&ctx.result, eq ? " == {}" : " != {}")
+										}
+										break node_kind_switch
+
+									case (AstTypeInlineStructure):
 										did_clobber, _, _, _ = write_node(ctx, binary.left, scope_node)
 										str.write_string(&ctx.result, eq ? " == {}" : " != {}")
 										break node_kind_switch
@@ -3174,6 +3197,15 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 		}
 	}
 
+	is_imgui_scalar :: proc(name : string) -> bool {
+		switch name {
+			case "uint", "ImGuiID", "ImS8", "ImU8", "ImS16", "ImU16", "ImS32", "ImU32", "ImS64", "ImU64":
+				return true
+			case:
+				return false;
+		}
+	}
+
 	@(require_results)
 	write_condition_maybe_translated :: proc(ctx : ^ConverterContext, scope_node, condition : AstNodeIndex) -> (did_clobber : bool)
 	{
@@ -3210,7 +3242,14 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 					str.write_string(&ctx.result, " != nil")
 					return
 
-				case (AstTypeFragment), (AstTypeInlineStructure):
+				case (AstTypeFragment):
+					if requires_brackets { str.write_byte(&ctx.result, '(') }
+					did_clobber, _, _, _ = write_node(ctx, condition, scope_node)
+					if requires_brackets { str.write_byte(&ctx.result, ')') }
+					str.write_string(&ctx.result, is_imgui_scalar(frag.identifier.source) ? " != 0" : " != {}")
+					return
+
+				case (AstTypeInlineStructure):
 					if requires_brackets { str.write_byte(&ctx.result, '(') }
 					did_clobber, _, _, _ = write_node(ctx, condition, scope_node)
 					if requires_brackets { str.write_byte(&ctx.result, ')') }

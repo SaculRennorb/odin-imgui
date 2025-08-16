@@ -16,4 +16,5 @@ void fn0338()
 	if (c) { }
 	if (c & 3) { }
 	if (!c) { }
+	int d = &a > b ? a : *b;
 }

@@ -2470,6 +2470,11 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 					continue
 
 				case .Questionmark:
+					if max_presedence < .Tenary {
+						fixup_sequence(&node, ctx, &sequence)
+						return
+					}
+
 					tokens^ = nexts
 
 					true_expression := ast_parse_expression(ctx, tokens) or_return

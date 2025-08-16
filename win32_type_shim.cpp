@@ -17,6 +17,12 @@ int strlen(char*);
 int strcmp(const char* lhs, const char* rhs);
 int memcmp(const void* lhs, const void* rhs, size_t count);
 int strncmp(const char* lhs, const char* rhs, size_t count);
+int fseek(void* stream, long offset, int origin);
+int fclose(void* stream);
+
+int WEXITSTATUS(int a);
+
+int offsetof(void* ex);
 
 // END STD SHIM
 
@@ -150,6 +156,8 @@ int stbtt_InitFont(stbtt_fontinfo *info, const unsigned char *data, int offset);
 int stbtt_FindGlyphIndex(const stbtt_fontinfo *info, int unicode_codepoint);
 
 static bool STB_TEXTEDIT_INSERTCHARS(void* obj, int pos, const char* new_text, int new_text_len);
+
+static bool STB_TEXTEDIT_IS_SPACE(char c); // not actually used, but the type inference gets sad if its not defined.
 
 // END STB SHIM
 

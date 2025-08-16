@@ -113,17 +113,17 @@ ImGuiDockNode :: struct {
 
 ImGuiDockNode_IsRootNode :: proc(this : ^ImGuiDockNode) -> bool { return this.ParentNode == nil }
 
-ImGuiDockNode_IsDockSpace :: proc(this : ^ImGuiDockNode) -> bool { return (this.MergedFlags & ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_DockSpace) != 0 }
+ImGuiDockNode_IsDockSpace :: proc(this : ^ImGuiDockNode) -> bool { return (this.MergedFlags & ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_DockSpace) != {} }
 
 ImGuiDockNode_IsFloatingNode :: proc(this : ^ImGuiDockNode) -> bool { return this.ParentNode == nil && (this.MergedFlags & ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_DockSpace) == 0 }
 
-ImGuiDockNode_IsCentralNode :: proc(this : ^ImGuiDockNode) -> bool { return (this.MergedFlags & ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_CentralNode) != 0 }
+ImGuiDockNode_IsCentralNode :: proc(this : ^ImGuiDockNode) -> bool { return (this.MergedFlags & ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_CentralNode) != {} }
 
 // Hidden tab bar can be shown back by clicking the small triangle
-ImGuiDockNode_IsHiddenTabBar :: proc(this : ^ImGuiDockNode) -> bool { return (this.MergedFlags & ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_HiddenTabBar) != 0 }
+ImGuiDockNode_IsHiddenTabBar :: proc(this : ^ImGuiDockNode) -> bool { return (this.MergedFlags & ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_HiddenTabBar) != {} }
 
 // Never show a tab bar
-ImGuiDockNode_IsNoTabBar :: proc(this : ^ImGuiDockNode) -> bool { return (this.MergedFlags & ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_NoTabBar) != 0 }
+ImGuiDockNode_IsNoTabBar :: proc(this : ^ImGuiDockNode) -> bool { return (this.MergedFlags & ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_NoTabBar) != {} }
 
 ImGuiDockNode_IsSplitNode :: proc(this : ^ImGuiDockNode) -> bool { return this.ChildNodes[0] != nil }
 

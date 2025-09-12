@@ -129,8 +129,9 @@ ast_parse_filescope_sequence :: proc(ctx : ^AstContext, tokens_ : []Token) -> (s
 						tokens^ = ns
 	
 						x := ast_append_node(ctx, AstNode { kind = .Comment, attached = true, literal = n })
-						append(&node.structure.attached_comments, x)
 						y := ast_append_node(ctx, AstNode { kind = .NewLine, attached = true })
+						node := &ctx.ast[structure]
+						append(&node.structure.attached_comments, x)
 						append(&node.structure.attached_comments, y)
 					}
 				}

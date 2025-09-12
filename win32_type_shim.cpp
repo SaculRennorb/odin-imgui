@@ -23,6 +23,7 @@ int fclose(void* stream);
 int WEXITSTATUS(int a);
 
 int offsetof(void* ex);
+int sizeof(void* ex);
 
 // END STD SHIM
 

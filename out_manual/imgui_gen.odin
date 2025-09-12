@@ -2696,8 +2696,8 @@ ImGuiIO :: struct {
 
 	// Nowadays those would be stored in ImGuiPlatformIO but we are leaving them here for legacy reasons.
 	// Optional: Platform/Renderer backend name (informational only! will be displayed in About Window) + User data for backend/wrappers to store their own stuff.
-	BackendPlatformName : ^u8, // = NULL
-	BackendRendererName : ^u8, // = NULL
+	BackendPlatformName : string, // = NULL
+	BackendRendererName : string, // = NULL
 	BackendPlatformUserData : rawptr, // = NULL           // User data for platform backend
 	BackendRendererUserData : rawptr, // = NULL           // User data for renderer backend
 	BackendLanguageUserData : rawptr, // = NULL           // User data for non C++ programming language backend
@@ -7758,7 +7758,7 @@ ImGuiIO_init :: proc(this : ^ImGuiIO)
 
 	// Platform Functions
 	// Note: Initialize() will setup default clipboard/ime handlers.
-	this.BackendRendererName = nil; this.BackendPlatformName = this.BackendRendererName
+	this.BackendRendererName = ""; this.BackendPlatformName = this.BackendRendererName
 	this.BackendLanguageUserData = nil; this.BackendRendererUserData = this.BackendLanguageUserData; this.BackendPlatformUserData = this.BackendRendererUserData
 
 	// Input (NB: we already have memset zero the entire structure!)

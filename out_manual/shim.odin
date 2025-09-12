@@ -638,6 +638,11 @@ GetSpanPtrEnd :: ImSpanAllocator_GetSpanPtrEnd
 
 AddQuadFilled :: ImDrawList_AddQuadFilled
 
+SetTexID :: ImFontAtlas_SetTexID
+GetTexDataAsRGBA32 :: ImFontAtlas_GetTexDataAsRGBA32
+
+GetTexID :: ImDrawCmd_GetTexID
+
 
 parse_int_pair_prefixed :: proc(line : string, offset : ^int, prefix : string, x : ^i64, $radix_x : int, y : ^i64, $radix_y : int) -> (ok : bool)
 {

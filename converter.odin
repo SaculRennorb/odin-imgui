@@ -3008,8 +3008,10 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 								return TYPE_LIT_INT32, {}
 							case "STB_TEXT_HAS_SELECTION":
 								return TYPE_LIT_BOOL, {}
-							case "IM_BITARRAY_TESTBIT":
+							case "IM_BITARRAY_TESTBIT", "ImDrawCmd_AreSequentialIdxOffset", "FAILED":
 								return TYPE_LIT_BOOL, {}
+							case "IM_ARRAYSIZE":
+								return TYPE_LIT_INT32, {}
 						}
 						
 
@@ -3029,6 +3031,10 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 							case "FLT_MIN":    return TYPE_LIT_FLOAT32, {}
 							case "DBL_MAX":    return TYPE_LIT_FLOAT64, {}
 							case "DBL_MIN":    return TYPE_LIT_FLOAT64, {}
+							case "ImGuiKeyOwner_Any", "ImGuiKeyOwner_NoOwner":
+								def, _ := try_find_definition_for_name_preflattened(ctx, scope_node, { "ImGuiID" }, { .Type })
+								assert(def != 0)
+								return TYPE_LIT_INT32, def
 						}
 
 						only_token : TokenKind

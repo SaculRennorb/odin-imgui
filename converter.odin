@@ -814,10 +814,10 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 							break node_kind_switch
 						}
 
-					// rewrite
-					// a == 0    ->   a == nil    if a is a pointer type
-					// a == 0    ->   a == {}    if a is not a numeric type
 					case .Equals, .NotEquals:
+						// rewrite
+						// a == 0    ->   a == nil    if a is a pointer type
+						// a == 0    ->   a == {}    if a is not a numeric type
 						eq := binary.operator == .Equals
 
 						if nl := &ctx.ast[binary.left]; \
@@ -871,6 +871,17 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 								}
 							}
 						}
+
+					case .LogicAnd, .LogicOr:
+						// rewrite 
+						// a && b   ->   a != 0 && b != 0
+						did_clobber |= write_condition_maybe_translated(ctx, scope_node, binary.left)
+						str.write_byte(&ctx.result, ' ')
+						write_op(ctx, binary.operator)
+						str.write_byte(&ctx.result, ' ')
+						did_clobber |= write_condition_maybe_translated(ctx, scope_node, binary.right)
+
+						break node_kind_switch
 				}
 
 				// default binary expression     a op b

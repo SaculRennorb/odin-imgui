@@ -1,3 +1,4 @@
+#+feature global-context
 package program
 
 import "core:mem"
@@ -110,10 +111,10 @@ _set_user_formatters :: proc()
 
 import win32 "core:sys/windows"
 import str "core:strings"
-import "winternal"
+import "win32/winternal"
 
 @(init)
-install_exception_handler :: proc()
+install_exception_handler :: proc "contextless"()
 {
 	win32.AddVectoredExceptionHandler(1, proc "system" (ExceptionInfo: ^win32.EXCEPTION_POINTERS) -> win32.LONG {
 		if ExceptionInfo.ExceptionRecord.ExceptionCode != win32.EXCEPTION_STACK_OVERFLOW { return win32.EXCEPTION_CONTINUE_SEARCH }

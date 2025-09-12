@@ -7857,7 +7857,8 @@ LocalizeGetMsg :: #force_inline proc(key : ImGuiLocKey) -> ^u8
 	g : ^ImGuiContext = GImGui; msg : ^u8 = g.LocalizationTable[key]; return msg != nil ? msg : "*Missing Text*"
 }
 
-//#ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS//#ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS
+//#ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS
+//#ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS
 ScrollToBringRectIntoView :: #force_inline proc(window : ^ImGuiWindow, rect : ^ImRect) { ScrollToRect(window, rect, ImGuiScrollFlags_.ImGuiScrollFlags_KeepVisibleEdgeY) }
 //#endif
 

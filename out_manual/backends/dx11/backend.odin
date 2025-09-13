@@ -1,4 +1,4 @@
-package imgui_test
+package im_dx11
 
 import im "../../"
 import dxgi "vendor:directx/dxgi"
@@ -26,15 +26,15 @@ import win32 "core:sys/windows"
 // CHANGELOG
 // (minor and older changes stripped away, please see git history for details)
 //  2025-XX-XX: Platform: Added support for multiple windows via the ImGuiPlatformIO interface.
-//  2025-01-06: DirectX11: Expose VertexConstantBuffer in ImGui_ImplDX11_RenderState. Reset projection matrix in ImDrawCallback_ResetRenderState handler.
+//  2025-01-06: DirectX11: Expose VertexConstantBuffer in RenderState. Reset projection matrix in ImDrawCallback_ResetRenderState handler.
 //  2024-10-07: DirectX11: Changed default texture sampler to Clamp instead of Repeat/Wrap.
-//  2024-10-07: DirectX11: Expose selected render state in ImGui_ImplDX11_RenderState, which you can access in 'void* platform_io.Renderer_RenderState' during draw callbacks.
+//  2024-10-07: DirectX11: Expose selected render state in RenderState, which you can access in 'void* platform_io.Renderer_RenderState' during draw callbacks.
 //  2022-10-11: Using 'nullptr' instead of 'NULL' as per our switch to C++11.
 //  2021-06-29: Reorganized backend to pull data from a single structure to facilitate usage with multiple-contexts (all g_XXXX access changed to bd->XXXX).
 //  2021-05-19: DirectX11: Replaced direct access to ImDrawCmd::TextureId with a call to ImDrawCmd::GetTexID(). (will become a requirement)
 //  2021-02-18: DirectX11: Change blending equation to preserve alpha in output buffer.
 //  2019-08-01: DirectX11: Fixed code querying the Geometry Shader state (would generally error with Debug layer enabled).
-//  2019-07-21: DirectX11: Backup, clear and restore Geometry Shader is any is bound when calling ImGui_ImplDX11_RenderDrawData. Clearing Hull/Domain/Compute shaders without backup/restore.
+//  2019-07-21: DirectX11: Backup, clear and restore Geometry Shader is any is bound when calling RenderDrawData. Clearing Hull/Domain/Compute shaders without backup/restore.
 //  2019-05-29: DirectX11: Added support for large mesh (64K+ vertices), enable ImGuiBackendFlags_RendererHasVtxOffset flag.
 //  2019-04-30: DirectX11: Added support for special ImDrawCallback_ResetRenderState callback to reset render state.
 //  2018-12-03: Misc: Added #pragma comment statement to automatically link with d3dcompiler.lib when using D3DCompile().
@@ -43,7 +43,7 @@ import win32 "core:sys/windows"
 //  2018-07-13: DirectX11: Fixed unreleased resources in Init and Shutdown functions.
 //  2018-06-08: Misc: Extracted imgui_impl_dx11.cpp/.h away from the old combined DX11+Win32 example.
 //  2018-06-08: DirectX11: Use draw_data->DisplayPos and draw_data->DisplaySize to setup projection matrix and clipping rectangle.
-//  2018-02-16: Misc: Obsoleted the io.RenderDrawListsFn callback and exposed ImGui_ImplDX11_RenderDrawData() in the .h file so you can call it yourself.
+//  2018-02-16: Misc: Obsoleted the io.RenderDrawListsFn callback and exposed RenderDrawData() in the .h file so you can call it yourself.
 //  2018-02-06: Misc: Removed call to ImGui::Shutdown() which is not available from 1.60 WIP, user needs to call CreateContext/DestroyContext themselves.
 //  2016-05-07: DirectX11: Disabling depth-write.
 
@@ -66,9 +66,9 @@ import win32 "core:sys/windows"
 // - Introduction, links and more at the top of imgui.cpp
 
 // [BETA] Selected render state data shared with callbacks.
-// This is temporarily stored in GetPlatformIO().Renderer_RenderState during the ImGui_ImplDX11_RenderDrawData() call.
+// This is temporarily stored in GetPlatformIO().Renderer_RenderState during the RenderDrawData() call.
 // (Please open an issue if you feel you need access to more data)
-ImGui_ImplDX11_RenderState :: struct {
+RenderState :: struct {
 	Device : ^dx11.IDevice,
 	DeviceContext : ^dx11.IDeviceContext,
 	SamplerDefault : ^dx11.ISamplerState,
@@ -78,7 +78,7 @@ ImGui_ImplDX11_RenderState :: struct {
 // DirectX
 
 // DirectX11 data
-ImGui_ImplDX11_Data :: struct {
+Data :: struct {
 	pd3dDevice : ^dx11.IDevice,
 	pd3dDeviceContext : ^dx11.IDeviceContext,
 	pFactory : ^dxgi.IFactory,
@@ -97,7 +97,7 @@ ImGui_ImplDX11_Data :: struct {
 	IndexBufferSize : i32,
 }
 
-ImGui_ImplDX11_Data_init :: proc(this : ^ImGui_ImplDX11_Data)
+Data_init :: proc(this : ^Data)
 {
 	im.memset(cast(rawptr) this, 0, size_of(this^)); this.VertexBufferSize = 5000; this.IndexBufferSize = 10000
 }
@@ -108,15 +108,15 @@ VERTEX_CONSTANT_BUFFER_DX11 :: struct {
 
 // Backend data stored in io.BackendRendererUserData to allow support for multiple Dear ImGui contexts
 // It is STRONGLY preferred that you use docking branch with multi-viewports (== single Dear ImGui context + multiple windows) instead of multiple Dear ImGui contexts.
-ImGui_ImplDX11_GetBackendData :: proc() -> ^ImGui_ImplDX11_Data
+GetBackendData :: proc() -> ^Data
 {
-	return im.GetCurrentContext() != nil ? cast(^ImGui_ImplDX11_Data) im.GetIO().BackendRendererUserData : nil
+	return im.GetCurrentContext() != nil ? cast(^Data) im.GetIO().BackendRendererUserData : nil
 }
 
 // Functions
-ImGui_ImplDX11_SetupRenderState :: proc(draw_data : ^im.ImDrawData, device_ctx : ^dx11.IDeviceContext)
+SetupRenderState :: proc(draw_data : ^im.ImDrawData, device_ctx : ^dx11.IDeviceContext)
 {
-	bd : ^ImGui_ImplDX11_Data = ImGui_ImplDX11_GetBackendData()
+	bd : ^Data = GetBackendData()
 
 	// Setup viewport
 	vp : dx11.VIEWPORT
@@ -171,12 +171,12 @@ ImGui_ImplDX11_SetupRenderState :: proc(draw_data : ^im.ImDrawData, device_ctx :
 }
 
 // Render function
-ImGui_ImplDX11_RenderDrawData :: proc(draw_data : ^im.ImDrawData)
+RenderDrawData :: proc(draw_data : ^im.ImDrawData)
 {
 	// Avoid rendering when minimized
 	if draw_data.DisplaySize.x <= 0.0 || draw_data.DisplaySize.y <= 0.0 { return }
 
-	bd : ^ImGui_ImplDX11_Data = ImGui_ImplDX11_GetBackendData()
+	bd : ^Data = GetBackendData()
 	device : ^dx11.IDeviceContext = bd.pd3dDeviceContext
 
 	// Create and grow vertex/index buffers if needed
@@ -264,11 +264,11 @@ BACKUP_DX11_STATE :: struct {
 	device->IAGetInputLayout(&old.InputLayout)
 
 	// Setup desired DX state
-	ImGui_ImplDX11_SetupRenderState(draw_data, device)
+	SetupRenderState(draw_data, device)
 
 	// Setup render state structure (for callbacks and custom texture bindings)
 	platform_io := im.GetPlatformIO()
-	render_state : ImGui_ImplDX11_RenderState
+	render_state : RenderState
 	render_state.Device = bd.pd3dDevice
 	render_state.DeviceContext = bd.pd3dDeviceContext
 	render_state.SamplerDefault = bd.pFontSampler
@@ -287,7 +287,7 @@ BACKUP_DX11_STATE :: struct {
 			if pcmd.UserCallback != nil {
 				// User callback, registered via ImDrawList::AddCallback()
 				// (ImDrawCallback_ResetRenderState is a special callback value used by the user to request the renderer to reset render state.)
-				if pcmd.UserCallback == im.ImDrawCallback_ResetRenderState { ImGui_ImplDX11_SetupRenderState(draw_data, device) }
+				if pcmd.UserCallback == im.ImDrawCallback_ResetRenderState { SetupRenderState(draw_data, device) }
 				else { pcmd.UserCallback(draw_list, pcmd) }
 			}
 			else {
@@ -335,11 +335,11 @@ BACKUP_DX11_STATE :: struct {
 	device->IASetInputLayout(old.InputLayout); if old.InputLayout != nil { old.InputLayout->Release() }
 }
 
-ImGui_ImplDX11_CreateFontsTexture :: proc()
+CreateFontsTexture :: proc()
 {
 	// Build texture atlas
 	io := im.GetIO()
-	bd : ^ImGui_ImplDX11_Data = ImGui_ImplDX11_GetBackendData()
+	bd : ^Data = GetBackendData()
 	pixels : ^u8
 	width : i32; height : i32
 	im.GetTexDataAsRGBA32(io.Fonts, &pixels, &width, &height)
@@ -379,9 +379,9 @@ ImGui_ImplDX11_CreateFontsTexture :: proc()
 	im.SetTexID(io.Fonts, cast(im.ImTextureID) cast(uintptr)bd.pFontTextureView)
 }
 
-ImGui_ImplDX11_DestroyFontsTexture :: proc()
+DestroyFontsTexture :: proc()
 {
-	bd : ^ImGui_ImplDX11_Data = ImGui_ImplDX11_GetBackendData()
+	bd : ^Data = GetBackendData()
 	if bd.pFontTextureView != nil {
 		bd.pFontTextureView->Release()
 		bd.pFontTextureView = nil
@@ -390,11 +390,11 @@ ImGui_ImplDX11_DestroyFontsTexture :: proc()
 }
 
 // Use if you want to reset your rendering device without losing Dear ImGui state.
-ImGui_ImplDX11_CreateDeviceObjects :: proc() -> bool
+CreateDeviceObjects :: proc() -> bool
 {
-	bd : ^ImGui_ImplDX11_Data = ImGui_ImplDX11_GetBackendData()
+	bd : ^Data = GetBackendData()
 	if bd.pd3dDevice == nil { return false }
-	if bd.pFontSampler != nil { ImGui_ImplDX11_InvalidateDeviceObjects() }
+	if bd.pFontSampler != nil { InvalidateDeviceObjects() }
 
 	// By using D3DCompile() from <d3dcompiler.h> / d3dcompiler.lib, we introduce a dependency to a given version of d3dcompiler_XX.dll (see D3DCOMPILER_DLL_A)
 	// If you would like to use this DX11 sample code but remove this dependency you can:
@@ -547,17 +547,17 @@ ImGui_ImplDX11_CreateDeviceObjects :: proc() -> bool
 	bd.pd3dDevice->CreateSamplerState(&desc, &bd.pFontSampler)
 	}
 
-	ImGui_ImplDX11_CreateFontsTexture()
+	CreateFontsTexture()
 
 	return true
 }
 
-ImGui_ImplDX11_InvalidateDeviceObjects :: proc()
+InvalidateDeviceObjects :: proc()
 {
-	bd : ^ImGui_ImplDX11_Data = ImGui_ImplDX11_GetBackendData()
+	bd : ^Data = GetBackendData()
 	if bd.pd3dDevice == nil { return }
 
-	ImGui_ImplDX11_DestroyFontsTexture()
+	DestroyFontsTexture()
 
 	if bd.pFontSampler != nil { bd.pFontSampler->Release(); bd.pFontSampler = nil }
 	if bd.pIB != nil { bd.pIB->Release(); bd.pIB = nil }
@@ -572,14 +572,14 @@ ImGui_ImplDX11_InvalidateDeviceObjects :: proc()
 }
 
 // Follow "Getting Started" link and check examples/ folder to learn about using backends!
-ImGui_ImplDX11_Init :: proc(device : ^dx11.IDevice, device_context : ^dx11.IDeviceContext) -> bool
+Init :: proc(device : ^dx11.IDevice, device_context : ^dx11.IDeviceContext) -> bool
 {
 	io := im.GetIO()
 	im.CHECKVERSION()
 	im.IM_ASSERT(io.BackendRendererUserData == nil, "Already initialized a renderer backend!")
 
 	// Setup backend capabilities flags
-	bd : ^ImGui_ImplDX11_Data = im.IM_NEW_MEM(ImGui_ImplDX11_Data); ImGui_ImplDX11_Data_init(bd)
+	bd : ^Data = im.IM_NEW_MEM(Data); Data_init(bd)
 	io.BackendRendererUserData = cast(rawptr) bd
 	io.BackendRendererName = "imgui_impl_dx11"
 	io.BackendFlags |= .ImGuiBackendFlags_RendererHasVtxOffset; // We can honor the ImDrawCmd::VtxOffset field, allowing for large meshes.
@@ -604,19 +604,19 @@ ImGui_ImplDX11_Init :: proc(device : ^dx11.IDevice, device_context : ^dx11.IDevi
 	bd.pd3dDevice->AddRef()
 	bd.pd3dDeviceContext->AddRef()
 
-	ImGui_ImplDX11_InitMultiViewportSupport()
+	InitMultiViewportSupport()
 
 	return true
 }
 
-ImGui_ImplDX11_Shutdown :: proc()
+Shutdown :: proc()
 {
-	bd : ^ImGui_ImplDX11_Data = ImGui_ImplDX11_GetBackendData()
+	bd : ^Data = GetBackendData()
 	im.IM_ASSERT(bd != nil, "No renderer backend to shutdown, or already shutdown?")
 	io := im.GetIO()
 
-	ImGui_ImplDX11_ShutdownMultiViewportSupport()
-	ImGui_ImplDX11_InvalidateDeviceObjects()
+	ShutdownMultiViewportSupport()
+	InvalidateDeviceObjects()
 	if bd.pFactory != nil { bd.pFactory->Release() }
 	if bd.pd3dDevice != nil { bd.pd3dDevice->Release() }
 	if bd.pd3dDeviceContext != nil { bd.pd3dDeviceContext->Release() }
@@ -626,12 +626,12 @@ ImGui_ImplDX11_Shutdown :: proc()
 	im.IM_FREE(bd)
 }
 
-ImGui_ImplDX11_NewFrame :: proc()
+NewFrame :: proc()
 {
-	bd : ^ImGui_ImplDX11_Data = ImGui_ImplDX11_GetBackendData()
-	im.IM_ASSERT(bd != nil, "Context or backend not initialized! Did you call ImGui_ImplDX11_Init()?")
+	bd : ^Data = GetBackendData()
+	im.IM_ASSERT(bd != nil, "Context or backend not initialized! Did you call Init()?")
 
-	if bd.pFontSampler == nil { ImGui_ImplDX11_CreateDeviceObjects() }
+	if bd.pFontSampler == nil { CreateDeviceObjects() }
 }
 
 //--------------------------------------------------------------------------------------------------------
@@ -641,23 +641,23 @@ ImGui_ImplDX11_NewFrame :: proc()
 //--------------------------------------------------------------------------------------------------------
 
 // Helper structure we store in the void* RendererUserData field of each ImGuiViewport to easily retrieve our backend data.
-ImGui_ImplDX11_ViewportData :: struct {
+ViewportData :: struct {
 	SwapChain : ^dxgi.ISwapChain,
 	RTView : ^dx11.IRenderTargetView,
 }
 
-ImGui_ImplDX11_ViewportData_deinit :: proc(this : ^ImGui_ImplDX11_ViewportData)
+ViewportData_deinit :: proc(this : ^ViewportData)
 {im.IM_ASSERT(this.SwapChain == nil && this.RTView == nil)}
 
-ImGui_ImplDX11_ViewportData_init :: proc(this : ^ImGui_ImplDX11_ViewportData)
+ViewportData_init :: proc(this : ^ViewportData)
 {
 	this.SwapChain = nil; this.RTView = nil
 }
 
-ImGui_ImplDX11_CreateWindow :: proc(viewport : ^im.ImGuiViewport)
+CreateWindow :: proc(viewport : ^im.ImGuiViewport)
 {
-	bd : ^ImGui_ImplDX11_Data = ImGui_ImplDX11_GetBackendData()
-	vd : ^ImGui_ImplDX11_ViewportData = im.IM_NEW_MEM(ImGui_ImplDX11_ViewportData); ImGui_ImplDX11_ViewportData_init(vd)
+	bd : ^Data = GetBackendData()
+	vd : ^ViewportData = im.IM_NEW_MEM(ViewportData); ViewportData_init(vd)
 	viewport.RendererUserData = vd
 
 	// PlatformHandleRaw should always be a HWND, whereas PlatformHandle might be a higher-level handle (e.g. GLFWWindow*, SDL_Window*).
@@ -691,23 +691,23 @@ ImGui_ImplDX11_CreateWindow :: proc(viewport : ^im.ImGuiViewport)
 	}
 }
 
-ImGui_ImplDX11_DestroyWindow :: proc(viewport : ^im.ImGuiViewport)
+DestroyWindow :: proc(viewport : ^im.ImGuiViewport)
 {
 	// The main viewport (owned by the application) will always have RendererUserData == nullptr since we didn't create the data for it.
-	if vd := cast(^ImGui_ImplDX11_ViewportData) viewport.RendererUserData; vd != nil {
+	if vd := cast(^ViewportData) viewport.RendererUserData; vd != nil {
 		if vd.SwapChain != nil { vd.SwapChain->Release() }
 		vd.SwapChain = nil
 		if vd.RTView != nil { vd.RTView->Release() }
 		vd.RTView = nil
-		ImGui_ImplDX11_ViewportData_deinit(vd); im.IM_FREE(vd)
+		ViewportData_deinit(vd); im.IM_FREE(vd)
 	}
 	viewport.RendererUserData = nil
 }
 
-ImGui_ImplDX11_SetWindowSize :: proc(viewport : ^im.ImGuiViewport, size : im.ImVec2)
+SetWindowSize :: proc(viewport : ^im.ImGuiViewport, size : im.ImVec2)
 {
-	bd : ^ImGui_ImplDX11_Data = ImGui_ImplDX11_GetBackendData()
-	vd := cast(^ImGui_ImplDX11_ViewportData) viewport.RendererUserData
+	bd : ^Data = GetBackendData()
+	vd := cast(^ViewportData) viewport.RendererUserData
 	if vd.RTView != nil {
 		vd.RTView->Release()
 		vd.RTView = nil
@@ -717,7 +717,7 @@ ImGui_ImplDX11_SetWindowSize :: proc(viewport : ^im.ImGuiViewport, size : im.ImV
 		vd.SwapChain->ResizeBuffers(0, cast(win32.UINT) size.x, cast(win32.UINT) size.y, .UNKNOWN, {})
 		vd.SwapChain->GetBuffer(0, dx11.ITexture2D_UUID, (^rawptr)(&pBackBuffer))
 		if pBackBuffer == nil {
-			im.IM_ASSERT(false, "ImGui_ImplDX11_SetWindowSize() failed creating buffers.\n")
+			im.IM_ASSERT(false, "SetWindowSize() failed creating buffers.\n")
 			return
 		}
 		bd.pd3dDevice->CreateRenderTargetView(pBackBuffer, nil, &vd.RTView)
@@ -725,34 +725,34 @@ ImGui_ImplDX11_SetWindowSize :: proc(viewport : ^im.ImGuiViewport, size : im.ImV
 	}
 }
 
-ImGui_ImplDX11_RenderWindow :: proc(viewport : ^im.ImGuiViewport, _ : rawptr)
+RenderWindow :: proc(viewport : ^im.ImGuiViewport, _ : rawptr)
 {
-	bd := ImGui_ImplDX11_GetBackendData()
-	vd := cast(^ImGui_ImplDX11_ViewportData) viewport.RendererUserData
+	bd := GetBackendData()
+	vd := cast(^ViewportData) viewport.RendererUserData
 	clear_color := im.ImVec4{0.0, 0.0, 0.0, 1.0}
 	bd.pd3dDeviceContext->OMSetRenderTargets(1, &vd.RTView, nil)
 	if (viewport.Flags & .ImGuiViewportFlags_NoRendererClear) == {} { bd.pd3dDeviceContext->ClearRenderTargetView(vd.RTView, &clear_color) }
-	ImGui_ImplDX11_RenderDrawData(viewport.DrawData)
+	RenderDrawData(viewport.DrawData)
 }
 
-ImGui_ImplDX11_SwapBuffers :: proc(viewport : ^im.ImGuiViewport, _ : rawptr)
+SwapBuffers :: proc(viewport : ^im.ImGuiViewport, _ : rawptr)
 {
-	vd := cast(^ImGui_ImplDX11_ViewportData) viewport.RendererUserData
+	vd := cast(^ViewportData) viewport.RendererUserData
 	vd.SwapChain->Present(0, {}); // Present without vsync
 }
 
 // Forward Declarations
-ImGui_ImplDX11_InitMultiViewportSupport :: proc()
+InitMultiViewportSupport :: proc()
 {
 	platform_io := im.GetPlatformIO()
-	platform_io.Renderer_CreateWindow = ImGui_ImplDX11_CreateWindow
-	platform_io.Renderer_DestroyWindow = ImGui_ImplDX11_DestroyWindow
-	platform_io.Renderer_SetWindowSize = ImGui_ImplDX11_SetWindowSize
-	platform_io.Renderer_RenderWindow = ImGui_ImplDX11_RenderWindow
-	platform_io.Renderer_SwapBuffers = ImGui_ImplDX11_SwapBuffers
+	platform_io.Renderer_CreateWindow = CreateWindow
+	platform_io.Renderer_DestroyWindow = DestroyWindow
+	platform_io.Renderer_SetWindowSize = SetWindowSize
+	platform_io.Renderer_RenderWindow = RenderWindow
+	platform_io.Renderer_SwapBuffers = SwapBuffers
 }
 
-ImGui_ImplDX11_ShutdownMultiViewportSupport :: proc()
+ShutdownMultiViewportSupport :: proc()
 {
 	im.DestroyPlatformWindows()
 }

@@ -643,6 +643,18 @@ GetTexDataAsRGBA32 :: ImFontAtlas_GetTexDataAsRGBA32
 
 GetTexID :: ImDrawCmd_GetTexID
 
+AddKeyEvent :: ImGuiIO_AddKeyEvent
+AddKeyAnalogEvent :: ImGuiIO_AddKeyAnalogEvent
+SetKeyEventNativeData :: ImGuiIO_SetKeyEventNativeData
+AddMousePosEvent :: ImGuiIO_AddMousePosEvent
+AddMouseViewportEvent :: ImGuiIO_AddMouseViewportEvent
+AddMouseSourceEvent :: ImGuiIO_AddMouseSourceEvent
+AddMouseButtonEvent :: ImGuiIO_AddMouseButtonEvent
+AddMouseWheelEvent :: ImGuiIO_AddMouseWheelEvent
+AddInputCharacter :: ImGuiIO_AddInputCharacter
+AddFocusEvent :: ImGuiIO_AddFocusEvent
+AddInputCharacterUTF16 :: ImGuiIO_AddInputCharacterUTF16
+
 
 parse_int_pair_prefixed :: proc(line : string, offset : ^int, prefix : string, x : ^i64, $radix_x : int, y : ^i64, $radix_y : int) -> (ok : bool)
 {

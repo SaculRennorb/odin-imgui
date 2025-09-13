@@ -3881,7 +3881,7 @@ ImGuiPlatformIO :: struct {
 	Platform_SetWindowFocus : proc(	_vp : ^ImGuiViewport), // N . . . .  // Move window to front and set input focus
 	Platform_GetWindowFocus : proc(	_vp : ^ImGuiViewport) -> bool, // . . U . .  //
 	Platform_GetWindowMinimized : proc(	_vp : ^ImGuiViewport) -> bool, // N . . . .  // Get platform window minimized state. When minimized, we generally won't attempt to get/set size and contents will be culled more easily
-	Platform_SetWindowTitle : proc(	_vp : ^ImGuiViewport, 	_str : [^]u8), // . . U . .  // Set platform window title (given an UTF-8 string)
+	Platform_SetWindowTitle : proc(	_vp : ^ImGuiViewport, 	_str : string), // . . U . .  // Set platform window title (given an UTF-8 string) // strign has a null byte after when called
 	Platform_SetWindowAlpha : proc(	_vp : ^ImGuiViewport, 	_alpha : f32), // . . U . .  // (Optional) Setup global transparency (not per-pixel transparency)
 	Platform_UpdateWindow : proc(	_vp : ^ImGuiViewport), // . . U . .  // (Optional) Called by UpdatePlatformWindows(). Optional hook to allow the platform backend from doing general book-keeping every frame.
 	Platform_RenderWindow : proc(	_vp : ^ImGuiViewport, 	_render_arg : rawptr), // . . . R .  // (Optional) Main rendering (platform side! This is often unused, or just setting a "current" context for OpenGL bindings). 'render_arg' is the value passed to RenderPlatformWindowsDefault().
@@ -10103,12 +10103,12 @@ RenderMouseCursor :: proc(base_pos : ImVec2, base_scale : f32, mouse_cursor : Im
 
 // Internal state access - if you want to share Dear ImGui state between modules (e.g. DLL) or allocate it yourself
 // Note that we still point to some static data and members (such as GFontAtlas), so the state instance you end up using will point to the static data within its module
-GetCurrentContext :: proc() -> ^ImGuiContext
+GetCurrentContext :: proc "contextless" () -> ^ImGuiContext
 {
 	return GImGui
 }
 
-SetCurrentContext :: proc(ctx : ^ImGuiContext)
+SetCurrentContext :: proc "contextless" (ctx : ^ImGuiContext)
 {
 	GImGui = ctx
 }
@@ -10117,7 +10117,7 @@ SetCurrentContext :: proc(ctx : ^ImGuiContext)
 // - Those functions are not reliant on the current context.
 // - DLL users: heaps and globals are not shared across DLL boundaries! You will need to call SetCurrentContext() + SetAllocatorFunctions()
 //   for each static/DLL boundary you are calling from. Read "Context and Memory Allocators" section of imgui.cpp for more details.
-SetAllocatorFunctions :: proc(alloc_func : ImGuiMemAllocFunc, free_func : ImGuiMemFreeFunc, user_data : rawptr)
+SetAllocatorFunctions :: proc "contextless" (alloc_func : ImGuiMemAllocFunc, free_func : ImGuiMemFreeFunc, user_data : rawptr)
 {
 	GImAllocatorAllocFunc = alloc_func
 	GImAllocatorFreeFunc = free_func
@@ -10125,7 +10125,7 @@ SetAllocatorFunctions :: proc(alloc_func : ImGuiMemAllocFunc, free_func : ImGuiM
 }
 
 // This is provided to facilitate copying allocators from one static/DLL boundary to another (e.g. retrieve default allocator of your executable address space)
-GetAllocatorFunctions :: proc(p_alloc_func : ^ImGuiMemAllocFunc, p_free_func : ^ImGuiMemFreeFunc, p_user_data : ^rawptr)
+GetAllocatorFunctions :: proc "contextless" (p_alloc_func : ^ImGuiMemAllocFunc, p_free_func : ^ImGuiMemFreeFunc, p_user_data : ^rawptr)
 {
 	p_alloc_func^ = GImAllocatorAllocFunc
 	p_free_func^ = GImAllocatorFreeFunc
@@ -10136,7 +10136,7 @@ GetAllocatorFunctions :: proc(p_alloc_func : ^ImGuiMemAllocFunc, p_free_func : ^
 // - Each context create its own ImFontAtlas by default. You may instance one yourself and pass it to CreateContext() to share a font atlas between contexts.
 // - DLL users: heaps and globals are not shared across DLL boundaries! You will need to call SetCurrentContext() + SetAllocatorFunctions()
 //   for each static/DLL boundary you are calling from. Read "Context and Memory Allocators" section of imgui.cpp for details.
-CreateContext :: proc(shared_font_atlas : ^ImFontAtlas) -> ^ImGuiContext
+CreateContext :: proc(shared_font_atlas : ^ImFontAtlas = nil) -> ^ImGuiContext
 {
 	prev_ctx : ^ImGuiContext = GetCurrentContext()
 	ctx : ^ImGuiContext = IM_NEW_MEM(ImGuiContext); init(ctx, shared_font_atlas)
@@ -21833,7 +21833,7 @@ UpdatePlatformWindows :: proc()
 			if viewport.LastNameHash != title_hash {
 				title_end_backup_c : u8 = title_begin[title_end]
 				raw_data(title_begin)[title_end] = 0; // Cut existing buffer short instead of doing an alloc/free, no small gain.
-				g.PlatformIO.Platform_SetWindowTitle(viewport, raw_data(title_begin))
+				g.PlatformIO.Platform_SetWindowTitle(viewport, title_begin[:title_end])
 				raw_data(title_begin)[title_end] = title_end_backup_c
 				viewport.LastNameHash = title_hash
 			}
@@ -27556,7 +27556,7 @@ STBTT_iceil :: #force_inline proc "contextless" (x : $T0) -> i32
 // [SECTION] Style functions
 //-----------------------------------------------------------------------------
 
-StyleColorsDark :: proc(dst : ^ImGuiStyle)
+StyleColorsDark :: proc(dst : ^ImGuiStyle = nil)
 {
 	style : ^ImGuiStyle = dst != nil ? dst : GetStyle()
 	colors := &style.Colors
@@ -27621,7 +27621,7 @@ StyleColorsDark :: proc(dst : ^ImGuiStyle)
 	colors[ImGuiCol_.ImGuiCol_ModalWindowDimBg] = ImVec4{0.80, 0.80, 0.80, 0.35}
 }
 
-StyleColorsClassic :: proc(dst : ^ImGuiStyle)
+StyleColorsClassic :: proc(dst : ^ImGuiStyle = nil)
 {
 	style : ^ImGuiStyle = dst != nil ? dst : GetStyle()
 	colors := &style.Colors
@@ -27687,7 +27687,7 @@ StyleColorsClassic :: proc(dst : ^ImGuiStyle)
 }
 
 // Those light colors are better suited with a thicker font than the default one + FrameBorder
-StyleColorsLight :: proc(dst : ^ImGuiStyle)
+StyleColorsLight :: proc(dst : ^ImGuiStyle = nil)
 {
 	style : ^ImGuiStyle = dst != nil ? dst : GetStyle()
 	colors := &style.Colors

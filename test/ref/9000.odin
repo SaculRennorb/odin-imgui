@@ -115,7 +115,7 @@ ImGuiDockNode_IsRootNode :: proc(this : ^ImGuiDockNode) -> bool { return this.Pa
 
 ImGuiDockNode_IsDockSpace :: proc(this : ^ImGuiDockNode) -> bool { return (this.MergedFlags & ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_DockSpace) != {} }
 
-ImGuiDockNode_IsFloatingNode :: proc(this : ^ImGuiDockNode) -> bool { return this.ParentNode == nil && (this.MergedFlags & ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_DockSpace) == 0 }
+ImGuiDockNode_IsFloatingNode :: proc(this : ^ImGuiDockNode) -> bool { return this.ParentNode == nil && (this.MergedFlags & ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_DockSpace) == {} }
 
 ImGuiDockNode_IsCentralNode :: proc(this : ^ImGuiDockNode) -> bool { return (this.MergedFlags & ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_CentralNode) != {} }
 

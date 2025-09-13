@@ -2553,7 +2553,7 @@ ImGuiPayload_Clear :: proc(this : ^ImGuiPayload)
 	this.SourceParentId = 0; this.SourceId = this.SourceParentId; this.Data = nil; this.DataSize = 0; memset(this.DataType, 0, size_of(DataType)); this.DataFrameCount = -1; this.Delivery = false; this.Preview = this.Delivery
 }
 
-ImGuiPayload_IsDataType :: proc(this : ^ImGuiPayload, type : ^u8) -> bool { return this.DataFrameCount != -1 && strcmp(type, this.DataType) != 0 == 0 }
+ImGuiPayload_IsDataType :: proc(this : ^ImGuiPayload, type : ^u8) -> bool { return this.DataFrameCount != -1 && strcmp(type, this.DataType) == 0 }
 
 ImGuiPayload_IsPreview :: proc(this : ^ImGuiPayload) -> bool { return this.Preview }
 
@@ -3442,7 +3442,7 @@ ImGuiViewport :: struct {
 }
 
 ImGuiViewport_deinit :: proc(this : ^ImGuiViewport)
-{IM_ASSERT(this.PlatformUserData == nil && this.RendererUserData != nil == nil)}
+{IM_ASSERT(this.PlatformUserData == nil && this.RendererUserData == nil)}
 
 ImGuiViewport_init :: proc(this : ^ImGuiViewport) { memset(this, 0, size_of(this^)) }
 
@@ -4274,7 +4274,7 @@ ImGui_ImplDX11_ViewportData :: struct {
 }
 
 ImGui_ImplDX11_ViewportData_deinit :: proc(this : ^ImGui_ImplDX11_ViewportData)
-{IM_ASSERT(this.SwapChain == nil && this.RTView != nil == nil)}
+{IM_ASSERT(this.SwapChain == nil && this.RTView == nil)}
 
 ImGui_ImplDX11_ViewportData_init :: proc(this : ^ImGui_ImplDX11_ViewportData)
 {
@@ -4307,7 +4307,7 @@ ImGui_ImplDX11_CreateWindow :: proc(viewport : ^ImGuiViewport)
 	sd.SwapEffect = DXGI_SWAP_EFFECT.DXGI_SWAP_EFFECT_DISCARD
 	sd.Flags = 0
 
-	IM_ASSERT(vd.SwapChain == nil && vd.RTView != nil == nil)
+	IM_ASSERT(vd.SwapChain == nil && vd.RTView == nil)
 	CreateSwapChain(bd.pFactory, bd.pd3dDevice, &sd, &vd.SwapChain)
 
 	// Create the render target

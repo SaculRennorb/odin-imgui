@@ -3145,7 +3145,7 @@ ImGuiPayload_Clear :: proc(this : ^ImGuiPayload)
 	this.SourceParentId = 0; this.SourceId = this.SourceParentId; this.Data = nil; this.DataSize = 0; memset(this.DataType, 0, size_of(DataType)); this.DataFrameCount = -1; this.Delivery = false; this.Preview = this.Delivery
 }
 
-ImGuiPayload_IsDataType :: proc(this : ^ImGuiPayload, type : ^u8) -> bool { return this.DataFrameCount != -1 && strcmp(type, this.DataType) != 0 == 0 }
+ImGuiPayload_IsDataType :: proc(this : ^ImGuiPayload, type : ^u8) -> bool { return this.DataFrameCount != -1 && strcmp(type, this.DataType) == 0 }
 
 ImGuiPayload_IsPreview :: proc(this : ^ImGuiPayload) -> bool { return this.Preview }
 
@@ -4034,7 +4034,7 @@ ImGuiViewport :: struct {
 }
 
 ImGuiViewport_deinit :: proc(this : ^ImGuiViewport)
-{IM_ASSERT(this.PlatformUserData == nil && this.RendererUserData != nil == nil)}
+{IM_ASSERT(this.PlatformUserData == nil && this.RendererUserData == nil)}
 
 ImGuiViewport_init :: proc(this : ^ImGuiViewport) { memset(this, 0, size_of(this^)) }
 
@@ -4636,16 +4636,16 @@ ImQsort :: #force_inline proc(base : rawptr, count : uint, size_of_element : uin
 } // preproc endif
 
 // Helpers: Bit manipulation
-ImIsPowerOfTwo_0 :: #force_inline proc(v : i32) -> bool { return v != 0 && (v & (v - 1)) != 0 == 0 }
-ImIsPowerOfTwo_1 :: #force_inline proc(v : ImU64) -> bool { return v != 0 && (v & (v - 1)) != 0 == 0 }
+ImIsPowerOfTwo_0 :: #force_inline proc(v : i32) -> bool { return v != 0 && (v & (v - 1)) == 0 }
+ImIsPowerOfTwo_1 :: #force_inline proc(v : ImU64) -> bool { return v != 0 && (v & (v - 1)) == 0 }
 ImUpperPowerOfTwo :: #force_inline proc(v : i32) -> i32
 {
 	post_decr(&v); v |= v >> 1; v |= v >> 2; v |= v >> 4; v |= v >> 8; v |= v >> 16; post_incr(&v); return v
 }
 
 ImToUpper :: #force_inline proc(c : u8) -> u8 { return (c >= 'a' && c <= 'z') ? c &= ~32 : c }
-ImCharIsBlankA :: #force_inline proc(c : u8) -> bool { return c == ' ' || c != 0 == '\t' }
-ImCharIsBlankW :: #force_inline proc(c : u32) -> bool { return c == ' ' || c != 0 == '\t' || c != 0 == 0x3000 }
+ImCharIsBlankA :: #force_inline proc(c : u8) -> bool { return c == ' ' || c == '\t' }
+ImCharIsBlankW :: #force_inline proc(c : u32) -> bool { return c == ' ' || c == '\t' || c == 0x3000 }
 ImCharIsXdigitA :: #force_inline proc(c : u8) -> bool { return (c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f') }
 
 
@@ -4767,7 +4767,7 @@ ImInvLength :: #force_inline proc(lhs : ^ImVec2, fail_value : f32) -> f32
 ImTrunc_0 :: #force_inline proc(f : f32) -> f32 { return cast(f32) cast(i32) (f) }
 ImTrunc_1 :: #force_inline proc(v : ^ImVec2) -> ImVec2 { return ImVec2(cast(f32) cast(i32) (v.x), cast(f32) cast(i32) (v.y)) }
 // Decent replacement for floorf()
-ImFloor_0 :: #force_inline proc(f : f32) -> f32 { return cast(f32) ((f >= 0 || (cast(f32) cast(i32) f) != 0 == f) ? cast(i32) f : cast(i32) f - 1) }
+ImFloor_0 :: #force_inline proc(f : f32) -> f32 { return cast(f32) ((f >= 0 || cast(f32) cast(i32) f == f) ? cast(i32) f : cast(i32) f - 1) }
 ImFloor_1 :: #force_inline proc(v : ^ImVec2) -> ImVec2 { return ImVec2(ImFloor(v.x), ImFloor(v.y)) }
 ImModPositive :: #force_inline proc(a : i32, b : i32) -> i32 { return (a + b) % b }
 ImDot :: #force_inline proc(a : ^ImVec2, b : ^ImVec2) -> f32 { return a.x * b.x + a.y * b.y }
@@ -5117,7 +5117,7 @@ ImSpanAllocator_init :: proc(this : ^ImSpanAllocator($CHUNKS)) { memset(this, 0,
 
 ImSpanAllocator_Reserve :: #force_inline proc(this : ^ImSpanAllocator($CHUNKS), n : i32, sz : uint, a : i32 = 4)
 {
-	IM_ASSERT(n == this.CurrIdx != 0 && n < CHUNKS); this.CurrOff = IM_MEMALIGN(this.CurrOff, a); this.Offsets[n] = this.CurrOff; this.Sizes[n] = cast(i32) sz; post_incr(&this.CurrIdx); this.CurrOff += cast(i32) sz
+	IM_ASSERT(n == this.CurrIdx && n < CHUNKS); this.CurrOff = IM_MEMALIGN(this.CurrOff, a); this.Offsets[n] = this.CurrOff; this.Sizes[n] = cast(i32) sz; post_incr(&this.CurrIdx); this.CurrOff += cast(i32) sz
 }
 
 ImSpanAllocator_GetArenaSizeInBytes :: #force_inline proc(this : ^ImSpanAllocator($CHUNKS)) -> i32 { return this.CurrOff }
@@ -5126,12 +5126,12 @@ ImSpanAllocator_SetArenaBasePtr :: #force_inline proc(this : ^ImSpanAllocator($C
 
 ImSpanAllocator_GetSpanPtrBegin :: #force_inline proc(this : ^ImSpanAllocator($CHUNKS), n : i32) -> rawptr
 {
-	IM_ASSERT(n >= 0 && n < CHUNKS && this.CurrIdx != 0 == CHUNKS); return cast(rawptr) (this.BasePtr + this.Offsets[n])
+	IM_ASSERT(n >= 0 && n < CHUNKS && this.CurrIdx == CHUNKS); return cast(rawptr) (this.BasePtr + this.Offsets[n])
 }
 
 ImSpanAllocator_GetSpanPtrEnd :: #force_inline proc(this : ^ImSpanAllocator($CHUNKS), n : i32) -> rawptr
 {
-	IM_ASSERT(n >= 0 && n < CHUNKS && this.CurrIdx != 0 == CHUNKS); return cast(rawptr) (this.BasePtr + this.Offsets[n] + this.Sizes[n])
+	IM_ASSERT(n >= 0 && n < CHUNKS && this.CurrIdx == CHUNKS); return cast(rawptr) (this.BasePtr + this.Offsets[n] + this.Sizes[n])
 }
 
 ImSpanAllocator_GetSpan :: #force_inline proc($T : typeid, this : ^ImSpanAllocator($CHUNKS), n : i32, span : ^ImSpan(T)) { set(span, cast(^T) ImSpanAllocator_GetSpanPtrBegin(this, n), cast(^T) ImSpanAllocator_GetSpanPtrEnd(this, n)) }
@@ -6484,7 +6484,7 @@ ImGuiDockNode_IsRootNode :: proc(this : ^ImGuiDockNode) -> bool { return this.Pa
 
 ImGuiDockNode_IsDockSpace :: proc(this : ^ImGuiDockNode) -> bool { return (this.MergedFlags & ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_DockSpace) != {} }
 
-ImGuiDockNode_IsFloatingNode :: proc(this : ^ImGuiDockNode) -> bool { return this.ParentNode == nil && (this.MergedFlags & ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_DockSpace) != {} == 0 }
+ImGuiDockNode_IsFloatingNode :: proc(this : ^ImGuiDockNode) -> bool { return this.ParentNode == nil && (this.MergedFlags & ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_DockSpace) == {} }
 
 ImGuiDockNode_IsCentralNode :: proc(this : ^ImGuiDockNode) -> bool { return (this.MergedFlags & ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_CentralNode) != {} }
 
@@ -6498,7 +6498,7 @@ ImGuiDockNode_IsSplitNode :: proc(this : ^ImGuiDockNode) -> bool { return this.C
 
 ImGuiDockNode_IsLeafNode :: proc(this : ^ImGuiDockNode) -> bool { return this.ChildNodes[0] == nil }
 
-ImGuiDockNode_IsEmpty :: proc(this : ^ImGuiDockNode) -> bool { return this.ChildNodes[0] == nil && this.Windows.Size != 0 == 0 }
+ImGuiDockNode_IsEmpty :: proc(this : ^ImGuiDockNode) -> bool { return this.ChildNodes[0] == nil && this.Windows.Size == 0 }
 
 ImGuiDockNode_Rect :: proc(this : ^ImGuiDockNode) -> ImRect { return ImRect(this.Pos.x, this.Pos.y, this.Pos.x + this.Size.x, this.Pos.y + this.Size.y) }
 
@@ -7884,7 +7884,7 @@ ItemSize_1 :: #force_inline proc(bb : ^ImRect, text_baseline_y : f32 = -1.0) { I
 // Inputs
 // FIXME: Eventually we should aim to move e.g. IsActiveIdUsingKey() into IsKeyXXX functions.
 IsNamedKey :: #force_inline proc(key : ImGuiKey) -> bool { return key >= ImGuiKey.ImGuiKey_NamedKey_BEGIN && key < ImGuiKey.ImGuiKey_NamedKey_END }
-IsNamedKeyOrMod :: #force_inline proc(key : ImGuiKey) -> bool { return (key >= ImGuiKey.ImGuiKey_NamedKey_BEGIN && key < ImGuiKey.ImGuiKey_NamedKey_END) || key != {} == ImGuiKey.ImGuiMod_Ctrl != 0 || key != {} == ImGuiKey.ImGuiMod_Shift != 0 || key != {} == ImGuiKey.ImGuiMod_Alt != 0 || key != {} == ImGuiKey.ImGuiMod_Super }
+IsNamedKeyOrMod :: #force_inline proc(key : ImGuiKey) -> bool { return (key >= ImGuiKey.ImGuiKey_NamedKey_BEGIN && key < ImGuiKey.ImGuiKey_NamedKey_END) || key == ImGuiKey.ImGuiMod_Ctrl || key == ImGuiKey.ImGuiMod_Shift || key == ImGuiKey.ImGuiMod_Alt || key == ImGuiKey.ImGuiMod_Super }
 IsLegacyKey :: #force_inline proc(key : ImGuiKey) -> bool { return key >= ImGuiKey_LegacyNativeKey_BEGIN && key < ImGuiKey_LegacyNativeKey_END }
 IsKeyboardKey :: #force_inline proc(key : ImGuiKey) -> bool { return key >= ImGuiKey_Keyboard_BEGIN && key < ImGuiKey_Keyboard_END }
 IsGamepadKey :: #force_inline proc(key : ImGuiKey) -> bool { return key >= ImGuiKey_Gamepad_BEGIN && key < ImGuiKey_Gamepad_END }
@@ -7947,7 +7947,7 @@ GetCurrentFocusScope :: #force_inline proc() -> ImGuiID
 
 GetBoxSelectState :: #force_inline proc(id : ImGuiID) -> ^ImGuiBoxSelectState
 {
-	g : ^ImGuiContext = GImGui; return (id != 0 && g.BoxSelectState.ID != 0 == id != 0 && g.BoxSelectState.IsActive) ? &g.BoxSelectState : nil
+	g : ^ImGuiContext = GImGui; return (id != 0 && g.BoxSelectState.ID == id && g.BoxSelectState.IsActive) ? &g.BoxSelectState : nil
 }
 GetMultiSelectState :: #force_inline proc(id : ImGuiID) -> ^ImGuiMultiSelectState
 {
@@ -7972,12 +7972,12 @@ GetCurrentTabBar :: #force_inline proc() -> ^ImGuiTabBar
 TabBarGetTabOrder :: #force_inline proc(tab_bar : ^ImGuiTabBar, tab : ^ImGuiTabItem) -> i32 { return index_from_ptr(&tab_bar.Tabs, tab) }
 TempInputIsActive :: #force_inline proc(id : ImGuiID) -> bool
 {
-	g : ^ImGuiContext = GImGui; return (g.ActiveId == id != 0 && g.TempInputId != 0 == id)
+	g : ^ImGuiContext = GImGui; return (g.ActiveId == id && g.TempInputId == id)
 }
 // Get input text state if active
 GetInputTextState :: #force_inline proc(id : ImGuiID) -> ^ImGuiInputTextState
 {
-	g : ^ImGuiContext = GImGui; return (id != 0 && g.InputTextState.ID != 0 == id) ? &g.InputTextState : nil
+	g : ^ImGuiContext = GImGui; return (id != 0 && g.InputTextState.ID == id) ? &g.InputTextState : nil
 }
 // Obsolete functions
 
@@ -8401,7 +8401,7 @@ ImGuiIO_AddInputCharacter :: proc(this : ^ImGuiIO, c : u32)
 // we should save the high surrogate.
 ImGuiIO_AddInputCharacterUTF16 :: proc(this : ^ImGuiIO, c : ImWchar16)
 {
-	if (c == 0 && this.InputQueueSurrogate != {} == 0) || !this.AppAcceptingEvents { return }
+	if (c == {} && this.InputQueueSurrogate == {}) || !this.AppAcceptingEvents { return }
 
 	if (c & 0xFC00) == 0xD800 {
 		// High surrogate, must save
@@ -8515,7 +8515,7 @@ ImGuiIO_AddKeyAnalogEvent :: proc(this : ^ImGuiIO, key : ImGuiKey, down : bool, 
 {
 	//if (e->Down) { IMGUI_DEBUG_LOG_IO("AddKeyEvent() Key='%s' %d, NativeKeycode = %d, NativeScancode = %d\n", ImGui::GetKeyName(e->Key), e->Down, e->NativeKeycode, e->NativeScancode); }
 	IM_ASSERT(this.Ctx != nil)
-	if key == ImGuiKey.ImGuiKey_None != 0 || !this.AppAcceptingEvents { return }
+	if key == ImGuiKey.ImGuiKey_None || !this.AppAcceptingEvents { return }
 	g : ^ImGuiContext = this.Ctx
 	IM_ASSERT(IsNamedKeyOrMod(key)); // Backend needs to pass a valid ImGuiKey_ constant. 0..511 values are legacy native key codes which are not accepted by this API.
 	IM_ASSERT(IsAliasKey(key) == false); // Backend cannot submit ImGuiKey_MouseXXX values they are automatically inferred from AddMouseXXX() events.
@@ -8535,7 +8535,7 @@ ImGuiIO_AddKeyAnalogEvent :: proc(this : ^ImGuiIO, key : ImGuiKey, down : bool, 
 	key_data : ^ImGuiKeyData = GetKeyData(&g, key)
 	latest_key_down : bool = latest_event != nil ? latest_event.Key.Down : key_data.Down
 	latest_key_analog : f32 = latest_event != nil ? latest_event.Key.AnalogValue : key_data.AnalogValue
-	if latest_key_down == down && latest_key_analog != 0 == analog_value { return }
+	if latest_key_down == down && latest_key_analog == analog_value { return }
 
 	// Add event
 	e : ImGuiInputEvent
@@ -8596,7 +8596,7 @@ ImGuiIO_AddMousePosEvent :: proc(this : ^ImGuiIO, x : f32, y : f32)
 	// Filter duplicate
 	latest_event : ^ImGuiInputEvent = FindLatestInputEvent(&g, ImGuiInputEventType.ImGuiInputEventType_MousePos)
 	latest_pos : ImVec2 = latest_event != nil ? ImVec2(latest_event.MousePos.PosX, latest_event.MousePos.PosY) : g.IO.MousePos
-	if latest_pos.x == pos.x != 0 && latest_pos.y != 0 == pos.y { return }
+	if latest_pos.x == pos.x && latest_pos.y == pos.y { return }
 
 	e : ImGuiInputEvent
 	e.Type = ImGuiInputEventType.ImGuiInputEventType_MousePos
@@ -8617,7 +8617,7 @@ ImGuiIO_AddMouseButtonEvent :: proc(this : ^ImGuiIO, mouse_button : i32, down : 
 	if !this.AppAcceptingEvents { return }
 
 	// On MacOS X: Convert Ctrl(Super)+Left click into Right-click: handle held button.
-	if this.ConfigMacOSXBehaviors && mouse_button != 0 == 0 && this.MouseCtrlLeftAsRightClick {
+	if this.ConfigMacOSXBehaviors && mouse_button == 0 && this.MouseCtrlLeftAsRightClick {
 		// Order of both statements matterns: this event will still release mouse button 1
 		mouse_button = 1
 		if !down { this.MouseCtrlLeftAsRightClick = false }
@@ -8631,7 +8631,7 @@ ImGuiIO_AddMouseButtonEvent :: proc(this : ^ImGuiIO, mouse_button : i32, down : 
 	// On MacOS X: Convert Ctrl(Super)+Left click into Right-click.
 	// - Note that this is actual physical Ctrl which is ImGuiMod_Super for us.
 	// - At this point we want from !down to down, so this is handling the initial press.
-	if this.ConfigMacOSXBehaviors && mouse_button != 0 == 0 && down {
+	if this.ConfigMacOSXBehaviors && mouse_button == 0 && down {
 		latest_super_event : ^ImGuiInputEvent = FindLatestInputEvent(&g, ImGuiInputEventType.ImGuiInputEventType_Key, cast(i32) ImGuiKey.ImGuiMod_Super)
 		if latest_super_event != nil ? latest_super_event.Key.Down : g.IO.KeySuper {
 			IMGUI_DEBUG_LOG_IO("[io] Super+Left Click aliased into Right Click\n")
@@ -8659,7 +8659,7 @@ ImGuiIO_AddMouseWheelEvent :: proc(this : ^ImGuiIO, wheel_x : f32, wheel_y : f32
 	g : ^ImGuiContext = this.Ctx
 
 	// Filter duplicate (unlike most events, wheel values are relative and easy to filter)
-	if !this.AppAcceptingEvents || (wheel_x == 0.0 && wheel_y != 0 == 0.0) { return }
+	if !this.AppAcceptingEvents || (wheel_x == 0.0 && wheel_y == 0.0) { return }
 
 	e : ImGuiInputEvent
 	e.Type = ImGuiInputEventType.ImGuiInputEventType_MouseWheel
@@ -8859,7 +8859,7 @@ ImStricmp :: proc(str1 : ^u8, str2 : ^u8) -> i32
 ImStrnicmp :: proc(str1 : ^u8, str2 : ^u8, count : uint) -> i32
 {
 	d : i32 = 0
-	for count > 0 && (d = ImToUpper(str2^) - ImToUpper(str1^)) != 0 == 0 && str1^ != 0 {post_incr(&str1); post_incr(&str2); post_decr(&count)	}
+	for count > 0 && (d = ImToUpper(str2^) - ImToUpper(str1^)) == 0 && str1^ != 0 {post_incr(&str1); post_incr(&str2); post_decr(&count)	}
 
 	return d
 }
@@ -8951,12 +8951,12 @@ ImStristr :: proc(haystack : ^u8, haystack_end : ^u8, needle : ^u8, needle_end :
 ImStrTrimBlanks :: proc(buf : ^u8)
 {
 	p : ^u8 = buf
-	for p[0] == ' ' || p[0] != 0 == '\t' { post_incr(&p) }
+	for p[0] == ' ' || p[0] == '\t' { post_incr(&p) }
 
 	p_start : ^u8 = p
 	for p^ != 0 { post_incr(&p) }
 
-	for p > p_start && (p[-1] == ' ' || p[-1] != 0 == '\t') { post_decr(&p) }
+	for p > p_start && (p[-1] == ' ' || p[-1] == '\t') { post_decr(&p) }
 
 	if p_start != buf {
 		// Copy memory if we had leading blanksmemmove(buf, p_start, p - p_start)
@@ -8967,7 +8967,7 @@ ImStrTrimBlanks :: proc(buf : ^u8)
 // Find first non-blank character.
 ImStrSkipBlank :: proc(str : ^u8) -> ^u8
 {
-	for str[0] == ' ' || str[0] != 0 == '\t' { post_incr(&str) }
+	for str[0] == ' ' || str[0] == '\t' { post_incr(&str) }
 
 	return str
 }
@@ -9042,13 +9042,13 @@ ImFormatStringToTempBuffer :: proc(out_buf : ^^u8, out_buf_end : ^^u8, fmt : ^u8
 ImFormatStringToTempBufferV :: proc(out_buf : ^^u8, out_buf_end : ^^u8, fmt : ^u8, args : []any)
 {
 	g : ^ImGuiContext = GImGui
-	if fmt[0] == '%' && fmt[1] != 0 == 's' && fmt[2] != 0 == 0 {
+	if fmt[0] == '%' && fmt[1] == 's' && fmt[2] == 0 {
 		buf : ^u8 = va_arg(args, ^u8); // Skip formatting when using "%s"
 		if buf == nil { buf = "(null)" }
 		out_buf^ = buf
 		if out_buf_end != nil { out_buf_end^ = buf + strlen(buf) }
 	}
-	else if fmt[0] == '%' && fmt[1] != 0 == '.' && fmt[2] != 0 == '*' && fmt[3] != 0 == 's' && fmt[4] != 0 == 0 {
+	else if fmt[0] == '%' && fmt[1] == '.' && fmt[2] == '*' && fmt[3] == 's' && fmt[4] == 0 {
 		buf_len : i32 = va_arg(args, i32); // Skip formatting when using "%.*s"
 		buf : ^u8 = va_arg(args, ^u8)
 		if buf == nil {
@@ -9179,7 +9179,7 @@ ImHashStr :: proc(data_p : ^u8, data_size : uint = 0, seed : ImGuiID = 0) -> ImG
 	if data_size != {} {
 		for post_decr(&data_size) != {} {
 			c : u8 = post_incr(&data)^
-			if c == '#' && data_size >= 2 && data[0] != 0 == '#' && data[1] != 0 == '#' { crc = seed }
+			if c == '#' && data_size >= 2 && data[0] == '#' && data[1] == '#' { crc = seed }
 			when ! IMGUI_ENABLE_SSE4_2_CRC { /* @gen ifndef */
 			crc = (crc >> 8) ~ crc32_lut[(crc & 0xFF) ~ c]
 			} else { // preproc else
@@ -9192,7 +9192,7 @@ ImHashStr :: proc(data_p : ^u8, data_size : uint = 0, seed : ImGuiID = 0) -> ImG
 			c : u8 = post_incr(&data)^
 			if !(c) { break }
 
-			if c == '#' && data[0] != 0 == '#' && data[1] != 0 == '#' { crc = seed }
+			if c == '#' && data[0] == '#' && data[1] == '#' { crc = seed }
 			when ! IMGUI_ENABLE_SSE4_2_CRC { /* @gen ifndef */
 			crc = (crc >> 8) ~ crc32_lut[(crc & 0xFF) ~ c]
 			} else { // preproc else
@@ -9614,7 +9614,7 @@ ImGuiStorage_BuildSortByKey :: proc(this : ^ImGuiStorage)
 ImGuiStorage_GetInt :: proc(this : ^ImGuiStorage, key : ImGuiID, default_val : i32 = 0) -> i32
 {
 	it : ^ImGuiStoragePair = ImLowerBound(transmute(^ImGuiStoragePair) this.Data.Data, transmute(^ImGuiStoragePair) this.Data.Data + this.Data.Size, key)
-	if it == (this.Data.Data + this.Data.Size) != nil || it.key != key { return default_val }
+	if it == this.Data.Data + this.Data.Size || it.key != key { return default_val }
 	return it.val_i
 }
 
@@ -9626,7 +9626,7 @@ ImGuiStorage_GetBool :: proc(this : ^ImGuiStorage, key : ImGuiID, default_val : 
 ImGuiStorage_GetFloat :: proc(this : ^ImGuiStorage, key : ImGuiID, default_val : f32 = 0.0) -> f32
 {
 	it : ^ImGuiStoragePair = ImLowerBound(transmute(^ImGuiStoragePair) this.Data.Data, transmute(^ImGuiStoragePair) this.Data.Data + this.Data.Size, key)
-	if it == (this.Data.Data + this.Data.Size) != nil || it.key != key { return default_val }
+	if it == this.Data.Data + this.Data.Size || it.key != key { return default_val }
 	return it.val_f
 }
 
@@ -9634,7 +9634,7 @@ ImGuiStorage_GetFloat :: proc(this : ^ImGuiStorage, key : ImGuiID, default_val :
 ImGuiStorage_GetVoidPtr :: proc(this : ^ImGuiStorage, key : ImGuiID) -> rawptr
 {
 	it : ^ImGuiStoragePair = ImLowerBound(transmute(^ImGuiStoragePair) this.Data.Data, transmute(^ImGuiStoragePair) this.Data.Data + this.Data.Size, key)
-	if it == (this.Data.Data + this.Data.Size) != nil || it.key != key { return nil }
+	if it == this.Data.Data + this.Data.Size || it.key != key { return nil }
 	return it.val_p
 }
 
@@ -9646,7 +9646,7 @@ ImGuiStorage_GetVoidPtr :: proc(this : ^ImGuiStorage, key : ImGuiID) -> rawptr
 ImGuiStorage_GetIntRef :: proc(this : ^ImGuiStorage, key : ImGuiID, default_val : i32 = 0) -> ^i32
 {
 	it : ^ImGuiStoragePair = ImLowerBound(this.Data.Data, this.Data.Data + this.Data.Size, key)
-	if it == (this.Data.Data + this.Data.Size) != nil || it.key != key { it = insert(&this.Data, it, ImGuiStoragePair(key, default_val)) }
+	if it == this.Data.Data + this.Data.Size || it.key != key { it = insert(&this.Data, it, ImGuiStoragePair(key, default_val)) }
 	return &it.val_i
 }
 
@@ -9658,14 +9658,14 @@ ImGuiStorage_GetBoolRef :: proc(this : ^ImGuiStorage, key : ImGuiID, default_val
 ImGuiStorage_GetFloatRef :: proc(this : ^ImGuiStorage, key : ImGuiID, default_val : f32 = 0.0) -> ^f32
 {
 	it : ^ImGuiStoragePair = ImLowerBound(this.Data.Data, this.Data.Data + this.Data.Size, key)
-	if it == (this.Data.Data + this.Data.Size) != nil || it.key != key { it = insert(&this.Data, it, ImGuiStoragePair(key, default_val)) }
+	if it == this.Data.Data + this.Data.Size || it.key != key { it = insert(&this.Data, it, ImGuiStoragePair(key, default_val)) }
 	return &it.val_f
 }
 
 ImGuiStorage_GetVoidPtrRef :: proc(this : ^ImGuiStorage, key : ImGuiID, default_val : rawptr = nil) -> ^rawptr
 {
 	it : ^ImGuiStoragePair = ImLowerBound(this.Data.Data, this.Data.Data + this.Data.Size, key)
-	if it == (this.Data.Data + this.Data.Size) != nil || it.key != key { it = insert(&this.Data, it, ImGuiStoragePair(key, default_val)) }
+	if it == this.Data.Data + this.Data.Size || it.key != key { it = insert(&this.Data, it, ImGuiStoragePair(key, default_val)) }
 	return &it.val_p
 }
 
@@ -9673,7 +9673,7 @@ ImGuiStorage_GetVoidPtrRef :: proc(this : ^ImGuiStorage, key : ImGuiID, default_
 ImGuiStorage_SetInt :: proc(this : ^ImGuiStorage, key : ImGuiID, val : i32)
 {
 	it : ^ImGuiStoragePair = ImLowerBound(this.Data.Data, this.Data.Data + this.Data.Size, key)
-	if it == (this.Data.Data + this.Data.Size) != nil || it.key != key { insert(&this.Data, it, ImGuiStoragePair(key, val)) }
+	if it == this.Data.Data + this.Data.Size || it.key != key { insert(&this.Data, it, ImGuiStoragePair(key, val)) }
 	else { it.val_i = val }
 }
 
@@ -9685,14 +9685,14 @@ ImGuiStorage_SetBool :: proc(this : ^ImGuiStorage, key : ImGuiID, val : bool)
 ImGuiStorage_SetFloat :: proc(this : ^ImGuiStorage, key : ImGuiID, val : f32)
 {
 	it : ^ImGuiStoragePair = ImLowerBound(this.Data.Data, this.Data.Data + this.Data.Size, key)
-	if it == (this.Data.Data + this.Data.Size) != nil || it.key != key { insert(&this.Data, it, ImGuiStoragePair(key, val)) }
+	if it == this.Data.Data + this.Data.Size || it.key != key { insert(&this.Data, it, ImGuiStoragePair(key, val)) }
 	else { it.val_f = val }
 }
 
 ImGuiStorage_SetVoidPtr :: proc(this : ^ImGuiStorage, key : ImGuiID, val : rawptr)
 {
 	it : ^ImGuiStoragePair = ImLowerBound(this.Data.Data, this.Data.Data + this.Data.Size, key)
-	if it == (this.Data.Data + this.Data.Size) != nil || it.key != key { insert(&this.Data, it, ImGuiStoragePair(key, val)) }
+	if it == this.Data.Data + this.Data.Size || it.key != key { insert(&this.Data, it, ImGuiStoragePair(key, val)) }
 	else { it.val_p = val }
 }
 
@@ -9862,7 +9862,7 @@ ImGuiTextIndex_append :: proc(this : ^ImGuiTextIndex, base : ^u8, old_size : i32
 {
 	IM_ASSERT(old_size >= 0 && new_size >= old_size && new_size >= this.EndOffset)
 	if old_size == new_size { return }
-	if this.EndOffset == 0 || base[this.EndOffset - 1] != 0 == '\n' { push_back(&this.LineOffsets, this.EndOffset) }
+	if this.EndOffset == 0 || base[this.EndOffset - 1] == '\n' { push_back(&this.LineOffsets, this.EndOffset) }
 	base_end : ^u8 = base + new_size
 	for p : ^u8 = base + old_size; (p = cast(^u8) memchr(p, '\n', base_end - p)) != nil;  { if pre_incr(&p) < base_end {
 	// Don't push a trailing offset on last \npush_back(&this.LineOffsets, cast(i32) cast(uintptr) (p - base))
@@ -10049,7 +10049,7 @@ ImGuiListClipper_StepInternal :: proc(clipper : ^ImGuiListClipper) -> bool
 	// Step 1: Let the clipper infer height from first range
 	if clipper.ItemsHeight <= 0.0 {
 		IM_ASSERT(data.StepNo == 1)
-		if table != nil { IM_ASSERT(table.RowPosY1 == clipper.StartPosY != 0 && table.RowPosY2 != 0 == window.DC.CursorPos.y) }
+		if table != nil { IM_ASSERT(table.RowPosY1 == clipper.StartPosY && table.RowPosY2 == window.DC.CursorPos.y) }
 
 		clipper.ItemsHeight = (window.DC.CursorPos.y - clipper.StartPosY) / cast(f32) (clipper.DisplayEnd - clipper.DisplayStart)
 		affected_by_floating_point_precision : bool = ImIsFloatAboveGuaranteedIntegerPrecision(clipper.StartPosY) || ImIsFloatAboveGuaranteedIntegerPrecision(window.DC.CursorPos.y)
@@ -10057,7 +10057,7 @@ ImGuiListClipper_StepInternal :: proc(clipper : ^ImGuiListClipper) -> bool
 			// FIXME: Technically wouldn't allow multi-line entries.
 			clipper.ItemsHeight = window.DC.PrevLineSize.y + g.Style.ItemSpacing.y
 		}
-		if clipper.ItemsHeight == 0.0 && clipper.ItemsCount != 0 == INT_MAX {
+		if clipper.ItemsHeight == 0.0 && clipper.ItemsCount == INT_MAX {
 			// Accept that no item have been submitted if in indeterminate mode.return false
 		}
 		IM_ASSERT(clipper.ItemsHeight > 0.0 && "Unable to calculate item height! First item hasn't moved the cursor vertically!")
@@ -10076,13 +10076,13 @@ ImGuiListClipper_StepInternal :: proc(clipper : ^ImGuiListClipper) -> bool
 		}
 		else {
 			// Add range selected to be included for navigation
-			is_nav_request : bool = (g.NavMoveScoringItems && g.NavWindow != nil && g.NavWindow.RootWindowForNav != nil == window.RootWindowForNav)
+			is_nav_request : bool = (g.NavMoveScoringItems && g.NavWindow != nil && g.NavWindow.RootWindowForNav == window.RootWindowForNav)
 			if is_nav_request { push_back(&data.Ranges, ImGuiListClipperRange_FromPositions(g.NavScoringNoClipRect.Min.y, g.NavScoringNoClipRect.Max.y, 0, 0)) }
-			if is_nav_request && (g.NavMoveFlags & ImGuiNavMoveFlags_.ImGuiNavMoveFlags_IsTabbing) != {} && g.NavTabbingDir != 0 == -1 { push_back(&data.Ranges, ImGuiListClipperRange_FromIndices(clipper.ItemsCount - 1, clipper.ItemsCount)) }
+			if is_nav_request && (g.NavMoveFlags & ImGuiNavMoveFlags_.ImGuiNavMoveFlags_IsTabbing) != {} && g.NavTabbingDir == -1 { push_back(&data.Ranges, ImGuiListClipperRange_FromIndices(clipper.ItemsCount - 1, clipper.ItemsCount)) }
 
 			// Add focused/active item
 			nav_rect_abs : ImRect = WindowRectRelToAbs(window, window.NavRectRel[0])
-			if g.NavId != 0 && window.NavLastIds[0] != 0 == g.NavId { push_back(&data.Ranges, ImGuiListClipperRange_FromPositions(nav_rect_abs.Min.y, nav_rect_abs.Max.y, 0, 0)) }
+			if g.NavId != 0 && window.NavLastIds[0] == g.NavId { push_back(&data.Ranges, ImGuiListClipperRange_FromPositions(nav_rect_abs.Min.y, nav_rect_abs.Max.y, 0, 0)) }
 
 			// Add visible range
 			min_y : f32 = window.ClipRect.Min.y
@@ -10090,7 +10090,7 @@ ImGuiListClipper_StepInternal :: proc(clipper : ^ImGuiListClipper) -> bool
 
 			// Add box selection range
 			bs : ^ImGuiBoxSelectState = &g.BoxSelectState
-			if bs.IsActive && bs.Window != nil == window {
+			if bs.IsActive && bs.Window == window {
 				// FIXME: Selectable() use of half-ItemSpacing isn't consistent in matter of layout, as ItemAdd(bb) stray above ItemSize()'s CursorPos.
 				// RangeSelect's BoxSelect relies on comparing overlap of previous and current rectangle and is sensitive to that.
 				// As a workaround we currently half ItemSpacing worth on each side.
@@ -10101,8 +10101,8 @@ ImGuiListClipper_StepInternal :: proc(clipper : ^ImGuiListClipper) -> bool
 				if bs.UnclipMode { push_back(&data.Ranges, ImGuiListClipperRange_FromPositions(bs.UnclipRect.Min.y, bs.UnclipRect.Max.y, 0, 0)) }
 			}
 
-			off_min : i32 = (is_nav_request && g.NavMoveClipDir != {} == ImGuiDir.ImGuiDir_Up) ? -1 : 0
-			off_max : i32 = (is_nav_request && g.NavMoveClipDir != {} == ImGuiDir.ImGuiDir_Down) ? 1 : 0
+			off_min : i32 = (is_nav_request && g.NavMoveClipDir == ImGuiDir.ImGuiDir_Up) ? -1 : 0
+			off_max : i32 = (is_nav_request && g.NavMoveClipDir == ImGuiDir.ImGuiDir_Down) ? 1 : 0
 			push_back(&data.Ranges, ImGuiListClipperRange_FromPositions(min_y, max_y, off_min, off_max))
 		}
 
@@ -10129,7 +10129,7 @@ ImGuiListClipper_StepInternal :: proc(clipper : ^ImGuiListClipper) -> bool
 			//-V1051SeekCursorForItem(clipper, clipper.DisplayStart)
 		}
 		post_incr(&data.StepNo)
-		if clipper.DisplayStart == clipper.DisplayEnd != 0 && data.StepNo < data.Ranges.Size { continue }
+		if clipper.DisplayStart == clipper.DisplayEnd && data.StepNo < data.Ranges.Size { continue }
 		return true
 	}
 
@@ -10349,8 +10349,8 @@ PopStyleVar :: proc(count : i32)
 		backup : ^ImGuiStyleMod = back(&g.StyleVarStack)
 		info : ^ImGuiDataVarInfo = GetStyleVarInfo(backup.VarIdx)
 		data : rawptr = GetVarPtr(info, &g.Style)
-		if info.Type == ImGuiDataType_.ImGuiDataType_Float && info.Count != 0 == 1 { (cast(^f32) data)[0] = backup.BackupFloat[0] }
-		else if info.Type == ImGuiDataType_.ImGuiDataType_Float && info.Count != 0 == 2 {(cast(^f32) data)[0] = backup.BackupFloat[0]; (cast(^f32) data)[1] = backup.BackupFloat[1]
+		if info.Type == ImGuiDataType_.ImGuiDataType_Float && info.Count == 1 { (cast(^f32) data)[0] = backup.BackupFloat[0] }
+		else if info.Type == ImGuiDataType_.ImGuiDataType_Float && info.Count == 2 {(cast(^f32) data)[0] = backup.BackupFloat[0]; (cast(^f32) data)[1] = backup.BackupFloat[1]
 		}
 		pop_back(&g.StyleVarStack)
 		post_decr(&count)
@@ -10613,7 +10613,7 @@ RenderTextEllipsis :: proc(draw_list : ^ImDrawList, pos_min : ^ImVec2, pos_max :
 		// We can now claim the space between pos_max.x and ellipsis_max.x
 		text_avail_width : f32 = ImMax((ImMax(pos_max.x, ellipsis_max_x) - ellipsis_width) - pos_min.x, 1.0)
 		text_size_clipped_x : f32 = CalcTextSizeA(font, font_size, text_avail_width, 0.0, text, text_end_full, &text_end_ellipsis).x
-		if text == text_end_ellipsis != nil && text_end_ellipsis < text_end_full {
+		if text == text_end_ellipsis && text_end_ellipsis < text_end_full {
 			// Always display at least 1 character if there's no room for character + ellipsis
 			text_end_ellipsis = text + ImTextCountUtf8BytesFromChar(text, text_end_full)
 			text_size_clipped_x = CalcTextSizeA(font, font_size, FLT_MAX, 0.0, text, text_end_ellipsis).x
@@ -10665,7 +10665,7 @@ RenderNavCursor :: proc(bb : ^ImRect, id : ImGuiID, flags : ImGuiNavRenderCursor
 	g : ^ImGuiContext = GImGui
 	if id != g.NavId { return }
 	if !g.NavCursorVisible && (flags & ImGuiNavRenderCursorFlags_.ImGuiNavRenderCursorFlags_AlwaysDraw) == {} { return }
-	if id == g.LastItemData.ID != 0 && (g.LastItemData.ItemFlags & ImGuiItemFlags_.ImGuiItemFlags_NoNav) != {} { return }
+	if id == g.LastItemData.ID && (g.LastItemData.ItemFlags & ImGuiItemFlags_.ImGuiItemFlags_NoNav) != {} { return }
 	window : ^ImGuiWindow = g.CurrentWindow
 	if window.DC.NavHideHighlightOneFrame { return }
 
@@ -11057,7 +11057,7 @@ Initialize :: proc()
 	push_back(&g.PlatformIO.Viewports, g.Viewports[0])
 
 	// Build KeysMayBeCharInput[] lookup table (1 bool per named key)
-	for key : ImGuiKey = ImGuiKey.ImGuiKey_NamedKey_BEGIN; key < ImGuiKey.ImGuiKey_NamedKey_END; key = cast(ImGuiKey) (key + 1) { if (key >= ImGuiKey.ImGuiKey_0 && key <= ImGuiKey.ImGuiKey_9) || (key >= ImGuiKey.ImGuiKey_A && key <= ImGuiKey.ImGuiKey_Z) || (key >= ImGuiKey.ImGuiKey_Keypad0 && key <= ImGuiKey.ImGuiKey_Keypad9) || key != {} == ImGuiKey.ImGuiKey_Tab != 0 || key != {} == ImGuiKey.ImGuiKey_Space != 0 || key != {} == ImGuiKey.ImGuiKey_Apostrophe != 0 || key != {} == ImGuiKey.ImGuiKey_Comma != 0 || key != {} == ImGuiKey.ImGuiKey_Minus != 0 || key != {} == ImGuiKey.ImGuiKey_Period != 0 || key != {} == ImGuiKey.ImGuiKey_Slash != 0 || key != {} == ImGuiKey.ImGuiKey_Semicolon != 0 || key != {} == ImGuiKey.ImGuiKey_Equal != 0 || key != {} == ImGuiKey.ImGuiKey_LeftBracket != 0 || key != {} == ImGuiKey.ImGuiKey_RightBracket != 0 || key != {} == ImGuiKey.ImGuiKey_GraveAccent != 0 || key != {} == ImGuiKey.ImGuiKey_KeypadDecimal != 0 || key != {} == ImGuiKey.ImGuiKey_KeypadDivide != 0 || key != {} == ImGuiKey.ImGuiKey_KeypadMultiply != 0 || key != {} == ImGuiKey.ImGuiKey_KeypadSubtract != 0 || key != {} == ImGuiKey.ImGuiKey_KeypadAdd != 0 || key != {} == ImGuiKey.ImGuiKey_KeypadEqual { SetBit(&g.KeysMayBeCharInput, key) } }
+	for key : ImGuiKey = ImGuiKey.ImGuiKey_NamedKey_BEGIN; key < ImGuiKey.ImGuiKey_NamedKey_END; key = cast(ImGuiKey) (key + 1) { if (key >= ImGuiKey.ImGuiKey_0 && key <= ImGuiKey.ImGuiKey_9) || (key >= ImGuiKey.ImGuiKey_A && key <= ImGuiKey.ImGuiKey_Z) || (key >= ImGuiKey.ImGuiKey_Keypad0 && key <= ImGuiKey.ImGuiKey_Keypad9) || key == ImGuiKey.ImGuiKey_Tab || key == ImGuiKey.ImGuiKey_Space || key == ImGuiKey.ImGuiKey_Apostrophe || key == ImGuiKey.ImGuiKey_Comma || key == ImGuiKey.ImGuiKey_Minus || key == ImGuiKey.ImGuiKey_Period || key == ImGuiKey.ImGuiKey_Slash || key == ImGuiKey.ImGuiKey_Semicolon || key == ImGuiKey.ImGuiKey_Equal || key == ImGuiKey.ImGuiKey_LeftBracket || key == ImGuiKey.ImGuiKey_RightBracket || key == ImGuiKey.ImGuiKey_GraveAccent || key == ImGuiKey.ImGuiKey_KeypadDecimal || key == ImGuiKey.ImGuiKey_KeypadDivide || key == ImGuiKey.ImGuiKey_KeypadMultiply || key == ImGuiKey.ImGuiKey_KeypadSubtract || key == ImGuiKey.ImGuiKey_KeypadAdd || key == ImGuiKey.ImGuiKey_KeypadEqual { SetBit(&g.KeysMayBeCharInput, key) } }
 
 	when IMGUI_HAS_DOCK { /* @gen ifdef */
 	// Initialize Docking
@@ -11158,7 +11158,7 @@ Shutdown :: proc()
 AddContextHook :: proc(ctx : ^ImGuiContext, hook : ^ImGuiContextHook) -> ImGuiID
 {
 	g : ^ImGuiContext = ctx
-	IM_ASSERT(hook.Callback != nil && hook.HookId != 0 == 0 && hook.Type != ImGuiContextHookType.ImGuiContextHookType_PendingRemoval_)
+	IM_ASSERT(hook.Callback != nil && hook.HookId == 0 && hook.Type != ImGuiContextHookType.ImGuiContextHookType_PendingRemoval_)
 	push_back(&g.Hooks, hook^)
 	back(&g.Hooks).HookId = pre_incr(&g.HookIdNext)
 	return g.HookIdNext
@@ -11286,7 +11286,7 @@ SetActiveID :: proc(id : ImGuiID, window : ^ImGuiWindow)
 		// While most behaved code would make an effort to not steal active id during window move/drag operations,
 		// we at least need to be resilient to it. Canceling the move is rather aggressive and users of 'master' branch
 		// may prefer the weird ill-defined half working situation ('docking' did assert), so may need to rework that.
-		if g.MovingWindow != nil && g.ActiveId != 0 == g.MovingWindow.MoveId {
+		if g.MovingWindow != nil && g.ActiveId == g.MovingWindow.MoveId {
 			IMGUI_DEBUG_LOG_ACTIVEID("SetActiveID() cancel MovingWindow\n")
 			g.MovingWindow = nil
 		}
@@ -11318,7 +11318,7 @@ SetActiveID :: proc(id : ImGuiID, window : ^ImGuiWindow)
 	g.ActiveIdFromShortcut = false
 	if id != 0 {
 		g.ActiveIdIsAlive = id
-		g.ActiveIdSource = (g.NavActivateId == id != 0 || g.NavJustMovedToId != 0 == id) ? g.NavInputSource : ImGuiInputSource.ImGuiInputEventType_Mouse
+		g.ActiveIdSource = (g.NavActivateId == id || g.NavJustMovedToId == id) ? g.NavInputSource : ImGuiInputSource.ImGuiInputEventType_Mouse
 		IM_ASSERT(g.ActiveIdSource != ImGuiInputSource.ImGuiInputSource_None)
 	}
 
@@ -11353,14 +11353,14 @@ MarkItemEdited :: proc(id : ImGuiID)
 	// ActiveId might have been released by the time we call this (as in the typical press/release button behavior) but still need to fill the data.
 	g : ^ImGuiContext = GImGui
 	if (g.LastItemData.ItemFlags & ImGuiItemFlagsPrivate_.ImGuiItemFlags_NoMarkEdited) != {} { return }
-	if g.ActiveId == id != 0 || g.ActiveId != 0 == 0 {
+	if g.ActiveId == id || g.ActiveId == 0 {
 		g.ActiveIdHasBeenEditedThisFrame = true
 		g.ActiveIdHasBeenEditedBefore = true
 	}
 
 	// We accept a MarkItemEdited() on drag and drop targets (see https://github.com/ocornut/imgui/issues/1875#issuecomment-978243343)
 	// We accept 'ActiveIdPreviousFrame == id' for InputText() returning an edit after it has been taken ActiveId away (#4714)
-	IM_ASSERT(g.DragDropActive || g.ActiveId != 0 == id != 0 || g.ActiveId != 0 == 0 || g.ActiveIdPreviousFrame != 0 == id != 0 || (g.CurrentMultiSelect != nil && g.BoxSelectState.IsActive))
+	IM_ASSERT(g.DragDropActive || g.ActiveId == id || g.ActiveId == 0 || g.ActiveIdPreviousFrame == id || (g.CurrentMultiSelect != nil && g.BoxSelectState.IsActive))
 
 	//IM_ASSERT(g.CurrentWindow->DC.LastItemId == id);
 	g.LastItemData.StatusFlags |= ImGuiItemStatusFlags_.ImGuiItemStatusFlags_Edited
@@ -11431,7 +11431,7 @@ IsItemHovered :: proc(flags : ImGuiHoveredFlags) -> bool
 		// [2017/10/16] Reverted commit 344d48be3 and testing RootWindow instead. I believe it is correct to NOT test for RootWindow but this leaves us unable
 		// to use IsItemHovered() after EndChild() itself. Until a solution is found I believe reverting to the test from 2017/09/27 is safe since this was
 		// the test that has been running for a long while.
-		if g.HoveredWindow != window && (status_flags & ImGuiItemStatusFlags_.ImGuiItemStatusFlags_HoveredWindow) != {} == 0 { if (flags & ImGuiHoveredFlags_.ImGuiHoveredFlags_AllowWhenOverlappedByWindow) == {} { return false } }
+		if g.HoveredWindow != window && (status_flags & ImGuiItemStatusFlags_.ImGuiItemStatusFlags_HoveredWindow) == {} { if (flags & ImGuiHoveredFlags_.ImGuiHoveredFlags_AllowWhenOverlappedByWindow) == {} { return false } }
 
 		// Test if another item is active (e.g. being dragged)
 		id : ImGuiID = g.LastItemData.ID
@@ -11447,7 +11447,7 @@ IsItemHovered :: proc(flags : ImGuiHoveredFlags) -> bool
 		// Special handling for calling after Begin() which represent the title bar or tab.
 		// When the window is skipped/collapsed (SkipItems==true) that last item (always ->MoveId submitted by Begin)
 		// will never be overwritten so we need to detect the case.
-		if id == window.MoveId != 0 && window.WriteAccessed { return false }
+		if id == window.MoveId && window.WriteAccessed { return false }
 
 		// Test if using AllowOverlap and overlapped
 		if (g.LastItemData.ItemFlags & ImGuiItemFlagsPrivate_.ImGuiItemFlags_AllowOverlap) != {} && id != 0 { if (flags & ImGuiHoveredFlags_.ImGuiHoveredFlags_AllowWhenOverlappedByItem) == {} { if g.HoveredIdPreviousFrame != g.LastItemData.ID { return false } } }
@@ -11485,7 +11485,7 @@ ItemHoverable :: proc(bb : ^ImRect, id : ImGuiID, item_flags : ImGuiItemFlags) -
 
 	// Detect ID conflicts
 	when ! IMGUI_DISABLE_DEBUG_TOOLS { /* @gen ifndef */
-	if id != 0 && g.HoveredIdPreviousFrame != 0 == id != 0 && (item_flags & ImGuiItemFlags_.ImGuiItemFlags_AllowDuplicateId) != {} == 0 {
+	if id != 0 && g.HoveredIdPreviousFrame == id && (item_flags & ImGuiItemFlags_.ImGuiItemFlags_AllowDuplicateId) == {} {
 		post_incr(&g.HoveredIdPreviousFrameItemCount)
 		if g.DebugDrawIdConflicts == id { AddRect(window.DrawList, bb.Min - ImVec2(1, 1), bb.Max + ImVec2(1, 1), IM_COL32(255, 0, 0, 255), 0.0, ImDrawFlags_.ImDrawFlags_None, 2.0) }
 	}
@@ -11507,7 +11507,7 @@ ItemHoverable :: proc(bb : ^ImRect, id : ImGuiID, item_flags : ImGuiItemFlags) -
 	// hover test in widgets code. We could also decide to split this function is two.
 	if id != 0 {
 		// Drag source doesn't report as hovered
-		if g.DragDropActive && g.DragDropPayload.SourceId != 0 == id != 0 && (g.DragDropSourceFlags & ImGuiDragDropFlags_.ImGuiDragDropFlags_SourceNoDisableHover) == {} { return false }
+		if g.DragDropActive && g.DragDropPayload.SourceId == id && (g.DragDropSourceFlags & ImGuiDragDropFlags_.ImGuiDragDropFlags_SourceNoDisableHover) == {} { return false }
 
 		SetHoveredID(id)
 
@@ -11520,13 +11520,13 @@ ItemHoverable :: proc(bb : ^ImRect, id : ImGuiID, item_flags : ImGuiItemFlags) -
 
 		// Display shortcut (only works with mouse)
 		// (ImGuiItemStatusFlags_HasShortcut in LastItemData denotes we want a tooltip)
-		if id == g.LastItemData.ID != 0 && (g.LastItemData.StatusFlags & ImGuiItemStatusFlags_.ImGuiItemStatusFlags_HasShortcut) != {} && g.ActiveId != id { if IsItemHovered(ImGuiHoveredFlags_.ImGuiHoveredFlags_ForTooltip | ImGuiHoveredFlags_.ImGuiHoveredFlags_DelayNormal) { SetTooltip("%s", GetKeyChordName(g.LastItemData.Shortcut)) } }
+		if id == g.LastItemData.ID && (g.LastItemData.StatusFlags & ImGuiItemStatusFlags_.ImGuiItemStatusFlags_HasShortcut) != {} && g.ActiveId != id { if IsItemHovered(ImGuiHoveredFlags_.ImGuiHoveredFlags_ForTooltip | ImGuiHoveredFlags_.ImGuiHoveredFlags_DelayNormal) { SetTooltip("%s", GetKeyChordName(g.LastItemData.Shortcut)) } }
 	}
 
 	// When disabled we'll return false but still set HoveredId
 	if (item_flags & ImGuiItemFlagsPrivate_.ImGuiItemFlags_Disabled) != {} {
 		// Release active id if turning disabled
-		if g.ActiveId == id != 0 && id != 0 { ClearActiveID() }
+		if g.ActiveId == id && id != 0 { ClearActiveID() }
 		g.HoveredIdIsDisabled = true
 		return false
 	}
@@ -11537,12 +11537,12 @@ ItemHoverable :: proc(bb : ^ImRect, id : ImGuiID, item_flags : ImGuiItemFlags) -
 		// We perform the check here because reaching is path is rare (1~ time a frame),
 		// making the cost of this tool near-zero! We could get better call-stack and support picking non-hovered
 		// items if we performed the test in ItemAdd(), but that would incur a bigger runtime cost.
-		if g.DebugItemPickerActive && g.HoveredIdPreviousFrame != 0 == id { AddRect(GetForegroundDrawList(), bb.Min, bb.Max, IM_COL32(255, 255, 0, 255)) }
+		if g.DebugItemPickerActive && g.HoveredIdPreviousFrame == id { AddRect(GetForegroundDrawList(), bb.Min, bb.Max, IM_COL32(255, 255, 0, 255)) }
 		if g.DebugItemPickerBreakId == id { IM_DEBUG_BREAK() }
 	}
 	} // preproc endif
 
-	if g.NavHighlightItemUnderNav && (item_flags & ImGuiItemFlagsPrivate_.ImGuiItemFlags_NoNavDisableMouseHover) != {} == 0 { return false }
+	if g.NavHighlightItemUnderNav && (item_flags & ImGuiItemFlagsPrivate_.ImGuiItemFlags_NoNavDisableMouseHover) == {} { return false }
 
 	return true
 }
@@ -11755,7 +11755,7 @@ StartMouseMovingWindowOrNode :: proc(window : ^ImGuiWindow, node : ^ImGuiDockNod
 {
 	g : ^ImGuiContext = GImGui
 	can_undock_node : bool = false
-	if undock && node != nil && node.VisibleWindow != nil && (node.VisibleWindow.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_NoMove) != {} == 0 && (node.MergedFlags & ImGuiDockNodeFlags_.ImGuiDockNodeFlags_NoUndocking) != {} == 0 {
+	if undock && node != nil && node.VisibleWindow != nil && (node.VisibleWindow.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_NoMove) == {} && (node.MergedFlags & ImGuiDockNodeFlags_.ImGuiDockNodeFlags_NoUndocking) == {} {
 		// Can undock if:
 		// - part of a hierarchy with more than one visible node (if only one is visible, we'll just move the root window)
 		// - part of a dockspace node hierarchy: so we can undock the last single visible node too. Undocking from a fixed/central node will create a new node and copy windows.
@@ -11822,7 +11822,7 @@ UpdateMouseMovingWindowNewFrame :: proc()
 	}
 	else {
 		// When clicking/dragging from a window that has the _NoMove flag, we still set the ActiveId in order to prevent hovering others.
-		if g.ActiveIdWindow != nil && g.ActiveIdWindow.MoveId != 0 == g.ActiveId {
+		if g.ActiveIdWindow != nil && g.ActiveIdWindow.MoveId == g.ActiveId {
 			KeepAliveID(g.ActiveId)
 			if !g.IO.MouseDown[0] { ClearActiveID() }
 		}
@@ -11867,7 +11867,7 @@ UpdateMouseMovingWindowEndFrame :: proc()
 	// With right mouse button we close popups without changing focus based on where the mouse is aimed
 	// Instead, focus will be restored to the window under the bottom-most closed popup.
 	// (The left mouse button path calls FocusWindow on the hovered window, which will lead NewFrame->ClosePopupsOverWindow to trigger)
-	if g.IO.MouseClicked[1] && g.HoveredId != 0 == 0 {
+	if g.IO.MouseClicked[1] && g.HoveredId == 0 {
 		// Find the top-most window between HoveredWindow and the top-most Modal Window.
 		// This is where we can trim the popup stack.
 		modal : ^ImGuiWindow = GetTopMostPopupModal()
@@ -11920,7 +11920,7 @@ UpdateHoveredWindowAndCaptureFlags :: proc()
 	// - We also support the moved window toggling the NoInputs flag after moving has started in order to be able to detect windows below it, which is useful for e.g. docking mechanisms.
 	clear_hovered_windows : bool = false
 	FindHoveredWindowEx(g.IO.MousePos, false, &g.HoveredWindow, &g.HoveredWindowUnderMovingWindow)
-	IM_ASSERT(g.HoveredWindow == nil || g.HoveredWindow != nil == g.MovingWindow != nil || g.HoveredWindow.Viewport != nil == g.MouseViewport)
+	IM_ASSERT(g.HoveredWindow == nil || g.HoveredWindow == g.MovingWindow || g.HoveredWindow.Viewport == g.MouseViewport)
 	g.HoveredWindowBeforeClear = g.HoveredWindow
 
 	// Modal windows prevents mouse from hovering behind them.
@@ -12054,7 +12054,7 @@ NewFrame :: proc()
 	}
 
 	// Drag and drop keep the source ID alive so even if the source disappear our state is consistent
-	if g.DragDropActive && g.DragDropPayload.SourceId != 0 == g.ActiveId { KeepAliveID(g.DragDropPayload.SourceId) }
+	if g.DragDropActive && g.DragDropPayload.SourceId == g.ActiveId { KeepAliveID(g.DragDropPayload.SourceId) }
 
 	// [DEBUG]
 	if !g.IO.ConfigDebugHighlightIdConflicts || !g.IO.KeyCtrl {
@@ -12064,7 +12064,7 @@ NewFrame :: proc()
 
 	// Update HoveredId data
 	if g.HoveredIdPreviousFrame == 0 { g.HoveredIdTimer = 0.0 }
-	if g.HoveredIdPreviousFrame == 0 || (g.HoveredId != 0 && g.ActiveId != 0 == g.HoveredId) { g.HoveredIdNotActiveTimer = 0.0 }
+	if g.HoveredIdPreviousFrame == 0 || (g.HoveredId != 0 && g.ActiveId == g.HoveredId) { g.HoveredIdNotActiveTimer = 0.0 }
 	if g.HoveredId != 0 { g.HoveredIdTimer += g.IO.DeltaTime }
 	if g.HoveredId != 0 && g.ActiveId != g.HoveredId { g.HoveredIdNotActiveTimer += g.IO.DeltaTime }
 	g.HoveredIdPreviousFrame = g.HoveredId
@@ -12076,7 +12076,7 @@ NewFrame :: proc()
 	// Clear ActiveID if the item is not alive anymore.
 	// In 1.87, the common most call to KeepAliveID() was moved from GetID() to ItemAdd().
 	// As a result, custom widget using ButtonBehavior() _without_ ItemAdd() need to call KeepAliveID() themselves.
-	if g.ActiveId != 0 && g.ActiveIdIsAlive != g.ActiveId && g.ActiveIdPreviousFrame != 0 == g.ActiveId {
+	if g.ActiveId != 0 && g.ActiveIdIsAlive != g.ActiveId && g.ActiveIdPreviousFrame == g.ActiveId {
 		IMGUI_DEBUG_LOG_ACTIVEID("NewFrame(): ClearActiveID() because it isn't marked alive anymore!\n")
 		ClearActiveID()
 	}
@@ -12218,11 +12218,11 @@ NewFrame :: proc()
 	UpdateDebugToolItemPicker()
 	UpdateDebugToolStackQueries()
 	UpdateDebugToolFlashStyleColor()
-	if g.DebugLocateFrames > 0 && pre_decr(&g.DebugLocateFrames) != 0 == 0 {
+	if g.DebugLocateFrames > 0 && pre_decr(&g.DebugLocateFrames) == 0 {
 		g.DebugLocateId = 0
 		g.DebugBreakInLocateId = false
 	}
-	if g.DebugLogAutoDisableFrames > 0 && pre_decr(&g.DebugLogAutoDisableFrames) != 0 == 0 {
+	if g.DebugLogAutoDisableFrames > 0 && pre_decr(&g.DebugLogAutoDisableFrames) == 0 {
 		DebugLog("(Debug Log: Auto-disabled some ImGuiDebugLogFlags after 2 frames)\n")
 		g.DebugLogFlags &= ~g.DebugLogAutoDisableFlags
 		g.DebugLogAutoDisableFlags = ImGuiDebugLogFlags_.ImGuiDebugLogFlags_None
@@ -12466,7 +12466,7 @@ RenderDimmedBackgrounds :: proc()
 
 	// Draw dimming background on _other_ viewports than the ones our windows are in
 	for viewport in g.Viewports {
-		if viewport == viewports_already_dimmed[0] != nil || viewport != nil == viewports_already_dimmed[1] { continue }
+		if viewport == viewports_already_dimmed[0] || viewport == viewports_already_dimmed[1] { continue }
 		if modal_window != nil && viewport.Window != nil && IsWindowAbove(viewport.Window, modal_window) { continue }
 		draw_list : ^ImDrawList = GetForegroundDrawList(viewport)
 		dim_bg_col : ImU32 = GetColorU32(dim_bg_for_modal ? ImGuiCol_.ImGuiCol_ModalWindowDimBg : ImGuiCol_.ImGuiCol_NavWindowingDimBg, g.DimBgRatio)
@@ -12516,7 +12516,7 @@ EndFrame :: proc()
 	// Drag and Drop: Elapse payload (if delivered, or if source stops being submitted)
 	if g.DragDropActive {
 		is_delivered : bool = g.DragDropPayload.Delivery
-		is_elapsed : bool = (g.DragDropSourceFrameCount + 1 < g.FrameCount) && ((g.DragDropSourceFlags & ImGuiDragDropFlags_.ImGuiDragDropFlags_PayloadAutoExpire) != {} || g.DragDropMouseButton != 0 == -1 || !IsMouseDown(g.DragDropMouseButton))
+		is_elapsed : bool = (g.DragDropSourceFrameCount + 1 < g.FrameCount) && ((g.DragDropSourceFlags & ImGuiDragDropFlags_.ImGuiDragDropFlags_PayloadAutoExpire) != {} || g.DragDropMouseButton == -1 || !IsMouseDown(g.DragDropMouseButton))
 		if is_delivered || is_elapsed { ClearDragDrop() }
 	}
 
@@ -12599,7 +12599,7 @@ Render :: proc()
 	windows_to_render_top_most[1] = (g.NavWindowingTarget != nil ? g.NavWindowingListWindow : nil)
 	for window in g.Windows {
 		IM_MSVC_WARNING_SUPPRESS(6011); // Static Analysis false positive "warning C6011: Dereferencing NULL pointer 'window'"
-		if IsWindowActiveAndVisible(window) && (window.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_ChildWindow) != {} == 0 && window != windows_to_render_top_most[0] && window != windows_to_render_top_most[1] { AddRootWindowToDrawData(window) }
+		if IsWindowActiveAndVisible(window) && (window.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_ChildWindow) == {} && window != windows_to_render_top_most[0] && window != windows_to_render_top_most[1] { AddRootWindowToDrawData(window) }
 	}
 
 	for n : i32 = 0; n < IM_ARRAYSIZE(windows_to_render_top_most); post_incr(&n) { if windows_to_render_top_most[n] != nil && IsWindowActiveAndVisible(windows_to_render_top_most[n]) {
@@ -12726,7 +12726,7 @@ IsItemActive :: proc() -> bool
 IsItemActivated :: proc() -> bool
 {
 	g : ^ImGuiContext = GImGui
-	if g.ActiveId != 0 { if g.ActiveId == g.LastItemData.ID != 0 && g.ActiveIdPreviousFrame != g.LastItemData.ID { return true } }
+	if g.ActiveId != 0 { if g.ActiveId == g.LastItemData.ID && g.ActiveIdPreviousFrame != g.LastItemData.ID { return true } }
 	return false
 }
 
@@ -12734,7 +12734,7 @@ IsItemDeactivated :: proc() -> bool
 {
 	g : ^ImGuiContext = GImGui
 	if (g.LastItemData.StatusFlags & ImGuiItemStatusFlags_.ImGuiItemStatusFlags_HasDeactivated) != {} { return (g.LastItemData.StatusFlags & ImGuiItemStatusFlags_.ImGuiItemStatusFlags_Deactivated) != {} }
-	return (g.ActiveIdPreviousFrame == g.LastItemData.ID != 0 && g.ActiveIdPreviousFrame != 0 && g.ActiveId != g.LastItemData.ID)
+	return (g.ActiveIdPreviousFrame == g.LastItemData.ID && g.ActiveIdPreviousFrame != 0 && g.ActiveId != g.LastItemData.ID)
 }
 
 IsItemDeactivatedAfterEdit :: proc() -> bool
@@ -12747,12 +12747,12 @@ IsItemDeactivatedAfterEdit :: proc() -> bool
 IsItemFocused :: proc() -> bool
 {
 	g : ^ImGuiContext = GImGui
-	if g.NavId != g.LastItemData.ID || g.NavId != 0 == 0 { return false }
+	if g.NavId != g.LastItemData.ID || g.NavId == 0 { return false }
 
 	// Special handling for the dummy item after Begin() which represent the title bar or tab.
 	// When the window is collapsed (SkipItems==true) that last item will never be overwritten so we need to detect the case.
 	window : ^ImGuiWindow = g.CurrentWindow
-	if g.LastItemData.ID == window.ID != 0 && window.WriteAccessed { return false }
+	if g.LastItemData.ID == window.ID && window.WriteAccessed { return false }
 
 	return true
 }
@@ -12883,10 +12883,10 @@ BeginChildEx :: proc(name : ^u8, id : ImGuiID, size_arg : ^ImVec2, child_flags :
 	// Sanity check as it is likely that some user will accidentally pass ImGuiWindowFlags into the ImGuiChildFlags argument.
 	ImGuiChildFlags_SupportedMask_ : ImGuiChildFlags = ImGuiChildFlags_.ImGuiChildFlags_Borders | ImGuiChildFlags_.ImGuiChildFlags_AlwaysUseWindowPadding | ImGuiChildFlags_.ImGuiChildFlags_ResizeX | ImGuiChildFlags_.ImGuiChildFlags_ResizeY | ImGuiChildFlags_.ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_.ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_.ImGuiChildFlags_AlwaysAutoResize | ImGuiChildFlags_.ImGuiChildFlags_FrameStyle | ImGuiChildFlags_.ImGuiChildFlags_NavFlattened
 	IM_UNUSED(ImGuiChildFlags_SupportedMask_)
-	IM_ASSERT((child_flags & ~ImGuiChildFlags_SupportedMask_) == 0 && "Illegal ImGuiChildFlags value. Did you pass ImGuiWindowFlags values instead of ImGuiChildFlags?")
-	IM_ASSERT((window_flags & ImGuiWindowFlags_.ImGuiWindowFlags_AlwaysAutoResize) == 0 && "Cannot specify ImGuiWindowFlags_AlwaysAutoResize for BeginChild(). Use ImGuiChildFlags_AlwaysAutoResize!")
+	IM_ASSERT((child_flags & ~ImGuiChildFlags_SupportedMask_) == {} && "Illegal ImGuiChildFlags value. Did you pass ImGuiWindowFlags values instead of ImGuiChildFlags?")
+	IM_ASSERT((window_flags & ImGuiWindowFlags_.ImGuiWindowFlags_AlwaysAutoResize) == {} && "Cannot specify ImGuiWindowFlags_AlwaysAutoResize for BeginChild(). Use ImGuiChildFlags_AlwaysAutoResize!")
 	if (child_flags & ImGuiChildFlags_.ImGuiChildFlags_AlwaysAutoResize) != {} {
-		IM_ASSERT((child_flags & (ImGuiChildFlags_.ImGuiChildFlags_ResizeX | ImGuiChildFlags_.ImGuiChildFlags_ResizeY)) == 0 && "Cannot use ImGuiChildFlags_ResizeX or ImGuiChildFlags_ResizeY with ImGuiChildFlags_AlwaysAutoResize!")
+		IM_ASSERT((child_flags & (ImGuiChildFlags_.ImGuiChildFlags_ResizeX | ImGuiChildFlags_.ImGuiChildFlags_ResizeY)) == {} && "Cannot use ImGuiChildFlags_ResizeX or ImGuiChildFlags_ResizeY with ImGuiChildFlags_AlwaysAutoResize!")
 		IM_ASSERT((child_flags & (ImGuiChildFlags_.ImGuiChildFlags_AutoResizeX | ImGuiChildFlags_.ImGuiChildFlags_AutoResizeY)) != {} && "Must use ImGuiChildFlags_AutoResizeX or ImGuiChildFlags_AutoResizeY with ImGuiChildFlags_AlwaysAutoResize!")
 	}
 
@@ -12971,7 +12971,7 @@ BeginChildEx :: proc(name : ^u8, id : ImGuiID, size_arg : ^ImVec2, child_flags :
 	// Can enter a child if (A) it has navigable items or (B) it can be scrolled.
 	temp_id_for_activation : ImGuiID = ImHashStr("##Child", 0, id)
 	if g.ActiveId == temp_id_for_activation { ClearActiveID() }
-	if g.NavActivateId == id != 0 && (child_flags & ImGuiChildFlags_.ImGuiChildFlags_NavFlattened) == {} && (child_window.DC.NavLayersActiveMask != 0 || child_window.DC.NavWindowHasScrollY) {
+	if g.NavActivateId == id && (child_flags & ImGuiChildFlags_.ImGuiChildFlags_NavFlattened) == {} && (child_window.DC.NavLayersActiveMask != 0 || child_window.DC.NavWindowHasScrollY) {
 		FocusWindow(child_window)
 		NavInitWindow(child_window, false)
 		SetActiveID(temp_id_for_activation, child_window); // Steal ActiveId with another arbitrary id so that key-press won't activate child item
@@ -13001,7 +13001,7 @@ EndChild :: proc()
 			RenderNavCursor(bb, child_window.ChildId)
 
 			// When browsing a window that has no activable items (scroll only) we keep a highlight on the child (pass g.NavId to trick into always displaying)
-			if child_window.DC.NavLayersActiveMask == 0 && child_window != nil == g.NavWindow { RenderNavCursor(ImRect(bb.Min - ImVec2(2, 2), bb.Max + ImVec2(2, 2)), g.NavId, ImGuiNavRenderCursorFlags_.ImGuiNavRenderCursorFlags_Compact) }
+			if child_window.DC.NavLayersActiveMask == 0 && child_window == g.NavWindow { RenderNavCursor(ImRect(bb.Min - ImVec2(2, 2), bb.Max + ImVec2(2, 2)), g.NavId, ImGuiNavRenderCursorFlags_.ImGuiNavRenderCursorFlags_Compact) }
 		}
 		else {
 			// Not navigable into
@@ -13166,7 +13166,7 @@ CalcWindowContentSizes :: proc(window : ^ImGuiWindow, content_size_current : ^Im
 {
 	preserve_old_content_sizes : bool = false
 	if window.Collapsed && window.AutoFitFramesX <= 0 && window.AutoFitFramesY <= 0 { preserve_old_content_sizes = true }
-	else if window.Hidden && window.HiddenFramesCannotSkipItems != 0 == 0 && window.HiddenFramesCanSkipItems > 0 { preserve_old_content_sizes = true }
+	else if window.Hidden && window.HiddenFramesCannotSkipItems == 0 && window.HiddenFramesCanSkipItems > 0 { preserve_old_content_sizes = true }
 	if preserve_old_content_sizes {
 		content_size_current^ = window.ContentSize
 		content_size_ideal^ = window.ContentSizeIdeal
@@ -13197,7 +13197,7 @@ CalcWindowAutoFitSize :: proc(window : ^ImGuiWindow, size_contents : ^ImVec2) ->
 		size_max : ImVec2 = ImVec2(FLT_MAX, FLT_MAX)
 
 		// Child windows are layed within their parent (unless they are also popups/menus) and thus have no restriction
-		if (window.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_ChildWindow) == 0 || (window.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_Popup) != {} {
+		if (window.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_ChildWindow) == {} || (window.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_Popup) != {} {
 			if !window.ViewportOwned { size_max = GetMainViewport().WorkSize - style.DisplaySafeAreaPadding * 2.0 }
 			monitor_idx : i32 = window.ViewportAllowPlatformMonitorExtend
 			if monitor_idx >= 0 && monitor_idx < g.PlatformIO.Monitors.Size { size_max = g.PlatformIO.Monitors[monitor_idx].WorkSize - style.DisplaySafeAreaPadding * 2.0 }
@@ -13389,7 +13389,7 @@ UpdateWindowManualResize :: proc(window : ^ImGuiWindow, size_auto_fit : ^ImVec2,
 	for border_n : i32 = 0; border_n < 4; post_incr(&border_n) {
 		if (resize_border_mask & (1 << border_n)) == 0 { continue }
 		def : ^ImGuiResizeBorderDef = resize_border_def[border_n]
-		axis : ImGuiAxis = (border_n == ImGuiDir.ImGuiDir_Left != 0 || border_n != 0 == ImGuiDir.ImGuiDir_Right) ? ImGuiAxis.ImGuiAxis_X : ImGuiAxis.ImGuiAxis_Y
+		axis : ImGuiAxis = (border_n == ImGuiDir.ImGuiDir_Left || border_n == ImGuiDir.ImGuiDir_Right) ? ImGuiAxis.ImGuiAxis_X : ImGuiAxis.ImGuiAxis_Y
 
 		hovered : bool; held : bool
 		border_rect : ImRect = GetResizeBorderRect(window, border_n, grip_hover_inner_size, WINDOWS_HOVER_PADDING)
@@ -13403,7 +13403,7 @@ UpdateWindowManualResize :: proc(window : ^ImGuiWindow, size_auto_fit : ^ImVec2,
 			// Double-clicking bottom or right border auto-fit on this axis
 			// FIXME: CalcWindowAutoFitSize() doesn't take into account that only one side may be auto-fit when calculating scrollbars.
 			// FIXME: Support top and right borders: rework CalcResizePosSizeFromAnyCorner() to be reusable in both cases.
-			if border_n == 1 || border_n != 0 == 3 {
+			if border_n == 1 || border_n == 3 {
 				// Right and bottom border
 				size_target[axis] = CalcWindowSizeAfterConstraint(window, size_auto_fit)[axis]
 				ret_auto_fit_mask |= (1 << axis)
@@ -13415,7 +13415,7 @@ UpdateWindowManualResize :: proc(window : ^ImGuiWindow, size_auto_fit : ^ImVec2,
 			// Switch to relative resizing mode when border geometry moved (e.g. resizing a child altering parent scroll), in order to avoid resizing feedback loop.
 			// Currently only using relative mode on resizable child windows, as the problem to solve is more likely noticeable for them, but could apply for all windows eventually.
 			// FIXME: May want to generalize this idiom at lower-level, so more widgets can use it!
-			just_scrolled_manually_while_resizing : bool = (g.WheelingWindow != nil && g.WheelingWindowScrolledFrame != 0 == g.FrameCount != 0 && IsWindowChildOf(window, g.WheelingWindow, false, true))
+			just_scrolled_manually_while_resizing : bool = (g.WheelingWindow != nil && g.WheelingWindowScrolledFrame == g.FrameCount && IsWindowChildOf(window, g.WheelingWindow, false, true))
 			if g.ActiveIdIsJustActivated || just_scrolled_manually_while_resizing {
 				g.WindowResizeBorderExpectedRect = border_rect
 				g.WindowResizeRelativeMode = false
@@ -13439,8 +13439,8 @@ UpdateWindowManualResize :: proc(window : ^ImGuiWindow, size_auto_fit : ^ImVec2,
 			}
 
 			// Clamp, apply
-			clamp_min : ImVec2; init(&clamp_min, border_n == ImGuiDir.ImGuiDir_Right != 0 ? clamp_rect.Min.x : -FLT_MAX, border_n == ImGuiDir.ImGuiDir_Down != 0 || (border_n == ImGuiDir.ImGuiDir_Up != 0 && window_move_from_title_bar) ? clamp_rect.Min.y : -FLT_MAX)
-			clamp_max : ImVec2; init(&clamp_max, border_n == ImGuiDir.ImGuiDir_Left != 0 ? clamp_rect.Max.x : +FLT_MAX, border_n == ImGuiDir.ImGuiDir_Up != 0 ? clamp_rect.Max.y : +FLT_MAX)
+			clamp_min : ImVec2; init(&clamp_min, border_n == ImGuiDir.ImGuiDir_Right ? clamp_rect.Min.x : -FLT_MAX, border_n == ImGuiDir.ImGuiDir_Down || (border_n == ImGuiDir.ImGuiDir_Up && window_move_from_title_bar) ? clamp_rect.Min.y : -FLT_MAX)
+			clamp_max : ImVec2; init(&clamp_max, border_n == ImGuiDir.ImGuiDir_Left ? clamp_rect.Max.x : +FLT_MAX, border_n == ImGuiDir.ImGuiDir_Up ? clamp_rect.Max.y : +FLT_MAX)
 			border_target = ImClamp(border_target, clamp_min, clamp_max)
 			if (flags & ImGuiWindowFlags_.ImGuiWindowFlags_ChildWindow) != {} {
 				// Clamp resizing of childs within parent
@@ -13448,7 +13448,7 @@ UpdateWindowManualResize :: proc(window : ^ImGuiWindow, size_auto_fit : ^ImVec2,
 				parent_flags : ImGuiWindowFlags = parent_window.Flags
 				border_limit_rect : ImRect = parent_window.InnerRect
 				Expand(&border_limit_rect, ImVec2(-ImMax(parent_window.WindowPadding.x, parent_window.WindowBorderSize), -ImMax(parent_window.WindowPadding.y, parent_window.WindowBorderSize)))
-				if (axis == ImGuiAxis.ImGuiAxis_X) && ((parent_flags & (ImGuiWindowFlags_.ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_.ImGuiWindowFlags_AlwaysHorizontalScrollbar)) == 0 || (parent_flags & ImGuiWindowFlags_.ImGuiWindowFlags_NoScrollbar) != {}) { border_target.x = ImClamp(border_target.x, border_limit_rect.Min.x, border_limit_rect.Max.x) }
+				if (axis == ImGuiAxis.ImGuiAxis_X) && ((parent_flags & (ImGuiWindowFlags_.ImGuiWindowFlags_HorizontalScrollbar | ImGuiWindowFlags_.ImGuiWindowFlags_AlwaysHorizontalScrollbar)) == {} || (parent_flags & ImGuiWindowFlags_.ImGuiWindowFlags_NoScrollbar) != {}) { border_target.x = ImClamp(border_target.x, border_limit_rect.Min.x, border_limit_rect.Max.x) }
 				if (axis == ImGuiAxis.ImGuiAxis_Y) && (parent_flags & ImGuiWindowFlags_.ImGuiWindowFlags_NoScrollbar) != {} { border_target.y = ImClamp(border_target.y, border_limit_rect.Min.y, border_limit_rect.Max.y) }
 			}
 			if !ignore_resize { CalcResizePosSizeFromAnyCorner(window, border_target, ImMin(def.SegmentN1, def.SegmentN2), &pos_target, &size_target) }
@@ -13465,7 +13465,7 @@ UpdateWindowManualResize :: proc(window : ^ImGuiWindow, size_auto_fit : ^ImVec2,
 	// Navigation resize (keyboard/gamepad)
 	// FIXME: This cannot be moved to NavUpdateWindowing() because CalcWindowSizeAfterConstraint() need to callback into user.
 	// Not even sure the callback works here.
-	if g.NavWindowingTarget != nil && g.NavWindowingTarget.RootWindowDockTree != nil == window {
+	if g.NavWindowingTarget != nil && g.NavWindowingTarget.RootWindowDockTree == window {
 		nav_resize_dir : ImVec2
 		if g.NavInputSource == ImGuiInputSource.ImGuiInputSource_Keyboard && g.IO.KeyShift { nav_resize_dir = GetKeyMagnitude2d(ImGuiKey.ImGuiKey_LeftArrow, ImGuiKey.ImGuiKey_RightArrow, ImGuiKey.ImGuiKey_UpArrow, ImGuiKey.ImGuiKey_DownArrow) }
 		if g.NavInputSource == ImGuiInputSource.ImGuiInputSource_Gamepad { nav_resize_dir = GetKeyMagnitude2d(ImGuiKey.ImGuiKey_GamepadDpadLeft, ImGuiKey.ImGuiKey_GamepadDpadRight, ImGuiKey.ImGuiKey_GamepadDpadUp, ImGuiKey.ImGuiKey_GamepadDpadDown) }
@@ -13528,7 +13528,7 @@ RenderWindowOuterBorders :: proc(window : ^ImGuiWindow)
 	g : ^ImGuiContext = GImGui
 	border_size : f32 = window.WindowBorderSize
 	border_col : ImU32 = GetColorU32(ImGuiCol_.ImGuiCol_Border)
-	if border_size > 0.0 && (window.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_NoBackground) != {} == 0 { AddRect(window.DrawList, window.Pos, window.Pos + window.Size, border_col, window.WindowRounding, 0, window.WindowBorderSize) }
+	if border_size > 0.0 && (window.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_NoBackground) == {} { AddRect(window.DrawList, window.Pos, window.Pos + window.Size, border_col, window.WindowRounding, 0, window.WindowBorderSize) }
 	else if border_size > 0.0 {
 		if (window.ChildFlags & ImGuiChildFlags_.ImGuiChildFlags_ResizeX) != {} {
 			// Similar code as 'resize_border_mask' computation in UpdateWindowManualResize() but we specifically only always draw explicit child resize border.RenderWindowOuterSingleBorder(window, 1, border_col, border_size)
@@ -13579,7 +13579,7 @@ RenderWindowDecorations :: proc(window : ^ImGuiWindow, title_bar_rect : ^ImRect,
 		// Window background
 		if (flags & ImGuiWindowFlags_.ImGuiWindowFlags_NoBackground) == {} {
 			is_docking_transparent_payload : bool = false
-			if g.DragDropActive && (g.FrameCount - g.DragDropAcceptFrameCount) <= 1 && g.IO.ConfigDockingTransparentPayload { if IsDataType(&g.DragDropPayload, IMGUI_PAYLOAD_TYPE_WINDOW) && cast(^^ImGuiWindow) g.DragDropPayload.Data^ != nil == window { is_docking_transparent_payload = true } }
+			if g.DragDropActive && (g.FrameCount - g.DragDropAcceptFrameCount) <= 1 && g.IO.ConfigDockingTransparentPayload { if IsDataType(&g.DragDropPayload, IMGUI_PAYLOAD_TYPE_WINDOW) && cast(^^ImGuiWindow) g.DragDropPayload.Data^ == window { is_docking_transparent_payload = true } }
 
 			bg_col : ImU32 = GetColorU32(GetWindowBgColorIdx(window))
 			if window.ViewportOwned {
@@ -13703,11 +13703,11 @@ RenderWindowTitleBarContents :: proc(window : ^ImGuiWindow, title_bar_rect : ^Im
 		close_button_pos = ImVec2(title_bar_rect.Max.x - pad_r - button_sz, title_bar_rect.Min.y + style.FramePadding.y)
 		pad_r += button_sz + style.ItemInnerSpacing.x
 	}
-	if has_collapse_button && style.WindowMenuButtonPosition != {} == ImGuiDir.ImGuiDir_Right {
+	if has_collapse_button && style.WindowMenuButtonPosition == ImGuiDir.ImGuiDir_Right {
 		collapse_button_pos = ImVec2(title_bar_rect.Max.x - pad_r - button_sz, title_bar_rect.Min.y + style.FramePadding.y)
 		pad_r += button_sz + style.ItemInnerSpacing.x
 	}
-	if has_collapse_button && style.WindowMenuButtonPosition != {} == ImGuiDir.ImGuiDir_Left {
+	if has_collapse_button && style.WindowMenuButtonPosition == ImGuiDir.ImGuiDir_Left {
 		collapse_button_pos = ImVec2(title_bar_rect.Min.x + pad_l, title_bar_rect.Min.y + style.FramePadding.y)
 		pad_l += button_sz + style.ItemInnerSpacing.x
 	}
@@ -13789,8 +13789,8 @@ UpdateWindowSkipRefresh :: proc(window : ^ImGuiWindow)
 		if window.Hidden {
 			// If was hidden (previous frame)return
 		}
-		if (g.NextWindowData.RefreshFlagsVal & ImGuiWindowRefreshFlags_.ImGuiWindowRefreshFlags_RefreshOnHover) != {} && g.HoveredWindow != nil { if window.RootWindow == g.HoveredWindow.RootWindow != nil || IsWindowWithinBeginStackOf(g.HoveredWindow.RootWindow, window) { return } }
-		if (g.NextWindowData.RefreshFlagsVal & ImGuiWindowRefreshFlags_.ImGuiWindowRefreshFlags_RefreshOnFocus) != {} && g.NavWindow != nil { if window.RootWindow == g.NavWindow.RootWindow != nil || IsWindowWithinBeginStackOf(g.NavWindow.RootWindow, window) { return } }
+		if (g.NextWindowData.RefreshFlagsVal & ImGuiWindowRefreshFlags_.ImGuiWindowRefreshFlags_RefreshOnHover) != {} && g.HoveredWindow != nil { if window.RootWindow == g.HoveredWindow.RootWindow || IsWindowWithinBeginStackOf(g.HoveredWindow.RootWindow, window) { return } }
+		if (g.NextWindowData.RefreshFlagsVal & ImGuiWindowRefreshFlags_.ImGuiWindowRefreshFlags_RefreshOnFocus) != {} && g.NavWindow != nil { if window.RootWindow == g.NavWindow.RootWindow || IsWindowWithinBeginStackOf(g.NavWindow.RootWindow, window) { return } }
 		window.DrawList = nil
 		window.SkipRefresh = true
 	}
@@ -13863,7 +13863,7 @@ Begin :: proc(name : ^u8, p_open : ^bool, flags : ImGuiWindowFlags) -> bool
 
 	// Docking
 	// (NB: during the frame dock nodes are created, it is possible that (window->DockIsActive == false) even though (window->DockNode->Windows.Size > 1)
-	IM_ASSERT(window.DockNode == nil || window.DockNodeAsHost != nil == nil); // Cannot be both
+	IM_ASSERT(window.DockNode == nil || window.DockNodeAsHost == nil); // Cannot be both
 	if (g.NextWindowData.Flags & ImGuiNextWindowDataFlags_.ImGuiNextWindowDataFlags_HasDock) != {} { SetWindowDock(window, g.NextWindowData.DockId, g.NextWindowData.DockCond) }
 	if first_begin_of_the_frame {
 		has_dock_node : bool = (window.DockId != 0 || window.DockNode != nil)
@@ -13959,10 +13959,10 @@ Begin :: proc(name : ^u8, p_open : ^bool, flags : ImGuiWindowFlags) -> bool
 	if (g.NextWindowData.Flags & ImGuiNextWindowDataFlags_.ImGuiNextWindowDataFlags_HasSize) != {} {
 		window_size_x_set_by_api = (window.SetWindowSizeAllowFlags & g.NextWindowData.SizeCond) != {} && (g.NextWindowData.SizeVal.x > 0.0)
 		window_size_y_set_by_api = (window.SetWindowSizeAllowFlags & g.NextWindowData.SizeCond) != {} && (g.NextWindowData.SizeVal.y > 0.0)
-		if (window.ChildFlags & ImGuiChildFlags_.ImGuiChildFlags_ResizeX) != {} && (window.SetWindowSizeAllowFlags & ImGuiCond_.ImGuiCond_FirstUseEver) != {} == 0 {
+		if (window.ChildFlags & ImGuiChildFlags_.ImGuiChildFlags_ResizeX) != {} && (window.SetWindowSizeAllowFlags & ImGuiCond_.ImGuiCond_FirstUseEver) == {} {
 			// Axis-specific conditions for BeginChild()g.NextWindowData.SizeVal.x = window.SizeFull.x
 		}
-		if (window.ChildFlags & ImGuiChildFlags_.ImGuiChildFlags_ResizeY) != {} && (window.SetWindowSizeAllowFlags & ImGuiCond_.ImGuiCond_FirstUseEver) != {} == 0 { g.NextWindowData.SizeVal.y = window.SizeFull.y }
+		if (window.ChildFlags & ImGuiChildFlags_.ImGuiChildFlags_ResizeY) != {} && (window.SetWindowSizeAllowFlags & ImGuiCond_.ImGuiCond_FirstUseEver) == {} { g.NextWindowData.SizeVal.y = window.SizeFull.y }
 		SetWindowSize(window, g.NextWindowData.SizeVal, g.NextWindowData.SizeCond)
 	}
 	if (g.NextWindowData.Flags & ImGuiNextWindowDataFlags_.ImGuiNextWindowDataFlags_HasScroll) != {} {
@@ -13986,7 +13986,7 @@ Begin :: proc(name : ^u8, p_open : ^bool, flags : ImGuiWindowFlags) -> bool
 	UpdateWindowSkipRefresh(window)
 
 	// Nested root windows (typically tooltips) override disabled state
-	if window_stack_data.DisabledOverrideReenable && window.RootWindow != nil == window { BeginDisabledOverrideReenable() }
+	if window_stack_data.DisabledOverrideReenable && window.RootWindow == window { BeginDisabledOverrideReenable() }
 
 	// We intentionally set g.CurrentWindow to NULL to prevent usage until when the viewport is set, then will call SetCurrentWindow()
 	g.CurrentWindow = nil
@@ -14013,8 +14013,8 @@ Begin :: proc(name : ^u8, p_open : ^bool, flags : ImGuiWindowFlags) -> bool
 		// Update stored window name when it changes (which can _only_ happen with the "###" operator, so the ID would stay unchanged).
 		// The title bar always display the 'name' parameter, so we only update the string storage if it needs to be visible to the end-user elsewhere.
 		window_title_visible_elsewhere : bool = false
-		if (window.Viewport != nil && window.Viewport.Window != nil == window) || (window.DockIsActive) { window_title_visible_elsewhere = true }
-		else if g.NavWindowingListWindow != nil && (window.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_NoNavFocus) != {} == 0 {
+		if (window.Viewport != nil && window.Viewport.Window == window) || (window.DockIsActive) { window_title_visible_elsewhere = true }
+		else if g.NavWindowingListWindow != nil && (window.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_NoNavFocus) == {} {
 			// Window titles visible when using CTRL+TABwindow_title_visible_elsewhere = true
 		}
 		if window_title_visible_elsewhere && !window_just_created && strcmp(name, window.Name) != 0 {
@@ -14064,7 +14064,7 @@ Begin :: proc(name : ^u8, p_open : ^bool, flags : ImGuiWindowFlags) -> bool
 		if !window.DockIsActive && (flags & ImGuiWindowFlags_.ImGuiWindowFlags_ChildWindow) != {} { window.WindowBorderSize = style.ChildBorderSize }
 		else { window.WindowBorderSize = ((flags & (ImGuiWindowFlags_.ImGuiWindowFlags_Popup | ImGuiWindowFlags_.ImGuiWindowFlags_Tooltip)) != {} && (flags & ImGuiWindowFlags_.ImGuiWindowFlags_Modal) == {}) ? style.PopupBorderSize : style.WindowBorderSize }
 		window.WindowPadding = style.WindowPadding
-		if !window.DockIsActive && (flags & ImGuiWindowFlags_.ImGuiWindowFlags_ChildWindow) != {} && (flags & ImGuiWindowFlags_.ImGuiWindowFlags_Popup) == {} && (window.ChildFlags & ImGuiChildFlags_.ImGuiChildFlags_AlwaysUseWindowPadding) == {} && window.WindowBorderSize != 0 == 0.0 { window.WindowPadding = ImVec2(0.0, (flags & ImGuiWindowFlags_.ImGuiWindowFlags_MenuBar) != {} ? style.WindowPadding.y : 0.0) }
+		if !window.DockIsActive && (flags & ImGuiWindowFlags_.ImGuiWindowFlags_ChildWindow) != {} && (flags & ImGuiWindowFlags_.ImGuiWindowFlags_Popup) == {} && (window.ChildFlags & ImGuiChildFlags_.ImGuiChildFlags_AlwaysUseWindowPadding) == {} && window.WindowBorderSize == 0.0 { window.WindowPadding = ImVec2(0.0, (flags & ImGuiWindowFlags_.ImGuiWindowFlags_MenuBar) != {} ? style.WindowPadding.y : 0.0) }
 
 		// Lock menu offset so size calculation can use it as menu-bar windows need a minimum size.
 		window.DC.MenuBarOffset.x = ImMax(ImMax(window.WindowPadding.x, style.ItemSpacing.x), g.NextWindowData.MenuBarOffsetMinVal.x)
@@ -14087,7 +14087,7 @@ Begin :: proc(name : ^u8, p_open : ^bool, flags : ImGuiWindowFlags) -> bool
 			// We don't use a regular button+id to test for double-click on title bar (mostly due to legacy reason, could be fixed),
 			// so verify that we don't have items over the title bar.
 			title_bar_rect : ImRect = TitleBarRect(window)
-			if g.HoveredWindow == window != nil && g.HoveredId != 0 == 0 && g.HoveredIdPreviousFrame != 0 == 0 && g.ActiveId != 0 == 0 && IsMouseHoveringRect(title_bar_rect.Min, title_bar_rect.Max) { if g.IO.MouseClickedCount[0] == 2 && GetKeyOwner(ImGuiKey.ImGuiKey_MouseLeft) != 0 == ImGuiKeyOwner_NoOwner { window.WantCollapseToggle = true } }
+			if g.HoveredWindow == window && g.HoveredId == 0 && g.HoveredIdPreviousFrame == 0 && g.ActiveId == 0 && IsMouseHoveringRect(title_bar_rect.Min, title_bar_rect.Max) { if g.IO.MouseClickedCount[0] == 2 && GetKeyOwner(ImGuiKey.ImGuiKey_MouseLeft) == ImGuiKeyOwner_NoOwner { window.WantCollapseToggle = true } }
 			if window.WantCollapseToggle {
 				window.Collapsed = !window.Collapsed
 				if !window.Collapsed { use_current_size_for_scrollbar_y = true }
@@ -14159,7 +14159,7 @@ Begin :: proc(name : ^u8, p_open : ^bool, flags : ImGuiWindowFlags) -> bool
 			if (flags & ImGuiWindowFlags_.ImGuiWindowFlags_Popup) == {} && !window_pos_set_by_api && !window_is_child_tooltip { window.Pos = parent_window.DC.CursorPos }
 		}
 
-		window_pos_with_pivot : bool = (window.SetWindowPosVal.x != FLT_MAX && window.HiddenFramesCannotSkipItems != 0 == 0)
+		window_pos_with_pivot : bool = (window.SetWindowPosVal.x != FLT_MAX && window.HiddenFramesCannotSkipItems == 0)
 		if window_pos_with_pivot {
 			// Position given a pivot (e.g. for centering)
 			SetWindowPos(window, window.SetWindowPosVal - window.Size * window.SetWindowPosPivot, 0)
@@ -14198,7 +14198,7 @@ Begin :: proc(name : ^u8, p_open : ^bool, flags : ImGuiWindowFlags) -> bool
 				ClampWindowPos(window, visibility_rect)
 			}
 			else if window.ViewportOwned && g.PlatformIO.Monitors.Size > 0 {
-				if g.MovingWindow != nil && window.RootWindowDockTree != nil == g.MovingWindow.RootWindowDockTree {
+				if g.MovingWindow != nil && window.RootWindowDockTree == g.MovingWindow.RootWindowDockTree {
 					// While moving windows we allow them to straddle monitors (#7299, #3071)
 					visibility_rect = g.PlatformMonitorsFullWorkRect
 				}
@@ -14227,7 +14227,7 @@ Begin :: proc(name : ^u8, p_open : ^bool, flags : ImGuiWindowFlags) -> bool
 		want_focus : bool = false
 		if window_just_activated_by_user && (flags & ImGuiWindowFlags_.ImGuiWindowFlags_NoFocusOnAppearing) == {} {
 			if (flags & ImGuiWindowFlags_.ImGuiWindowFlags_Popup) != {} { want_focus = true }
-			else if (window.DockIsActive || (flags & ImGuiWindowFlags_.ImGuiWindowFlags_ChildWindow) != {} == 0) && (flags & ImGuiWindowFlags_.ImGuiWindowFlags_Tooltip) == {} { want_focus = true }
+			else if (window.DockIsActive || (flags & ImGuiWindowFlags_.ImGuiWindowFlags_ChildWindow) == {}) && (flags & ImGuiWindowFlags_.ImGuiWindowFlags_Tooltip) == {} { want_focus = true }
 		}
 
 		// [Test Engine] Register whole window in the item system (before submitting further decorations)
@@ -14360,7 +14360,7 @@ Begin :: proc(name : ^u8, p_open : ^bool, flags : ImGuiWindowFlags) -> bool
 		// DRAWING
 
 		// Setup draw list and outer clipping rectangle
-		IM_ASSERT(window.DrawList.CmdBuffer.Size == 1 && window.DrawList.CmdBuffer[0].ElemCount != 0 == 0)
+		IM_ASSERT(window.DrawList.CmdBuffer.Size == 1 && window.DrawList.CmdBuffer[0].ElemCount == 0)
 		PushTextureID(window.DrawList, g.Font.ContainerAtlas.TexID)
 		PushClipRect(host_rect.Min, host_rect.Max, false)
 
@@ -14382,7 +14382,7 @@ Begin :: proc(name : ^u8, p_open : ^bool, flags : ImGuiWindowFlags) -> bool
 
 			// Handle title bar, scrollbar, resize grips and resize borders
 			window_to_highlight : ^ImGuiWindow = g.NavWindowingTarget != nil ? g.NavWindowingTarget : g.NavWindow
-			title_bar_is_highlight : bool = want_focus || (window_to_highlight != nil && (window.RootWindowForTitleBarHighlight == window_to_highlight.RootWindowForTitleBarHighlight != nil || (window.DockNode != nil && window.DockNode != nil == window_to_highlight.DockNode)))
+			title_bar_is_highlight : bool = want_focus || (window_to_highlight != nil && (window.RootWindowForTitleBarHighlight == window_to_highlight.RootWindowForTitleBarHighlight || (window.DockNode != nil && window.DockNode == window_to_highlight.DockNode)))
 			RenderWindowDecorations(window, title_bar_rect, title_bar_is_highlight, handle_borders_and_resize_grips, resize_grip_count, resize_grip_col, resize_grip_draw_size)
 
 			if render_decorations_in_parent { window.DrawList = &window.DrawListInst }
@@ -14469,7 +14469,7 @@ Begin :: proc(name : ^u8, p_open : ^bool, flags : ImGuiWindowFlags) -> bool
 		// - Avoid focusing a window that is created outside of a modal. This will prevent active modal from being closed.
 		// - Position window behind the modal that is not a begin-parent of this window.
 		if want_focus { FocusWindow(window, ImGuiFocusRequestFlags_.ImGuiFocusRequestFlags_UnlessBelowModal) }
-		if want_focus && window != nil == g.NavWindow {
+		if want_focus && window == g.NavWindow {
 			// <-- this is in the way for us to be able to defer and sort reappearing FocusWindow() calls
 			NavInitWindow(window, false)
 		}
@@ -14484,7 +14484,7 @@ Begin :: proc(name : ^u8, p_open : ^bool, flags : ImGuiWindowFlags) -> bool
 		// Pressing CTRL+C copy window content into the clipboard
 		// [EXPERIMENTAL] Breaks on nested Begin/End pairs. We need to work that out and add better logging scope.
 		// [EXPERIMENTAL] Text outputs has many issues.
-		if g.IO.ConfigWindowsCopyContentsWithCtrlC { if g.NavWindow != nil && g.NavWindow.RootWindow != nil == window != nil && g.ActiveId != 0 == 0 && Shortcut(ImGuiKey.ImGuiMod_Ctrl | ImGuiKey.ImGuiKey_C) { LogToClipboard(0) } }
+		if g.IO.ConfigWindowsCopyContentsWithCtrlC { if g.NavWindow != nil && g.NavWindow.RootWindow == window && g.ActiveId == 0 && Shortcut(ImGuiKey.ImGuiMod_Ctrl | ImGuiKey.ImGuiKey_C) { LogToClipboard(0) } }
 
 		// Title bar
 		if (flags & ImGuiWindowFlags_.ImGuiWindowFlags_NoTitleBar) == {} && !window.DockIsActive { RenderWindowTitleBarContents(window, ImRect(title_bar_rect.Min.x + window.WindowBorderSize, title_bar_rect.Min.y, title_bar_rect.Max.x - window.WindowBorderSize, title_bar_rect.Max.y), name, p_open) }
@@ -14498,7 +14498,7 @@ Begin :: proc(name : ^u8, p_open : ^bool, flags : ImGuiWindowFlags) -> bool
 		if (g.IO.ConfigFlags & ImGuiConfigFlags_.ImGuiConfigFlags_DockingEnable) != {} {
 			// Docking: Dragging a dockable window (or any of its child) turns it into a drag and drop source.
 			// We need to do this _before_ we overwrite window->DC.LastItemId below because BeginDockableDragDropSource() also overwrites it.
-			if g.MovingWindow == window != nil && (window.RootWindowDockTree.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_NoDocking) != {} == 0 { BeginDockableDragDropSource(window) }
+			if g.MovingWindow == window && (window.RootWindowDockTree.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_NoDocking) == {} { BeginDockableDragDropSource(window) }
 
 			// Docking: Any dockable window can act as a target. For dock node hosts we call BeginDockableDragDropTarget() in DockNodeUpdate() instead.
 			if g.DragDropActive && (flags & ImGuiWindowFlags_.ImGuiWindowFlags_NoDocking) == {} { if g.MovingWindow == nil || g.MovingWindow.RootWindowDockTree != window { if (window == window.RootWindowDockTree) && (window.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_DockNodeHost) == {} { BeginDockableDragDropTarget(window) } } }
@@ -14510,7 +14510,7 @@ Begin :: proc(name : ^u8, p_open : ^bool, flags : ImGuiWindowFlags) -> bool
 
 		// [DEBUG]
 		when ! IMGUI_DISABLE_DEBUG_TOOLS { /* @gen ifndef */
-		if g.DebugLocateId != 0 && (window.ID == g.DebugLocateId != 0 || window.MoveId != 0 == g.DebugLocateId) { DebugLocateItemResolveWithLastItem() }
+		if g.DebugLocateId != 0 && (window.ID == g.DebugLocateId || window.MoveId == g.DebugLocateId) { DebugLocateItemResolveWithLastItem() }
 		} // preproc endif
 
 		// [Test Engine] Register title bar / tab with MoveId.
@@ -14554,7 +14554,7 @@ Begin :: proc(name : ^u8, p_open : ^bool, flags : ImGuiWindowFlags) -> bool
 			// Child window can be out of sight and have "negative" clip windows.
 			// Mark them as collapsed so commands are skipped earlier (we can't manually collapse them because they have no title bar).
 			IM_ASSERT((flags & ImGuiWindowFlags_.ImGuiWindowFlags_NoTitleBar) != {} || window.DockIsActive)
-			nav_request : bool = (window.ChildFlags & ImGuiChildFlags_.ImGuiChildFlags_NavFlattened) != {} && (g.NavAnyRequest && g.NavWindow != nil && g.NavWindow.RootWindowForNav != nil == window.RootWindowForNav)
+			nav_request : bool = (window.ChildFlags & ImGuiChildFlags_.ImGuiChildFlags_NavFlattened) != {} && (g.NavAnyRequest && g.NavWindow != nil && g.NavWindow.RootWindowForNav == window.RootWindowForNav)
 			if !g.LogEnabled && !nav_request { if window.OuterRectClipped.Min.x >= window.OuterRectClipped.Max.x || window.OuterRectClipped.Min.y >= window.OuterRectClipped.Max.y {
 	if window.AutoFitFramesX > 0 || window.AutoFitFramesY > 0 { window.HiddenFramesCannotSkipItems = 1 }
 	else { window.HiddenFramesCanSkipItems = 1 }
@@ -14602,7 +14602,7 @@ Begin :: proc(name : ^u8, p_open : ^bool, flags : ImGuiWindowFlags) -> bool
 	// [DEBUG] io.ConfigDebugBeginReturnValue override return value to test Begin/End and BeginChild/EndChild behaviors.
 	// (The implicit fallback window is NOT automatically ended allowing it to always be able to receive commands without crashing)
 	when ! IMGUI_DISABLE_DEBUG_TOOLS { /* @gen ifndef */
-	if !window.IsFallbackWindow { if (g.IO.ConfigDebugBeginReturnValueOnce && window_just_created) || (g.IO.ConfigDebugBeginReturnValueLoop && g.DebugBeginReturnValueCullDepth != 0 == g.CurrentWindowStack.Size) {
+	if !window.IsFallbackWindow { if (g.IO.ConfigDebugBeginReturnValueOnce && window_just_created) || (g.IO.ConfigDebugBeginReturnValueLoop && g.DebugBeginReturnValueCullDepth == g.CurrentWindowStack.Size) {
 	if window.AutoFitFramesX > 0 { post_incr(&window.AutoFitFramesX) }
 	if window.AutoFitFramesY > 0 { post_incr(&window.AutoFitFramesY) }
 	return false
@@ -14640,7 +14640,7 @@ End :: proc()
 		// Pop inner window clip rectanglePopClipRect()
 	}
 	PopFocusScope()
-	if window_stack_data.DisabledOverrideReenable && window.RootWindow != nil == window { EndDisabledOverrideReenable() }
+	if window_stack_data.DisabledOverrideReenable && window.RootWindow == window { EndDisabledOverrideReenable() }
 
 	if window.SkipRefresh {
 		IM_ASSERT(window.DrawList == nil)
@@ -14774,7 +14774,7 @@ EndDisabled :: proc()
 	//PopItemFlag();
 	pop_back(&g.ItemFlagsStack)
 	g.CurrentItemFlags = back(&g.ItemFlagsStack)
-	if was_disabled && (g.CurrentItemFlags & ImGuiItemFlagsPrivate_.ImGuiItemFlags_Disabled) != {} == 0 {
+	if was_disabled && (g.CurrentItemFlags & ImGuiItemFlagsPrivate_.ImGuiItemFlags_Disabled) == {} {
 		//PopStyleVar();
 		g.Style.Alpha = g.DisabledAlphaBackup
 	}
@@ -14952,9 +14952,9 @@ GetWindowPos :: proc() -> ImVec2
 SetWindowPos_2 :: proc(window : ^ImGuiWindow, pos : ^ImVec2, cond : ImGuiCond)
 {
 	// Test condition (NB: bit 0 is always true) and clear flags for next time
-	if cond != {} && (window.SetWindowPosAllowFlags & cond) != {} == 0 { return }
+	if cond != {} && (window.SetWindowPosAllowFlags & cond) == {} { return }
 
-	IM_ASSERT(cond == 0 || ImIsPowerOfTwo(cond)); // Make sure the user doesn't attempt to combine multiple condition flags.
+	IM_ASSERT(cond == {} || ImIsPowerOfTwo(cond)); // Make sure the user doesn't attempt to combine multiple condition flags.
 	window.SetWindowPosAllowFlags &= ~(ImGuiCond_.ImGuiCond_Once | ImGuiCond_.ImGuiCond_FirstUseEver | ImGuiCond_.ImGuiCond_Appearing)
 	window.SetWindowPosVal = ImVec2(FLT_MAX, FLT_MAX)
 
@@ -14962,7 +14962,7 @@ SetWindowPos_2 :: proc(window : ^ImGuiWindow, pos : ^ImVec2, cond : ImGuiCond)
 	old_pos : ImVec2 = window.Pos
 	window.Pos = ImTrunc(pos)
 	offset : ImVec2 = window.Pos - old_pos
-	if offset.x == 0.0 && offset.y != 0 == 0.0 { return }
+	if offset.x == 0.0 && offset.y == 0.0 { return }
 	MarkIniSettingsDirty(window)
 	// FIXME: share code with TranslateWindow(), need to confirm whether the 3 rect modified by TranslateWindow() are desirable here.
 	window.DC.CursorPos += offset; // As we happen to move the window while it is being appended to (which is a bad idea - will smear) let's at least offset the cursor
@@ -14991,14 +14991,14 @@ GetWindowSize :: proc() -> ImVec2
 SetWindowSize_2 :: proc(window : ^ImGuiWindow, size : ^ImVec2, cond : ImGuiCond)
 {
 	// Test condition (NB: bit 0 is always true) and clear flags for next time
-	if cond != {} && (window.SetWindowSizeAllowFlags & cond) != {} == 0 { return }
+	if cond != {} && (window.SetWindowSizeAllowFlags & cond) == {} { return }
 
-	IM_ASSERT(cond == 0 || ImIsPowerOfTwo(cond)); // Make sure the user doesn't attempt to combine multiple condition flags.
+	IM_ASSERT(cond == {} || ImIsPowerOfTwo(cond)); // Make sure the user doesn't attempt to combine multiple condition flags.
 	window.SetWindowSizeAllowFlags &= ~(ImGuiCond_.ImGuiCond_Once | ImGuiCond_.ImGuiCond_FirstUseEver | ImGuiCond_.ImGuiCond_Appearing)
 
 	// Enable auto-fit (not done in BeginChild() path unless appearing or combined with ImGuiChildFlags_AlwaysAutoResize)
-	if (window.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_ChildWindow) == 0 || window.Appearing || (window.ChildFlags & ImGuiChildFlags_.ImGuiChildFlags_AlwaysAutoResize) != {} { window.AutoFitFramesX = (size.x <= 0.0) ? 2 : 0 }
-	if (window.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_ChildWindow) == 0 || window.Appearing || (window.ChildFlags & ImGuiChildFlags_.ImGuiChildFlags_AlwaysAutoResize) != {} { window.AutoFitFramesY = (size.y <= 0.0) ? 2 : 0 }
+	if (window.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_ChildWindow) == {} || window.Appearing || (window.ChildFlags & ImGuiChildFlags_.ImGuiChildFlags_AlwaysAutoResize) != {} { window.AutoFitFramesX = (size.x <= 0.0) ? 2 : 0 }
+	if (window.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_ChildWindow) == {} || window.Appearing || (window.ChildFlags & ImGuiChildFlags_.ImGuiChildFlags_AlwaysAutoResize) != {} { window.AutoFitFramesY = (size.y <= 0.0) ? 2 : 0 }
 
 	// Set
 	old_size : ImVec2 = window.SizeFull
@@ -15022,7 +15022,7 @@ SetWindowSize_1 :: proc(name : ^u8, size : ^ImVec2, cond : ImGuiCond)
 SetWindowCollapsed_2 :: proc(window : ^ImGuiWindow, collapsed : bool, cond : ImGuiCond)
 {
 	// Test condition (NB: bit 0 is always true) and clear flags for next time
-	if cond != {} && (window.SetWindowCollapsedAllowFlags & cond) != {} == 0 { return }
+	if cond != {} && (window.SetWindowCollapsedAllowFlags & cond) == {} { return }
 	window.SetWindowCollapsedAllowFlags &= ~(ImGuiCond_.ImGuiCond_Once | ImGuiCond_.ImGuiCond_FirstUseEver | ImGuiCond_.ImGuiCond_Appearing)
 
 	// Set
@@ -15067,7 +15067,7 @@ SetWindowCollapsed_1 :: proc(name : ^u8, collapsed : bool, cond : ImGuiCond)
 SetNextWindowPos :: proc(pos : ^ImVec2, cond : ImGuiCond, pivot : ^ImVec2)
 {
 	g : ^ImGuiContext = GImGui
-	IM_ASSERT(cond == 0 || ImIsPowerOfTwo(cond)); // Make sure the user doesn't attempt to combine multiple condition flags.
+	IM_ASSERT(cond == {} || ImIsPowerOfTwo(cond)); // Make sure the user doesn't attempt to combine multiple condition flags.
 	g.NextWindowData.Flags |= ImGuiNextWindowDataFlags_.ImGuiNextWindowDataFlags_HasPos
 	g.NextWindowData.PosVal = pos
 	g.NextWindowData.PosPivotVal = pivot
@@ -15078,7 +15078,7 @@ SetNextWindowPos :: proc(pos : ^ImVec2, cond : ImGuiCond, pivot : ^ImVec2)
 SetNextWindowSize :: proc(size : ^ImVec2, cond : ImGuiCond)
 {
 	g : ^ImGuiContext = GImGui
-	IM_ASSERT(cond == 0 || ImIsPowerOfTwo(cond)); // Make sure the user doesn't attempt to combine multiple condition flags.
+	IM_ASSERT(cond == {} || ImIsPowerOfTwo(cond)); // Make sure the user doesn't attempt to combine multiple condition flags.
 	g.NextWindowData.Flags |= ImGuiNextWindowDataFlags_.ImGuiNextWindowDataFlags_HasSize
 	g.NextWindowData.SizeVal = size
 	g.NextWindowData.SizeCond = cond != {} ? cond : ImGuiCond_.ImGuiCond_Always
@@ -15116,7 +15116,7 @@ SetNextWindowScroll :: proc(scroll : ^ImVec2)
 SetNextWindowCollapsed :: proc(collapsed : bool, cond : ImGuiCond)
 {
 	g : ^ImGuiContext = GImGui
-	IM_ASSERT(cond == 0 || ImIsPowerOfTwo(cond)); // Make sure the user doesn't attempt to combine multiple condition flags.
+	IM_ASSERT(cond == {} || ImIsPowerOfTwo(cond)); // Make sure the user doesn't attempt to combine multiple condition flags.
 	g.NextWindowData.Flags |= ImGuiNextWindowDataFlags_.ImGuiNextWindowDataFlags_HasCollapsed
 	g.NextWindowData.CollapsedVal = collapsed
 	g.NextWindowData.CollapsedCond = cond != {} ? cond : ImGuiCond_.ImGuiCond_Always
@@ -15175,7 +15175,7 @@ GetWindowDpiScale :: proc() -> f32
 GetWindowViewport :: proc() -> ^ImGuiViewport
 {
 	g : ^ImGuiContext = GImGui
-	IM_ASSERT(g.CurrentViewport != nil && g.CurrentViewport != nil == g.CurrentWindow.Viewport)
+	IM_ASSERT(g.CurrentViewport != nil && g.CurrentViewport == g.CurrentWindow.Viewport)
 	return g.CurrentViewport
 }
 
@@ -15236,7 +15236,7 @@ SetNavFocusScope :: proc(focus_scope_id : ImGuiID)
 	// Store current path (in reverse order)
 	if focus_scope_id == g.CurrentFocusScopeId {
 		// Top of focus stack contains local focus scopes inside current window
-		for n : i32 = g.FocusScopeStack.Size - 1; n >= 0 && g.FocusScopeStack.Data[n].WindowID != 0 == g.CurrentWindow.ID; post_decr(&n) { push_back(&g.NavFocusRoute, g.FocusScopeStack.Data[n]) }
+		for n : i32 = g.FocusScopeStack.Size - 1; n >= 0 && g.FocusScopeStack.Data[n].WindowID == g.CurrentWindow.ID; post_decr(&n) { push_back(&g.NavFocusRoute, g.FocusScopeStack.Data[n]) }
 	}
 	else if focus_scope_id == g.NavWindow.NavRootFocusScopeId { push_back(&g.NavFocusRoute, {focus_scope_id, g.NavWindow.ID}) }
 	else { return }
@@ -15310,7 +15310,7 @@ SetItemDefaultFocus :: proc()
 	g : ^ImGuiContext = GImGui
 	window : ^ImGuiWindow = g.CurrentWindow
 	if !window.Appearing { return }
-	if g.NavWindow != window.RootWindowForNav || (!g.NavInitRequest && g.NavInitResult.ID != 0 == 0) || g.NavLayer != window.DC.NavLayerCurrent { return }
+	if g.NavWindow != window.RootWindowForNav || (!g.NavInitRequest && g.NavInitResult.ID == 0) || g.NavLayer != window.DC.NavLayerCurrent { return }
 
 	g.NavInitRequest = false
 	NavApplyItemToResult(&g.NavInitResult)
@@ -15572,10 +15572,10 @@ GetID_3 :: proc(int_id : i32) -> ImGuiID
 
 GetModForLRModKey :: proc(key : ImGuiKey) -> ImGuiKeyChord
 {
-	if key == ImGuiKey.ImGuiKey_LeftCtrl != 0 || key != {} == ImGuiKey.ImGuiKey_RightCtrl { return ImGuiKey.ImGuiMod_Ctrl }
-	if key == ImGuiKey.ImGuiKey_LeftShift != 0 || key != {} == ImGuiKey.ImGuiKey_RightShift { return ImGuiKey.ImGuiMod_Shift }
-	if key == ImGuiKey.ImGuiKey_LeftAlt != 0 || key != {} == ImGuiKey.ImGuiKey_RightAlt { return ImGuiKey.ImGuiMod_Alt }
-	if key == ImGuiKey.ImGuiKey_LeftSuper != 0 || key != {} == ImGuiKey.ImGuiKey_RightSuper { return ImGuiKey.ImGuiMod_Super }
+	if key == ImGuiKey.ImGuiKey_LeftCtrl || key == ImGuiKey.ImGuiKey_RightCtrl { return ImGuiKey.ImGuiMod_Ctrl }
+	if key == ImGuiKey.ImGuiKey_LeftShift || key == ImGuiKey.ImGuiKey_RightShift { return ImGuiKey.ImGuiMod_Shift }
+	if key == ImGuiKey.ImGuiKey_LeftAlt || key == ImGuiKey.ImGuiKey_RightAlt { return ImGuiKey.ImGuiMod_Alt }
+	if key == ImGuiKey.ImGuiKey_LeftSuper || key == ImGuiKey.ImGuiKey_RightSuper { return ImGuiKey.ImGuiMod_Super }
 	return ImGuiKey.ImGuiMod_None
 }
 
@@ -15645,9 +15645,9 @@ GetKeyChordName :: proc(key_chord : ImGuiKeyChord) -> ^u8
 		// Return "Ctrl+LeftShift" instead of "Ctrl+Shift+LeftShift"
 		key_chord &= ~GetModForLRModKey(key)
 	}
-	ImFormatString(g.TempKeychordName, IM_ARRAYSIZE(g.TempKeychordName), "%s%s%s%s%s", (key_chord & ImGuiKey.ImGuiMod_Ctrl) != {} ? "Ctrl+" : "", (key_chord & ImGuiKey.ImGuiMod_Shift) != {} ? "Shift+" : "", (key_chord & ImGuiKey.ImGuiMod_Alt) != {} ? "Alt+" : "", (key_chord & ImGuiKey.ImGuiMod_Super) != {} ? "Super+" : "", (key != ImGuiKey.ImGuiKey_None || key_chord != {} == ImGuiKey.ImGuiKey_None) ? GetKeyName(key) : "")
+	ImFormatString(g.TempKeychordName, IM_ARRAYSIZE(g.TempKeychordName), "%s%s%s%s%s", (key_chord & ImGuiKey.ImGuiMod_Ctrl) != {} ? "Ctrl+" : "", (key_chord & ImGuiKey.ImGuiMod_Shift) != {} ? "Shift+" : "", (key_chord & ImGuiKey.ImGuiMod_Alt) != {} ? "Alt+" : "", (key_chord & ImGuiKey.ImGuiMod_Super) != {} ? "Super+" : "", (key != ImGuiKey.ImGuiKey_None || key_chord == ImGuiKey.ImGuiKey_None) ? GetKeyName(key) : "")
 	len : uint
-	if key == ImGuiKey.ImGuiKey_None != 0 && key_chord != {} { if (len = strlen(g.TempKeychordName)) != {} {
+	if key == ImGuiKey.ImGuiKey_None && key_chord != {} { if (len = strlen(g.TempKeychordName)) != {} {
 	// Remove trailing '+'g.TempKeychordName[len - 1] = 0
 } }
 	return g.TempKeychordName
@@ -15793,7 +15793,7 @@ CalcRoutingScore :: proc(focus_scope_id : ImGuiID, owner_id : ImGuiID, flags : I
 	if (flags & ImGuiInputFlags_.ImGuiInputFlags_RouteFocused) != {} {
 		// ActiveID gets top priority
 		// (we don't check g.ActiveIdUsingAllKeys here. Routing is applied but if input ownership is tested later it may discard it)
-		if owner_id != 0 && g.ActiveId != 0 == owner_id { return 1 }
+		if owner_id != 0 && g.ActiveId == owner_id { return 1 }
 
 		// Score based on distance to focused window (lower is better)
 		// Assuming both windows are submitting a routing request,
@@ -15808,7 +15808,7 @@ CalcRoutingScore :: proc(focus_scope_id : ImGuiID, owner_id : ImGuiID, flags : I
 		return 255
 	}
 	else if (flags & ImGuiInputFlags_.ImGuiInputFlags_RouteActive) != {} {
-		if owner_id != 0 && g.ActiveId != 0 == owner_id { return 1 }
+		if owner_id != 0 && g.ActiveId == owner_id { return 1 }
 		return 255
 	}
 	else if (flags & ImGuiInputFlags_.ImGuiInputFlags_RouteGlobal) != {} {
@@ -15887,7 +15887,7 @@ SetShortcutRouting :: proc(key_chord : ImGuiKeyChord, flags : ImGuiInputFlags, o
 		}
 
 		// ActiveIdUsingAllKeyboardKeys trumps all for ActiveId
-		if (flags & ImGuiInputFlags_.ImGuiInputFlags_RouteOverActive) == 0 && g.ActiveIdUsingAllKeyboardKeys {
+		if (flags & ImGuiInputFlags_.ImGuiInputFlags_RouteOverActive) == {} && g.ActiveIdUsingAllKeyboardKeys {
 			key : ImGuiKey = cast(ImGuiKey) (key_chord & ~ImGuiKey.ImGuiMod_Mask_)
 			if key == ImGuiKey.ImGuiKey_None { key = ConvertSingleModFlagToKey(cast(ImGuiKey) (key_chord & ImGuiKey.ImGuiMod_Mask_)) }
 			if key >= ImGuiKey_Keyboard_BEGIN && key < ImGuiKey_Keyboard_END { return false }
@@ -16232,7 +16232,7 @@ UpdateKeyboardInputs :: proc()
 	io.KeyAlt = (io.KeyMods & ImGuiKey.ImGuiMod_Alt) != {}
 	io.KeySuper = (io.KeyMods & ImGuiKey.ImGuiMod_Super) != {}
 	if prev_key_mods != io.KeyMods { g.LastKeyModsChangeTime = g.Time }
-	if prev_key_mods != io.KeyMods && prev_key_mods != {} == 0 { g.LastKeyModsChangeFromNoneTime = g.Time }
+	if prev_key_mods != io.KeyMods && prev_key_mods == {} { g.LastKeyModsChangeFromNoneTime = g.Time }
 
 	// Clear gamepad data if disabled
 	if (io.BackendFlags & ImGuiBackendFlags_.ImGuiBackendFlags_HasGamepad) == {} { for key : i32 = ImGuiKey_Gamepad_BEGIN; key < ImGuiKey_Gamepad_END; post_incr(&key) {
@@ -16247,7 +16247,7 @@ UpdateKeyboardInputs :: proc()
 		key_data.DownDuration = key_data.Down ? (key_data.DownDuration < 0.0 ? 0.0 : key_data.DownDuration + io.DeltaTime) : -1.0
 		if key_data.DownDuration == 0.0 {
 			if IsKeyboardKey(cast(ImGuiKey) key) { g.LastKeyboardKeyPressTime = g.Time }
-			else if key == ImGuiKey.ImGuiKey_ReservedForModCtrl != 0 || key != 0 == ImGuiKey.ImGuiKey_ReservedForModShift != 0 || key != 0 == ImGuiKey.ImGuiKey_ReservedForModAlt != 0 || key != 0 == ImGuiKey.ImGuiKey_ReservedForModSuper { g.LastKeyboardKeyPressTime = g.Time }
+			else if key == ImGuiKey.ImGuiKey_ReservedForModCtrl || key == ImGuiKey.ImGuiKey_ReservedForModShift || key == ImGuiKey.ImGuiKey_ReservedForModAlt || key == ImGuiKey.ImGuiKey_ReservedForModSuper { g.LastKeyboardKeyPressTime = g.Time }
 		}
 	}
 
@@ -16366,16 +16366,16 @@ FindBestWheelingWindow :: proc(wheel : ^ImVec2) -> ^ImGuiWindow
 	}
 } } }
 
-	if windows[0] == nil && windows[1] != nil == nil { return nil }
+	if windows[0] == nil && windows[1] == nil { return nil }
 
 	// If there's only one window or only one axis then there's no ambiguity
-	if windows[0] == windows[1] != nil || windows[0] != nil == nil || windows[1] != nil == nil { return windows[1] != nil ? windows[1] : windows[0] }
+	if windows[0] == windows[1] || windows[0] == nil || windows[1] == nil { return windows[1] != nil ? windows[1] : windows[0] }
 
 	// If candidate are different windows we need to decide which one to prioritize
 	// - First frame: only find a winner if one axis is zero.
 	// - Subsequent frames: only find a winner when one is more than the other.
 	if g.WheelingWindowStartFrame == -1 { g.WheelingWindowStartFrame = g.FrameCount }
-	if (g.WheelingWindowStartFrame == g.FrameCount != 0 && wheel.x != 0.0 && wheel.y != 0.0) || (g.WheelingAxisAvg.x == g.WheelingAxisAvg.y) {
+	if (g.WheelingWindowStartFrame == g.FrameCount && wheel.x != 0.0 && wheel.y != 0.0) || (g.WheelingAxisAvg.x == g.WheelingAxisAvg.y) {
 		g.WheelingWindowWheelRemainder = wheel
 		return nil
 	}
@@ -16432,7 +16432,7 @@ UpdateMouseWheel :: proc()
 	// In the rare situation where FindBestWheelingWindow() had to defer first frame of wheeling due to ambiguous main axis, reinject it now.
 	wheel += g.WheelingWindowWheelRemainder
 	g.WheelingWindowWheelRemainder = ImVec2(0.0, 0.0)
-	if wheel.x == 0.0 && wheel.y != 0 == 0.0 { return }
+	if wheel.x == 0.0 && wheel.y == 0.0 { return }
 
 	// Mouse wheel scrolling: find target and apply
 	// - don't renew lock if axis doesn't apply on the window.
@@ -16479,13 +16479,13 @@ GetInputSourceName :: proc(source : ImGuiInputSource) -> ^u8
 GetMouseSourceName :: proc(source : ImGuiMouseSource) -> ^u8
 {
 	mouse_source_names : [^]^u8 = {"Mouse", "TouchScreen", "Pen"}
-	IM_ASSERT(IM_ARRAYSIZE(mouse_source_names) == ImGuiMouseSource.ImGuiMouseSource_COUNT != 0 && source >= 0 && source < ImGuiMouseSource.ImGuiMouseSource_COUNT)
+	IM_ASSERT(IM_ARRAYSIZE(mouse_source_names) == ImGuiMouseSource.ImGuiMouseSource_COUNT && source >= 0 && source < ImGuiMouseSource.ImGuiMouseSource_COUNT)
 	return mouse_source_names[source]
 }
 DebugPrintInputEvent :: proc(prefix : ^u8, e : ^ImGuiInputEvent)
 {
 	g : ^ImGuiContext = GImGui
-	if e.Type == ImGuiInputEventType.ImGuiInputEventType_MousePos {if e.MousePos.PosX == -FLT_MAX && e.MousePos.PosY != 0 == -FLT_MAX { IMGUI_DEBUG_LOG_IO("[io] %s: MousePos (-FLT_MAX, -FLT_MAX)\n", prefix) }
+	if e.Type == ImGuiInputEventType.ImGuiInputEventType_MousePos {if e.MousePos.PosX == -FLT_MAX && e.MousePos.PosY == -FLT_MAX { IMGUI_DEBUG_LOG_IO("[io] %s: MousePos (-FLT_MAX, -FLT_MAX)\n", prefix) }
 		else { IMGUI_DEBUG_LOG_IO("[io] %s: MousePos (%.1f, %.1f) (%s)\n", prefix, e.MousePos.PosX, e.MousePos.PosY, GetMouseSourceName(e.MousePos.MouseSource)) }; return
 	}
 	if e.Type == ImGuiInputEventType.ImGuiInputEventType_MouseButton {IMGUI_DEBUG_LOG_IO("[io] %s: MouseButton %d %s (%s)\n", prefix, e.MouseButton.Button, e.MouseButton.Down ? "Down" : "Up", GetMouseSourceName(e.MouseButton.MouseSource)); return
@@ -16515,7 +16515,7 @@ UpdateInputEvents :: proc(trickle_fast_inputs : bool)
 	// Only trickle chars<>key when working with InputText()
 	// FIXME: InputText() could parse event trail?
 	// FIXME: Could specialize chars<>keys trickling rules for control keys (those not typically associated to characters)
-	trickle_interleaved_nonchar_keys_and_text : bool = (trickle_fast_inputs && g.WantTextInputNextFrame != 0 == 1)
+	trickle_interleaved_nonchar_keys_and_text : bool = (trickle_fast_inputs && g.WantTextInputNextFrame == 1)
 
 	mouse_moved : bool = false; mouse_wheeled : bool = false; key_changed : bool = false; key_changed_nonchar : bool = false; text_inputted : bool = false
 	mouse_button_changed : i32 = 0x00
@@ -16538,7 +16538,7 @@ UpdateInputEvents :: proc(trickle_fast_inputs : bool)
 			button : ImGuiMouseButton = e.MouseButton.Button
 			IM_ASSERT(button >= 0 && button < ImGuiMouseButton_.ImGuiMouseButton_COUNT)
 			if trickle_fast_inputs && ((mouse_button_changed & (1 << button)) != 0 || mouse_wheeled) { break }
-			if trickle_fast_inputs && e.MouseButton.MouseSource != {} == ImGuiMouseSource.ImGuiMouseSource_TouchScreen != 0 && mouse_moved {
+			if trickle_fast_inputs && e.MouseButton.MouseSource == ImGuiMouseSource.ImGuiMouseSource_TouchScreen && mouse_moved {
 				// #2702: TouchScreen have no initial hover.break
 			}
 			io.MouseDown[button] = e.MouseButton.Down
@@ -16698,7 +16698,7 @@ SetItemKeyOwner_1 :: proc(key : ImGuiKey, flags : ImGuiInputFlags)
 	id : ImGuiID = g.LastItemData.ID
 	if id == 0 || (g.HoveredId != id && g.ActiveId != id) { return }
 	if (flags & ImGuiInputFlagsPrivate_.ImGuiInputFlags_CondMask_) == {} { flags |= ImGuiInputFlagsPrivate_.ImGuiInputFlags_CondDefault_ }
-	if (g.HoveredId == id != 0 && (flags & ImGuiInputFlagsPrivate_.ImGuiInputFlags_CondHovered) != {}) || (g.ActiveId == id != 0 && (flags & ImGuiInputFlagsPrivate_.ImGuiInputFlags_CondActive) != {}) {
+	if (g.HoveredId == id && (flags & ImGuiInputFlagsPrivate_.ImGuiInputFlags_CondHovered) != {}) || (g.ActiveId == id && (flags & ImGuiInputFlagsPrivate_.ImGuiInputFlags_CondActive) != {}) {
 		IM_ASSERT((flags & ~ImGuiInputFlagsPrivate_.ImGuiInputFlags_SupportedBySetItemKeyOwner) == {}); // Passing flags not supported by this function!
 		SetKeyOwner(key, id, flags & ~ImGuiInputFlagsPrivate_.ImGuiInputFlags_CondMask_)
 	}
@@ -16775,7 +16775,7 @@ Shortcut_1 :: proc(key_chord : ImGuiKeyChord, flags : ImGuiInputFlags, owner_id 
 
 	// Using 'owner_id == ImGuiKeyOwner_Any/0': auto-assign an owner based on current focus scope (each window has its focus scope by default)
 	// Effectively makes Shortcut() always input-owner aware.
-	if owner_id == ImGuiKeyOwner_Any || owner_id != 0 == ImGuiKeyOwner_NoOwner { owner_id = GetRoutingIdFromOwnerId(owner_id) }
+	if owner_id == ImGuiKeyOwner_Any || owner_id == ImGuiKeyOwner_NoOwner { owner_id = GetRoutingIdFromOwnerId(owner_id) }
 
 	if (g.CurrentItemFlags & ImGuiItemFlagsPrivate_.ImGuiItemFlags_Disabled) != {} { return false }
 
@@ -16784,7 +16784,7 @@ Shortcut_1 :: proc(key_chord : ImGuiKeyChord, flags : ImGuiInputFlags, owner_id 
 
 	// Default repeat behavior for Shortcut()
 	// So e.g. pressing Ctrl+W and releasing Ctrl while holding W will not trigger the W shortcut.
-	if (flags & ImGuiInputFlags_.ImGuiInputFlags_Repeat) != {} && (flags & ImGuiInputFlagsPrivate_.ImGuiInputFlags_RepeatUntilMask_) != {} == 0 { flags |= ImGuiInputFlagsPrivate_.ImGuiInputFlags_RepeatUntilKeyModsChange }
+	if (flags & ImGuiInputFlags_.ImGuiInputFlags_Repeat) != {} && (flags & ImGuiInputFlagsPrivate_.ImGuiInputFlags_RepeatUntilMask_) == {} { flags |= ImGuiInputFlagsPrivate_.ImGuiInputFlags_RepeatUntilKeyModsChange }
 
 	if !IsKeyChordPressed(key_chord, flags, owner_id) { return false }
 
@@ -16823,17 +16823,17 @@ DebugCheckVersionAndDataLayout :: proc(version : ^u8, sz_io : uint, sz_style : u
 	error : bool = false
 	if strcmp(version, IMGUI_VERSION) != 0 {error = true; IM_ASSERT(strcmp(version, IMGUI_VERSION) == 0 && "Mismatched version string!")
 	}
-	if sz_io != size_of(ImGuiIO) {error = true; IM_ASSERT(sz_io == size_of(ImGuiIO) != 0 && "Mismatched struct layout!")
+	if sz_io != size_of(ImGuiIO) {error = true; IM_ASSERT(sz_io == size_of(ImGuiIO) && "Mismatched struct layout!")
 	}
-	if sz_style != size_of(ImGuiStyle) {error = true; IM_ASSERT(sz_style == size_of(ImGuiStyle) != 0 && "Mismatched struct layout!")
+	if sz_style != size_of(ImGuiStyle) {error = true; IM_ASSERT(sz_style == size_of(ImGuiStyle) && "Mismatched struct layout!")
 	}
-	if sz_vec2 != size_of(ImVec2) {error = true; IM_ASSERT(sz_vec2 == size_of(ImVec2) != 0 && "Mismatched struct layout!")
+	if sz_vec2 != size_of(ImVec2) {error = true; IM_ASSERT(sz_vec2 == size_of(ImVec2) && "Mismatched struct layout!")
 	}
-	if sz_vec4 != size_of(ImVec4) {error = true; IM_ASSERT(sz_vec4 == size_of(ImVec4) != 0 && "Mismatched struct layout!")
+	if sz_vec4 != size_of(ImVec4) {error = true; IM_ASSERT(sz_vec4 == size_of(ImVec4) && "Mismatched struct layout!")
 	}
-	if sz_vert != size_of(ImDrawVert) {error = true; IM_ASSERT(sz_vert == size_of(ImDrawVert) != 0 && "Mismatched struct layout!")
+	if sz_vert != size_of(ImDrawVert) {error = true; IM_ASSERT(sz_vert == size_of(ImDrawVert) && "Mismatched struct layout!")
 	}
-	if sz_idx != size_of(ImDrawIdx) {error = true; IM_ASSERT(sz_idx == size_of(ImDrawIdx) != 0 && "Mismatched struct layout!")
+	if sz_idx != size_of(ImDrawIdx) {error = true; IM_ASSERT(sz_idx == size_of(ImDrawIdx) && "Mismatched struct layout!")
 	}
 	return !error
 }
@@ -16890,16 +16890,16 @@ ErrorCheckNewFrameSanityChecks :: proc()
 	// Check user data
 	// (We pass an error message in the assert expression to make it visible to programmers who are not using a debugger, as most assert handlers display their argument)
 	IM_ASSERT(g.Initialized)
-	IM_ASSERT((g.IO.DeltaTime > 0.0 || g.FrameCount != 0 == 0) && "Need a positive DeltaTime!")
-	IM_ASSERT((g.FrameCount == 0 || g.FrameCountEnded != 0 == g.FrameCount) && "Forgot to call Render() or EndFrame() at the end of the previous frame?")
+	IM_ASSERT((g.IO.DeltaTime > 0.0 || g.FrameCount == 0) && "Need a positive DeltaTime!")
+	IM_ASSERT((g.FrameCount == 0 || g.FrameCountEnded == g.FrameCount) && "Forgot to call Render() or EndFrame() at the end of the previous frame?")
 	IM_ASSERT(g.IO.DisplaySize.x >= 0.0 && g.IO.DisplaySize.y >= 0.0 && "Invalid DisplaySize value!")
 	IM_ASSERT(IsBuilt(g.IO.Fonts) && "Font Atlas not built! Make sure you called ImGui_ImplXXXX_NewFrame() function for renderer backend, which should call io.Fonts->GetTexDataAsRGBA32() / GetTexDataAsAlpha8()")
 	IM_ASSERT(g.Style.CurveTessellationTol > 0.0 && "Invalid style setting!")
 	IM_ASSERT(g.Style.CircleTessellationMaxError > 0.0 && "Invalid style setting!")
 	IM_ASSERT(g.Style.Alpha >= 0.0 && g.Style.Alpha <= 1.0 && "Invalid style setting!"); // Allows us to avoid a few clamps in color computations
 	IM_ASSERT(g.Style.WindowMinSize.x >= 1.0 && g.Style.WindowMinSize.y >= 1.0 && "Invalid style setting.")
-	IM_ASSERT(g.Style.WindowMenuButtonPosition == ImGuiDir.ImGuiDir_None != 0 || g.Style.WindowMenuButtonPosition != {} == ImGuiDir.ImGuiDir_Left != 0 || g.Style.WindowMenuButtonPosition != {} == ImGuiDir.ImGuiDir_Right)
-	IM_ASSERT(g.Style.ColorButtonPosition == ImGuiDir.ImGuiDir_Left != 0 || g.Style.ColorButtonPosition != {} == ImGuiDir.ImGuiDir_Right)
+	IM_ASSERT(g.Style.WindowMenuButtonPosition == ImGuiDir.ImGuiDir_None || g.Style.WindowMenuButtonPosition == ImGuiDir.ImGuiDir_Left || g.Style.WindowMenuButtonPosition == ImGuiDir.ImGuiDir_Right)
+	IM_ASSERT(g.Style.ColorButtonPosition == ImGuiDir.ImGuiDir_Left || g.Style.ColorButtonPosition == ImGuiDir.ImGuiDir_Right)
 
 	// Error handling: we do not accept 100% silent recovery! Please contact me if you feel this is getting in your way.
 	if g.IO.ConfigErrorRecovery { IM_ASSERT(g.IO.ConfigErrorRecoveryEnableAssert || g.IO.ConfigErrorRecoveryEnableDebugLog || g.IO.ConfigErrorRecoveryEnableTooltip || g.ErrorCallback != nil) }
@@ -16907,13 +16907,13 @@ ErrorCheckNewFrameSanityChecks :: proc()
 
 
 	// Perform simple check: error if Docking or Viewport are enabled _exactly_ on frame 1 (instead of frame 0 or later), which is a common error leading to loss of .ini data.
-	if g.FrameCount == 1 && (g.IO.ConfigFlags & ImGuiConfigFlags_.ImGuiConfigFlags_DockingEnable) != {} && (g.ConfigFlagsLastFrame & ImGuiConfigFlags_.ImGuiConfigFlags_DockingEnable) != {} == 0 { IM_ASSERT(0 && "Please set DockingEnable before the first call to NewFrame()! Otherwise you will lose your .ini settings!") }
-	if g.FrameCount == 1 && (g.IO.ConfigFlags & ImGuiConfigFlags_.ImGuiConfigFlags_ViewportsEnable) != {} && (g.ConfigFlagsLastFrame & ImGuiConfigFlags_.ImGuiConfigFlags_ViewportsEnable) != {} == 0 { IM_ASSERT(0 && "Please set ViewportsEnable before the first call to NewFrame()! Otherwise you will lose your .ini settings!") }
+	if g.FrameCount == 1 && (g.IO.ConfigFlags & ImGuiConfigFlags_.ImGuiConfigFlags_DockingEnable) != {} && (g.ConfigFlagsLastFrame & ImGuiConfigFlags_.ImGuiConfigFlags_DockingEnable) == {} { IM_ASSERT(0 && "Please set DockingEnable before the first call to NewFrame()! Otherwise you will lose your .ini settings!") }
+	if g.FrameCount == 1 && (g.IO.ConfigFlags & ImGuiConfigFlags_.ImGuiConfigFlags_ViewportsEnable) != {} && (g.ConfigFlagsLastFrame & ImGuiConfigFlags_.ImGuiConfigFlags_ViewportsEnable) == {} { IM_ASSERT(0 && "Please set ViewportsEnable before the first call to NewFrame()! Otherwise you will lose your .ini settings!") }
 
 	// Perform simple checks: multi-viewport and platform windows support
 	if (g.IO.ConfigFlags & ImGuiConfigFlags_.ImGuiConfigFlags_ViewportsEnable) != {} {
 		if (g.IO.BackendFlags & ImGuiBackendFlags_.ImGuiBackendFlags_PlatformHasViewports) != {} && (g.IO.BackendFlags & ImGuiBackendFlags_.ImGuiBackendFlags_RendererHasViewports) != {} {
-			IM_ASSERT((g.FrameCount == 0 || g.FrameCount != 0 == g.FrameCountPlatformEnded) && "Forgot to call UpdatePlatformWindows() in main loop after EndFrame()? Check examples/ applications for reference.")
+			IM_ASSERT((g.FrameCount == 0 || g.FrameCount == g.FrameCountPlatformEnded) && "Forgot to call UpdatePlatformWindows() in main loop after EndFrame()? Check examples/ applications for reference.")
 			IM_ASSERT(g.PlatformIO.Platform_CreateWindow != nil && "Platform init didn't install handlers?")
 			IM_ASSERT(g.PlatformIO.Platform_DestroyWindow != nil && "Platform init didn't install handlers?")
 			IM_ASSERT(g.PlatformIO.Platform_GetWindowPos != nil && "Platform init didn't install handlers?")
@@ -16951,7 +16951,7 @@ ErrorCheckEndFrameSanityChecks :: proc()
 	key_mods : ImGuiKeyChord = GetMergedModsFromKeys()
 	IM_UNUSED(g)
 	IM_UNUSED(key_mods)
-	IM_ASSERT((key_mods == 0 || g.IO.KeyMods != {} == key_mods) && "Mismatching io.KeyCtrl/io.KeyShift/io.KeyAlt/io.KeySuper vs io.KeyMods")
+	IM_ASSERT((key_mods == {} || g.IO.KeyMods == key_mods) && "Mismatching io.KeyCtrl/io.KeyShift/io.KeyAlt/io.KeySuper vs io.KeyMods")
 	IM_UNUSED(key_mods)
 
 	IM_ASSERT(g.CurrentWindowStack.Size == 1)
@@ -16990,7 +16990,7 @@ ErrorRecoveryTryToRecoverState :: proc(state_in : ^ImGuiErrorRecoveryState)
 		// - We will fix that in a future major update.
 		window : ^ImGuiWindow = g.CurrentWindow
 		if (window.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_ChildWindow) != {} {
-			if g.CurrentTable != nil && g.CurrentTable.InnerWindow != nil == g.CurrentWindow {
+			if g.CurrentTable != nil && g.CurrentTable.InnerWindow == g.CurrentWindow {
 				IM_ASSERT_USER_ERROR(0, "Missing EndTable()")
 				EndTable()
 			}
@@ -17015,7 +17015,7 @@ ErrorRecoveryTryToRecoverWindowState :: proc(state_in : ^ImGuiErrorRecoveryState
 {
 	g : ^ImGuiContext = GImGui
 
-	for g.CurrentTable != nil && g.CurrentTable.InnerWindow != nil == g.CurrentWindow {
+	for g.CurrentTable != nil && g.CurrentTable.InnerWindow == g.CurrentWindow {
 		IM_ASSERT_USER_ERROR(0, "Missing EndTable()")
 		EndTable()
 	}
@@ -17023,12 +17023,12 @@ ErrorRecoveryTryToRecoverWindowState :: proc(state_in : ^ImGuiErrorRecoveryState
 	window : ^ImGuiWindow = g.CurrentWindow
 
 	// FIXME: Can't recover from inside BeginTabItem/EndTabItem yet.
-	for g.CurrentTabBar != nil && g.CurrentTabBar.Window != nil == window {
+	for g.CurrentTabBar != nil && g.CurrentTabBar.Window == window {
 		IM_ASSERT_USER_ERROR(0, "Missing EndTabBar()")
 		EndTabBar()
 	}
 
-	for g.CurrentMultiSelect != nil && g.CurrentMultiSelect.Storage.Window != nil == window {
+	for g.CurrentMultiSelect != nil && g.CurrentMultiSelect.Storage.Window == window {
 		IM_ASSERT_USER_ERROR(0, "Missing EndMultiSelect()")
 		EndMultiSelect()
 	}
@@ -17171,7 +17171,7 @@ BeginErrorTooltip :: proc() -> bool
 	if use_locked_pos { SetNextWindowPos(g.ErrorTooltipLockedPos) }
 	is_visible : bool = Begin("##Tooltip_Error", nil, ImGuiWindowFlags_.ImGuiWindowFlags_Tooltip | ImGuiWindowFlags_.ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_.ImGuiWindowFlags_NoMove | ImGuiWindowFlags_.ImGuiWindowFlags_NoResize | ImGuiWindowFlags_.ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_.ImGuiWindowFlags_AlwaysAutoResize)
 	PopStyleColor()
-	if is_visible && g.CurrentWindow.BeginCount != 0 == 1 {
+	if is_visible && g.CurrentWindow.BeginCount == 1 {
 		SeparatorText("MESSAGE FROM DEAR IMGUI")
 		BringWindowToDisplayFront(g.CurrentWindow)
 		BringWindowToFocusFront(g.CurrentWindow)
@@ -17238,7 +17238,7 @@ ItemAdd :: proc(bb : ^ImRect, id : ImGuiID, nav_bb_arg : ^ImRect, extra_flags : 
 		if (g.LastItemData.ItemFlags & ImGuiItemFlags_.ImGuiItemFlags_NoNav) == {} {
 			// FIMXE-NAV: investigate changing the window tests into a simple 'if (g.NavFocusScopeId == g.CurrentFocusScopeId)' test.
 			window.DC.NavLayersActiveMaskNext |= (1 << window.DC.NavLayerCurrent)
-			if g.NavId == id != 0 || g.NavAnyRequest { if g.NavWindow.RootWindowForNav == window.RootWindowForNav { if window == g.NavWindow != nil || ((window.ChildFlags | g.NavWindow.ChildFlags) & ImGuiChildFlags_.ImGuiChildFlags_NavFlattened) != {} { NavProcessItem() } } }
+			if g.NavId == id || g.NavAnyRequest { if g.NavWindow.RootWindowForNav == window.RootWindowForNav { if window == g.NavWindow || ((window.ChildFlags | g.NavWindow.ChildFlags) & ImGuiChildFlags_.ImGuiChildFlags_NavFlattened) != {} { NavProcessItem() } } }
 		}
 
 		if (g.NextItemData.HasFlags & ImGuiNextItemDataFlags_.ImGuiNextItemDataFlags_HasShortcut) != {} { ItemHandleShortcut(id) }
@@ -17737,12 +17737,12 @@ ScrollToRectEx :: proc(window : ^ImGuiWindow, item_rect : ^ImRect, flags : ImGui
 	//GetForegroundDrawList(window)->AddRect(scroll_rect.Min, scroll_rect.Max, IM_COL32_WHITE); // [DEBUG]
 
 	// Check that only one behavior is selected per axis
-	IM_ASSERT((flags & ImGuiScrollFlags_.ImGuiScrollFlags_MaskX_) == 0 || ImIsPowerOfTwo(flags & ImGuiScrollFlags_.ImGuiScrollFlags_MaskX_))
-	IM_ASSERT((flags & ImGuiScrollFlags_.ImGuiScrollFlags_MaskY_) == 0 || ImIsPowerOfTwo(flags & ImGuiScrollFlags_.ImGuiScrollFlags_MaskY_))
+	IM_ASSERT((flags & ImGuiScrollFlags_.ImGuiScrollFlags_MaskX_) == {} || ImIsPowerOfTwo(flags & ImGuiScrollFlags_.ImGuiScrollFlags_MaskX_))
+	IM_ASSERT((flags & ImGuiScrollFlags_.ImGuiScrollFlags_MaskY_) == {} || ImIsPowerOfTwo(flags & ImGuiScrollFlags_.ImGuiScrollFlags_MaskY_))
 
 	// Defaults
 	in_flags : ImGuiScrollFlags = flags
-	if (flags & ImGuiScrollFlags_.ImGuiScrollFlags_MaskX_) == 0 && window.ScrollbarX { flags |= ImGuiScrollFlags_.ImGuiScrollFlags_KeepVisibleEdgeX }
+	if (flags & ImGuiScrollFlags_.ImGuiScrollFlags_MaskX_) == {} && window.ScrollbarX { flags |= ImGuiScrollFlags_.ImGuiScrollFlags_KeepVisibleEdgeX }
 	if (flags & ImGuiScrollFlags_.ImGuiScrollFlags_MaskY_) == {} { flags |= window.Appearing ? ImGuiScrollFlags_.ImGuiScrollFlags_AlwaysCenterY : ImGuiScrollFlags_.ImGuiScrollFlags_KeepVisibleEdgeY }
 
 	fully_visible_x : bool = item_rect.Min.x >= scroll_rect.Min.x && item_rect.Max.x <= scroll_rect.Max.x
@@ -18016,7 +18016,7 @@ IsPopupOpen_1 :: proc(id : ImGuiID, popup_flags : ImGuiPopupFlags) -> bool
 		}
 		else {
 			// Return true if the popup is open at the current BeginPopup() level of the popup stack (this is the most-common query)
-			return g.OpenPopupStack.Size > g.BeginPopupStack.Size && g.OpenPopupStack[g.BeginPopupStack.Size].PopupId != 0 == id
+			return g.OpenPopupStack.Size > g.BeginPopupStack.Size && g.OpenPopupStack[g.BeginPopupStack.Size].PopupId == id
 		}
 	}
 }
@@ -18430,7 +18430,7 @@ FindBestWindowPosForPopupEx :: proc(ref_pos : ^ImVec2, size : ^ImVec2, last_dir 
 		dir_prefered_order : [ImGuiDir.ImGuiDir_COUNT]ImGuiDir = {ImGuiDir.ImGuiDir_Down, ImGuiDir.ImGuiDir_Right, ImGuiDir.ImGuiDir_Left, ImGuiDir.ImGuiDir_Up}
 		for n : i32 = (last_dir^ != ImGuiDir.ImGuiDir_None) ? -1 : 0; n < ImGuiDir.ImGuiDir_COUNT; post_incr(&n) {
 			dir : ImGuiDir = (n == -1) ? last_dir^ : dir_prefered_order[n]
-			if n != -1 && dir != {} == last_dir^ {
+			if n != -1 && dir == last_dir^ {
 				// Already tried this direction?continue
 			}
 			pos : ImVec2
@@ -18458,20 +18458,20 @@ FindBestWindowPosForPopupEx :: proc(ref_pos : ^ImVec2, size : ^ImVec2, last_dir 
 
 	// Tooltip and Default popup policy
 	// (Always first try the direction we used on the last frame, if any)
-	if policy == ImGuiPopupPositionPolicy.ImGuiPopupPositionPolicy_Tooltip || policy != {} == ImGuiPopupPositionPolicy.ImGuiPopupPositionPolicy_Default {
+	if policy == ImGuiPopupPositionPolicy.ImGuiPopupPositionPolicy_Tooltip || policy == ImGuiPopupPositionPolicy.ImGuiPopupPositionPolicy_Default {
 		dir_prefered_order : [ImGuiDir.ImGuiDir_COUNT]ImGuiDir = {ImGuiDir.ImGuiDir_Right, ImGuiDir.ImGuiDir_Down, ImGuiDir.ImGuiDir_Up, ImGuiDir.ImGuiDir_Left}
 		for n : i32 = (last_dir^ != ImGuiDir.ImGuiDir_None) ? -1 : 0; n < ImGuiDir.ImGuiDir_COUNT; post_incr(&n) {
 			dir : ImGuiDir = (n == -1) ? last_dir^ : dir_prefered_order[n]
-			if n != -1 && dir != {} == last_dir^ {
+			if n != -1 && dir == last_dir^ {
 				// Already tried this direction?continue
 			}
 
-			avail_w : f32 = (dir == ImGuiDir.ImGuiDir_Left != 0 ? r_avoid.Min.x : r_outer.Max.x) - (dir == ImGuiDir.ImGuiDir_Right != 0 ? r_avoid.Max.x : r_outer.Min.x)
-			avail_h : f32 = (dir == ImGuiDir.ImGuiDir_Up != 0 ? r_avoid.Min.y : r_outer.Max.y) - (dir == ImGuiDir.ImGuiDir_Down != 0 ? r_avoid.Max.y : r_outer.Min.y)
+			avail_w : f32 = (dir == ImGuiDir.ImGuiDir_Left ? r_avoid.Min.x : r_outer.Max.x) - (dir == ImGuiDir.ImGuiDir_Right ? r_avoid.Max.x : r_outer.Min.x)
+			avail_h : f32 = (dir == ImGuiDir.ImGuiDir_Up ? r_avoid.Min.y : r_outer.Max.y) - (dir == ImGuiDir.ImGuiDir_Down ? r_avoid.Max.y : r_outer.Min.y)
 
 			// If there's not enough room on one axis, there's no point in positioning on a side on this axis (e.g. when not enough width, use a top/bottom position to maximize available width)
-			if avail_w < size.x && (dir == ImGuiDir.ImGuiDir_Left != 0 || dir != {} == ImGuiDir.ImGuiDir_Right) { continue }
-			if avail_h < size.y && (dir == ImGuiDir.ImGuiDir_Up != 0 || dir != {} == ImGuiDir.ImGuiDir_Down) { continue }
+			if avail_w < size.x && (dir == ImGuiDir.ImGuiDir_Left || dir == ImGuiDir.ImGuiDir_Right) { continue }
+			if avail_h < size.y && (dir == ImGuiDir.ImGuiDir_Up || dir == ImGuiDir.ImGuiDir_Down) { continue }
 
 			pos : ImVec2
 			pos.x = (dir == ImGuiDir.ImGuiDir_Left) ? r_avoid.Min.x - size.x : (dir == ImGuiDir.ImGuiDir_Right) ? r_avoid.Max.x : base_pos_clamped.x
@@ -18551,7 +18551,7 @@ FindBestWindowPosForPopup :: proc(window : ^ImGuiWindow) -> ImVec2
 		scale : f32 = g.Style.MouseCursorScale
 		ref_pos : ImVec2 = NavCalcPreferredRefPos()
 
-		if g.IO.MouseSource == ImGuiMouseSource.ImGuiMouseSource_TouchScreen != 0 && NavCalcPreferredRefPosSource() != {} == ImGuiInputSource.ImGuiInputEventType_Mouse {
+		if g.IO.MouseSource == ImGuiMouseSource.ImGuiMouseSource_TouchScreen && NavCalcPreferredRefPosSource() == ImGuiInputSource.ImGuiInputEventType_Mouse {
 			tooltip_pos : ImVec2 = ref_pos + TOOLTIP_DEFAULT_OFFSET_TOUCH * scale - (TOOLTIP_DEFAULT_PIVOT_TOUCH * window.Size)
 			if Contains(&r_outer, ImRect(tooltip_pos, tooltip_pos + window.Size)) { return tooltip_pos }
 		}
@@ -18641,7 +18641,7 @@ UpdateWindowInFocusOrderList :: proc(window : ^ImGuiWindow, just_created : bool,
 {
 	g : ^ImGuiContext = GImGui
 
-	new_is_explicit_child : bool = (new_flags & ImGuiWindowFlags_.ImGuiWindowFlags_ChildWindow) != {} && ((new_flags & ImGuiWindowFlags_.ImGuiWindowFlags_Popup) == 0 || (new_flags & ImGuiWindowFlags_.ImGuiWindowFlags_ChildMenu) != {})
+	new_is_explicit_child : bool = (new_flags & ImGuiWindowFlags_.ImGuiWindowFlags_ChildWindow) != {} && ((new_flags & ImGuiWindowFlags_.ImGuiWindowFlags_Popup) == {} || (new_flags & ImGuiWindowFlags_.ImGuiWindowFlags_ChildMenu) != {})
 	child_flag_changed : bool = new_is_explicit_child != window.IsExplicitChild
 	if (just_created || child_flag_changed) && !new_is_explicit_child {
 		IM_ASSERT(!contains(&g.WindowsFocusOrder, window))
@@ -18683,7 +18683,7 @@ BringWindowToDisplayFront :: proc(window : ^ImGuiWindow)
 {
 	g : ^ImGuiContext = GImGui
 	current_front_window : ^ImGuiWindow = back(&g.Windows)
-	if current_front_window == window != nil || current_front_window.RootWindowDockTree != nil == window {
+	if current_front_window == window || current_front_window.RootWindowDockTree == window {
 		// Cheap early out (could be better)return
 	}
 	for i : i32 = g.Windows.Size - 2; i >= 0; post_decr(&i) { if g.Windows[i] == window {
@@ -18742,7 +18742,7 @@ FocusWindow :: proc(window : ^ImGuiWindow, flags : ImGuiFocusRequestFlags)
 			// - API call to FocusWindow() with a window under a modal and ImGuiFocusRequestFlags_UnlessBelowModal flag.
 			// - User clicking on void or anything behind a modal while a modal is open (window == NULL)
 			IMGUI_DEBUG_LOG_FOCUS("[focus] FocusWindow(\"%s\", UnlessBelowModal): prevented by \"%s\".\n", window != nil ? window.Name : "<NULL>", blocking_modal.Name)
-			if window != nil && window != nil == window.RootWindow != nil && (window.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_NoBringToFrontOnFocus) != {} == 0 {
+			if window != nil && window == window.RootWindow && (window.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_NoBringToFrontOnFocus) == {} {
 				// Still bring right under modal. (FIXME: Could move in focus list too?)
 				BringWindowToDisplayBehind(window, blocking_modal)
 			}
@@ -18773,7 +18773,7 @@ FocusWindow :: proc(window : ^ImGuiWindow, flags : ImGuiFocusRequestFlags)
 	focus_front_window : ^ImGuiWindow = window != nil ? window.RootWindow : nil
 	display_front_window : ^ImGuiWindow = window != nil ? window.RootWindowDockTree : nil
 	dock_node : ^ImGuiDockNode = window != nil ? window.DockNode : nil
-	active_id_window_is_dock_node_host : bool = (g.ActiveIdWindow != nil && dock_node != nil && dock_node.HostWindow != nil == g.ActiveIdWindow)
+	active_id_window_is_dock_node_host : bool = (g.ActiveIdWindow != nil && dock_node != nil && dock_node.HostWindow == g.ActiveIdWindow)
 
 	// Steal active widgets. Some of the cases it triggers includes:
 	// - Focus a window while an InputText in another window is active, if focus happens before the old InputText can run.
@@ -18812,7 +18812,7 @@ FocusTopMostWindowUnderOne :: proc(under_this_window : ^ImGuiWindow, ignore_wind
 	for i : i32 = start_idx; i >= 0; post_decr(&i) {
 		// We may later decide to test for different NoXXXInputs based on the active navigation input (mouse vs nav) but that may feel more confusing to the user.
 		window : ^ImGuiWindow = g.WindowsFocusOrder[i]
-		if window == ignore_window != nil || !window.WasActive { continue }
+		if window == ignore_window || !window.WasActive { continue }
 		if filter_viewport != nil && window.Viewport != filter_viewport { continue }
 		if (window.Flags & (ImGuiWindowFlags_.ImGuiWindowFlags_NoMouseInputs | ImGuiWindowFlags_.ImGuiWindowFlags_NoNavInputs)) != (ImGuiWindowFlags_.ImGuiWindowFlags_NoMouseInputs | ImGuiWindowFlags_.ImGuiWindowFlags_NoNavInputs) {
 			// FIXME-DOCK: When ImGuiFocusRequestFlags_RestoreFocusedChild is set...
@@ -18880,7 +18880,7 @@ SetNavID :: proc(id : ImGuiID, nav_layer : ImGuiNavLayer, focus_scope_id : ImGui
 {
 	g : ^ImGuiContext = GImGui
 	IM_ASSERT(g.NavWindow != nil)
-	IM_ASSERT(nav_layer == ImGuiNavLayer.ImGuiNavLayer_Main || nav_layer != {} == ImGuiNavLayer.ImGuiNavLayer_Menu)
+	IM_ASSERT(nav_layer == ImGuiNavLayer.ImGuiNavLayer_Main || nav_layer == ImGuiNavLayer.ImGuiNavLayer_Menu)
 	g.NavId = id
 	g.NavLayer = nav_layer
 	SetNavFocusScope(focus_scope_id)
@@ -18908,7 +18908,7 @@ SetFocusID :: proc(id : ImGuiID, window : ^ImGuiWindow)
 	window.NavLastIds[nav_layer] = id
 	if g.LastItemData.ID == id { window.NavRectRel[nav_layer] = WindowRectAbsToRel(window, g.LastItemData.NavRect) }
 
-	if g.ActiveIdSource == ImGuiInputSource.ImGuiInputSource_Keyboard || g.ActiveIdSource != {} == ImGuiInputSource.ImGuiInputSource_Gamepad { g.NavHighlightItemUnderNav = true }
+	if g.ActiveIdSource == ImGuiInputSource.ImGuiInputSource_Keyboard || g.ActiveIdSource == ImGuiInputSource.ImGuiInputSource_Gamepad { g.NavHighlightItemUnderNav = true }
 	else if g.IO.ConfigNavCursorVisibleAuto { g.NavCursorVisible = false }
 
 	// Clear preferred scoring position (NavMoveRequestApplyResult() will tend to restore it)
@@ -19032,7 +19032,7 @@ NavScoreItem :: proc(result : ^ImGuiNavItemData) -> bool
 				// Still tied! we need to be extra-careful to make sure everything gets linked properly. We consistently break ties by symbolically moving "later" items
 				// (with higher index) to the right/downwards by an infinitesimal amount since we the current "best" button already (so it must have a lower index),
 				// this is fairly easy. This rule ensures that all buttons with dx==dy==0 will end up being linked in order of appearance along the x axis.
-				if ((move_dir == ImGuiDir.ImGuiDir_Up != 0 || move_dir != {} == ImGuiDir.ImGuiDir_Down) ? dby : dbx) < 0.0 {
+				if ((move_dir == ImGuiDir.ImGuiDir_Up || move_dir == ImGuiDir.ImGuiDir_Down) ? dby : dbx) < 0.0 {
 					// moving bj to the right/down decreases distancenew_best = true
 				}
 			}
@@ -19045,7 +19045,7 @@ NavScoreItem :: proc(result : ^ImGuiNavItemData) -> bool
 	// 2017/09/29: FIXME: This now currently only enabled inside menu bars, ideally we'd disable it everywhere. Menus in particular need to catch failure. For general navigation it feels awkward.
 	// Disabling it may lead to disconnected graphs when nodes are very spaced out on different axis. Perhaps consider offering this as an option?
 	if result.DistBox == FLT_MAX && dist_axial < result.DistAxial {
-		// Check axial matchif g.NavLayer == ImGuiNavLayer.ImGuiNavLayer_Menu && (g.NavWindow.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_ChildMenu) == {} { if (move_dir == ImGuiDir.ImGuiDir_Left != 0 && dax < 0.0) || (move_dir == ImGuiDir.ImGuiDir_Right != 0 && dax > 0.0) || (move_dir == ImGuiDir.ImGuiDir_Up != 0 && day < 0.0) || (move_dir == ImGuiDir.ImGuiDir_Down != 0 && day > 0.0) {
+		// Check axial matchif g.NavLayer == ImGuiNavLayer.ImGuiNavLayer_Menu && (g.NavWindow.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_ChildMenu) == {} { if (move_dir == ImGuiDir.ImGuiDir_Left && dax < 0.0) || (move_dir == ImGuiDir.ImGuiDir_Right && dax > 0.0) || (move_dir == ImGuiDir.ImGuiDir_Up && day < 0.0) || (move_dir == ImGuiDir.ImGuiDir_Down && day > 0.0) {
 	result.DistAxial = dist_axial
 	new_best = true
 } }
@@ -19075,7 +19075,7 @@ NavUpdateCurrentWindowIsScrollPushableX :: proc()
 {
 	g : ^ImGuiContext = GImGui
 	window : ^ImGuiWindow = g.CurrentWindow
-	window.DC.NavIsScrollPushableX = (g.CurrentTable == nil && window.DC.CurrentColumns != nil == nil)
+	window.DC.NavIsScrollPushableX = (g.CurrentTable == nil && window.DC.CurrentColumns == nil)
 }
 
 // We get there when either NavId == id, or when g.NavAnyRequest is set (which is updated by NavUpdateAnyRequestFlag above)
@@ -19095,10 +19095,10 @@ NavProcessItem :: proc()
 	nav_bb : ImRect = g.LastItemData.NavRect
 
 	// Process Init Request
-	if g.NavInitRequest && g.NavLayer != {} == window.DC.NavLayerCurrent != {} && (item_flags & ImGuiItemFlagsPrivate_.ImGuiItemFlags_Disabled) != {} == 0 {
+	if g.NavInitRequest && g.NavLayer == window.DC.NavLayerCurrent && (item_flags & ImGuiItemFlagsPrivate_.ImGuiItemFlags_Disabled) == {} {
 		// Even if 'ImGuiItemFlags_NoNavDefaultFocus' is on (typically collapse/close button) we record the first ResultId so they can be used as a fallback
 		candidate_for_nav_default_focus : bool = (item_flags & ImGuiItemFlags_.ImGuiItemFlags_NoNavDefaultFocus) == {}
-		if candidate_for_nav_default_focus || g.NavInitResult.ID != 0 == 0 {
+		if candidate_for_nav_default_focus || g.NavInitResult.ID == 0 {
 			NavApplyItemToResult(&g.NavInitResult)
 		}
 		if candidate_for_nav_default_focus {
@@ -19109,8 +19109,8 @@ NavProcessItem :: proc()
 
 	// Process Move Request (scoring for navigation)
 	// FIXME-NAV: Consider policy for double scoring (scoring from NavScoringRect + scoring from a rect wrapped according to current wrapping policy)
-	if g.NavMoveScoringItems && (item_flags & ImGuiItemFlagsPrivate_.ImGuiItemFlags_Disabled) != {} == 0 {
-		if (g.NavMoveFlags & ImGuiNavMoveFlags_.ImGuiNavMoveFlags_FocusApi) != {} || (window.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_NoNavInputs) != {} == 0 {
+	if g.NavMoveScoringItems && (item_flags & ImGuiItemFlagsPrivate_.ImGuiItemFlags_Disabled) == {} {
+		if (g.NavMoveFlags & ImGuiNavMoveFlags_.ImGuiNavMoveFlags_FocusApi) != {} || (window.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_NoNavInputs) == {} {
 			is_tabbing : bool = (g.NavMoveFlags & ImGuiNavMoveFlags_.ImGuiNavMoveFlags_IsTabbing) != {}
 			if is_tabbing {
 				NavProcessItemForTabbingRequest(id, item_flags, g.NavMoveFlags)
@@ -19165,14 +19165,14 @@ NavProcessItemForTabbingRequest :: proc(id : ImGuiID, item_flags : ImGuiItemFlag
 	// - Tabbing without _NavEnableKeyboard: goes through inputable items only.
 	can_stop : bool
 	if (move_flags & ImGuiNavMoveFlags_.ImGuiNavMoveFlags_FocusApi) != {} { can_stop = true }
-	else { can_stop = (item_flags & ImGuiItemFlags_.ImGuiItemFlags_NoTabStop) == 0 && ((g.IO.ConfigFlags & ImGuiConfigFlags_.ImGuiConfigFlags_NavEnableKeyboard) != {} || (item_flags & ImGuiItemFlagsPrivate_.ImGuiItemFlags_Inputable) != {}) }
+	else { can_stop = (item_flags & ImGuiItemFlags_.ImGuiItemFlags_NoTabStop) == {} && ((g.IO.ConfigFlags & ImGuiConfigFlags_.ImGuiConfigFlags_NavEnableKeyboard) != {} || (item_flags & ImGuiItemFlagsPrivate_.ImGuiItemFlags_Inputable) != {}) }
 
 	// Always store in NavMoveResultLocal (unlike directional request which uses NavMoveResultOther on sibling/flattened windows)
 	result : ^ImGuiNavItemData = &g.NavMoveResultLocal
 	if g.NavTabbingDir == +1 {
 		// Tab Forward or SetKeyboardFocusHere() with >= 0
-		if can_stop && g.NavTabbingResultFirst.ID != 0 == 0 { NavApplyItemToResult(&g.NavTabbingResultFirst) }
-		if can_stop && g.NavTabbingCounter > 0 && pre_decr(&g.NavTabbingCounter) != 0 == 0 { NavMoveRequestResolveWithLastItem(result) }
+		if can_stop && g.NavTabbingResultFirst.ID == 0 { NavApplyItemToResult(&g.NavTabbingResultFirst) }
+		if can_stop && g.NavTabbingCounter > 0 && pre_decr(&g.NavTabbingCounter) == 0 { NavMoveRequestResolveWithLastItem(result) }
 		else if g.NavId == id { g.NavTabbingCounter = 1 }
 	}
 	else if g.NavTabbingDir == -1 {
@@ -19189,8 +19189,8 @@ NavProcessItemForTabbingRequest :: proc(id : ImGuiID, item_flags : ImGuiItemFlag
 		}
 	}
 	else if g.NavTabbingDir == 0 {
-		if can_stop && g.NavId != 0 == id { NavMoveRequestResolveWithLastItem(result) }
-		if can_stop && g.NavTabbingResultFirst.ID != 0 == 0 {
+		if can_stop && g.NavId == id { NavMoveRequestResolveWithLastItem(result) }
+		if can_stop && g.NavTabbingResultFirst.ID == 0 {
 			// Tab initNavApplyItemToResult(&g.NavTabbingResultFirst)
 		}
 	}
@@ -19199,7 +19199,7 @@ NavProcessItemForTabbingRequest :: proc(id : ImGuiID, item_flags : ImGuiItemFlag
 NavMoveRequestButNoResultYet :: proc() -> bool
 {
 	g : ^ImGuiContext = GImGui
-	return g.NavMoveScoringItems && g.NavMoveResultLocal.ID != 0 == 0 && g.NavMoveResultOther.ID != 0 == 0
+	return g.NavMoveScoringItems && g.NavMoveResultLocal.ID == 0 && g.NavMoveResultOther.ID == 0
 }
 
 // FIXME: ScoringRect is not set
@@ -19273,11 +19273,11 @@ NavMoveRequestForward :: proc(move_dir : ImGuiDir, clip_dir : ImGuiDir, move_fla
 NavMoveRequestTryWrapping :: proc(window : ^ImGuiWindow, wrap_flags : ImGuiNavMoveFlags)
 {
 	g : ^ImGuiContext = GImGui
-	IM_ASSERT((wrap_flags & ImGuiNavMoveFlags_.ImGuiNavMoveFlags_WrapMask_) != {} && (wrap_flags & ~ImGuiNavMoveFlags_.ImGuiNavMoveFlags_WrapMask_) != {} == 0); // Call with _WrapX, _WrapY, _LoopX, _LoopY
+	IM_ASSERT((wrap_flags & ImGuiNavMoveFlags_.ImGuiNavMoveFlags_WrapMask_) != {} && (wrap_flags & ~ImGuiNavMoveFlags_.ImGuiNavMoveFlags_WrapMask_) == {}); // Call with _WrapX, _WrapY, _LoopX, _LoopY
 
 	// In theory we should test for NavMoveRequestButNoResultYet() but there's no point doing it:
 	// as NavEndFrame() will do the same test. It will end up calling NavUpdateCreateWrappingRequest().
-	if g.NavWindow == window != nil && g.NavMoveScoringItems && g.NavLayer != {} == ImGuiNavLayer.ImGuiNavLayer_Main { g.NavMoveFlags = (g.NavMoveFlags & ~ImGuiNavMoveFlags_.ImGuiNavMoveFlags_WrapMask_) | wrap_flags }
+	if g.NavWindow == window && g.NavMoveScoringItems && g.NavLayer == ImGuiNavLayer.ImGuiNavLayer_Main { g.NavMoveFlags = (g.NavMoveFlags & ~ImGuiNavMoveFlags_.ImGuiNavMoveFlags_WrapMask_) | wrap_flags }
 }
 
 // FIXME: This could be replaced by updating a frame number in each window when (window == NavWindow) and (NavLayer == 0).
@@ -19285,7 +19285,7 @@ NavMoveRequestTryWrapping :: proc(window : ^ImGuiWindow, wrap_flags : ImGuiNavMo
 NavSaveLastChildNavWindowIntoParent :: proc(nav_window : ^ImGuiWindow)
 {
 	parent : ^ImGuiWindow = nav_window
-	for parent != nil && parent.RootWindow != parent && (parent.Flags & (ImGuiWindowFlags_.ImGuiWindowFlags_Popup | ImGuiWindowFlags_.ImGuiWindowFlags_ChildMenu)) != {} == 0 { parent = parent.ParentWindow }
+	for parent != nil && parent.RootWindow != parent && (parent.Flags & (ImGuiWindowFlags_.ImGuiWindowFlags_Popup | ImGuiWindowFlags_.ImGuiWindowFlags_ChildMenu)) == {} { parent = parent.ParentWindow }
 
 	if parent != nil && parent != nav_window { parent.NavLastChildNavWindow = nav_window }
 }
@@ -19339,7 +19339,7 @@ NavInitWindow :: proc(window : ^ImGuiWindow, force_reinit : bool)
 	}
 
 	init_for_nav : bool = false
-	if window == window.RootWindow != nil || (window.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_Popup) != {} || (window.NavLastIds[0] == 0) || force_reinit { init_for_nav = true }
+	if window == window.RootWindow || (window.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_Popup) != {} || (window.NavLastIds[0] == 0) || force_reinit { init_for_nav = true }
 	IMGUI_DEBUG_LOG_NAV("[nav] NavInitRequest: from NavInitWindow(), init_for_nav=%d, window=\"%s\", layer=%d\n", init_for_nav, window.Name, g.NavLayer)
 	if init_for_nav {
 		SetNavID(0, g.NavLayer, window.NavRootFocusScopeId, ImRect())
@@ -19358,7 +19358,7 @@ NavCalcPreferredRefPosSource :: proc() -> ImGuiInputSource
 {
 	g : ^ImGuiContext = GImGui
 	window : ^ImGuiWindow = g.NavWindow
-	activated_shortcut : bool = g.ActiveId != 0 && g.ActiveIdFromShortcut && g.ActiveId != 0 == g.LastItemData.ID
+	activated_shortcut : bool = g.ActiveId != 0 && g.ActiveIdFromShortcut && g.ActiveId == g.LastItemData.ID
 
 	// Testing for !activated_shortcut here could in theory be removed if we decided that activating a remote shortcut altered one of the g.NavDisableXXX flag.
 	if (!g.NavCursorVisible || !g.NavHighlightItemUnderNav || window == nil) && !activated_shortcut { return ImGuiInputSource.ImGuiInputEventType_Mouse }
@@ -19374,7 +19374,7 @@ NavCalcPreferredRefPos :: proc() -> ImVec2
 	window : ^ImGuiWindow = g.NavWindow
 	source : ImGuiInputSource = NavCalcPreferredRefPosSource()
 
-	activated_shortcut : bool = g.ActiveId != 0 && g.ActiveIdFromShortcut && g.ActiveId != 0 == g.LastItemData.ID
+	activated_shortcut : bool = g.ActiveId != 0 && g.ActiveIdFromShortcut && g.ActiveId == g.LastItemData.ID
 
 	// Testing for !activated_shortcut here could in theory be removed if we decided that activating a remote shortcut altered one of the g.NavDisableXXX flag.
 	if source == ImGuiInputSource.ImGuiInputEventType_Mouse {
@@ -19458,11 +19458,11 @@ NavUpdate :: proc()
 	set_mouse_pos : bool = false
 	if g.NavMousePosDirty && g.NavIdIsAlive { if g.NavCursorVisible && g.NavHighlightItemUnderNav && g.NavWindow != nil { set_mouse_pos = true } }
 	g.NavMousePosDirty = false
-	IM_ASSERT(g.NavLayer == ImGuiNavLayer.ImGuiNavLayer_Main || g.NavLayer != {} == ImGuiNavLayer.ImGuiNavLayer_Menu)
+	IM_ASSERT(g.NavLayer == ImGuiNavLayer.ImGuiNavLayer_Main || g.NavLayer == ImGuiNavLayer.ImGuiNavLayer_Menu)
 
 	// Store our return window (for returning from Menu Layer to Main Layer) and clear it as soon as we step back in our own Layer 0
 	if g.NavWindow != nil { NavSaveLastChildNavWindowIntoParent(g.NavWindow) }
-	if g.NavWindow != nil && g.NavWindow.NavLastChildNavWindow != nil && g.NavLayer != {} == ImGuiNavLayer.ImGuiNavLayer_Main { g.NavWindow.NavLastChildNavWindow = nil }
+	if g.NavWindow != nil && g.NavWindow.NavLastChildNavWindow != nil && g.NavLayer == ImGuiNavLayer.ImGuiNavLayer_Main { g.NavWindow.NavLastChildNavWindow = nil }
 
 	// Update CTRL+TAB and Windowing features (hold Square to move/resize/etc.)
 	NavUpdateWindowing()
@@ -19486,18 +19486,18 @@ NavUpdate :: proc()
 			g.NavActivateId = g.NavId
 			g.NavActivateFlags = ImGuiActivateFlags_.ImGuiActivateFlags_PreferTweak
 		}
-		if (g.ActiveId == 0 || g.ActiveId != 0 == g.NavId) && input_pressed {
+		if (g.ActiveId == 0 || g.ActiveId == g.NavId) && input_pressed {
 			g.NavActivateId = g.NavId
 			g.NavActivateFlags = ImGuiActivateFlags_.ImGuiActivateFlags_PreferInput
 		}
-		if (g.ActiveId == 0 || g.ActiveId != 0 == g.NavId) && (activate_down || input_down) { g.NavActivateDownId = g.NavId }
-		if (g.ActiveId == 0 || g.ActiveId != 0 == g.NavId) && (activate_pressed || input_pressed) {
+		if (g.ActiveId == 0 || g.ActiveId == g.NavId) && (activate_down || input_down) { g.NavActivateDownId = g.NavId }
+		if (g.ActiveId == 0 || g.ActiveId == g.NavId) && (activate_pressed || input_pressed) {
 			g.NavActivatePressedId = g.NavId
 			NavHighlightActivated(g.NavId)
 		}
 	}
 	if g.NavWindow != nil && (g.NavWindow.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_NoNavInputs) != {} { g.NavCursorVisible = false }
-	else if g.IO.ConfigNavCursorVisibleAlways && g.NavCursorHideFrames != 0 == 0 { g.NavCursorVisible = true }
+	else if g.IO.ConfigNavCursorVisibleAlways && g.NavCursorHideFrames == 0 { g.NavCursorVisible = true }
 	if g.NavActivateId != 0 { IM_ASSERT(g.NavActivateDownId == g.NavActivateId) }
 
 	// Highlight
@@ -19525,8 +19525,8 @@ NavUpdate :: proc()
 		scroll_speed : f32 = IM_ROUND(CalcFontSize(window) * 100 * io.DeltaTime); // We need round the scrolling speed because sub-pixel scroll isn't reliably supported.
 		move_dir : ImGuiDir = g.NavMoveDir
 		if window.DC.NavLayersActiveMask == 0x00 && window.DC.NavWindowHasScrollY && move_dir != ImGuiDir.ImGuiDir_None {
-			if move_dir == ImGuiDir.ImGuiDir_Left != 0 || move_dir != {} == ImGuiDir.ImGuiDir_Right { SetScrollX(window, ImTrunc(window.Scroll.x + ((move_dir == ImGuiDir.ImGuiDir_Left) ? -1.0 : +1.0) * scroll_speed)) }
-			if move_dir == ImGuiDir.ImGuiDir_Up != 0 || move_dir != {} == ImGuiDir.ImGuiDir_Down { SetScrollY(window, ImTrunc(window.Scroll.y + ((move_dir == ImGuiDir.ImGuiDir_Up) ? -1.0 : +1.0) * scroll_speed)) }
+			if move_dir == ImGuiDir.ImGuiDir_Left || move_dir == ImGuiDir.ImGuiDir_Right { SetScrollX(window, ImTrunc(window.Scroll.x + ((move_dir == ImGuiDir.ImGuiDir_Left) ? -1.0 : +1.0) * scroll_speed)) }
+			if move_dir == ImGuiDir.ImGuiDir_Up || move_dir == ImGuiDir.ImGuiDir_Down { SetScrollY(window, ImTrunc(window.Scroll.y + ((move_dir == ImGuiDir.ImGuiDir_Up) ? -1.0 : +1.0) * scroll_speed)) }
 		}
 
 		// *Normal* Manual scroll with LStick
@@ -19601,8 +19601,8 @@ NavBiasScoringRect :: proc(r : ^ImRect, preferred_pos_rel : ^ImVec2, move_dir : 
 	}
 
 	// Apply general bias on the other axis
-	if (move_dir == ImGuiDir.ImGuiDir_Up != 0 || move_dir != {} == ImGuiDir.ImGuiDir_Down) && preferred_pos_rel.x != FLT_MAX { r.Max.x = preferred_pos_rel.x + rel_to_abs_offset.x; r.Min.x = r.Max.x }
-	else if (move_dir == ImGuiDir.ImGuiDir_Left != 0 || move_dir != {} == ImGuiDir.ImGuiDir_Right) && preferred_pos_rel.y != FLT_MAX { r.Max.y = preferred_pos_rel.y + rel_to_abs_offset.y; r.Min.y = r.Max.y }
+	if (move_dir == ImGuiDir.ImGuiDir_Up || move_dir == ImGuiDir.ImGuiDir_Down) && preferred_pos_rel.x != FLT_MAX { r.Max.x = preferred_pos_rel.x + rel_to_abs_offset.x; r.Min.x = r.Max.x }
+	else if (move_dir == ImGuiDir.ImGuiDir_Left || move_dir == ImGuiDir.ImGuiDir_Right) && preferred_pos_rel.y != FLT_MAX { r.Max.y = preferred_pos_rel.y + rel_to_abs_offset.y; r.Min.y = r.Max.y }
 }
 
 NavUpdateCreateMoveRequest :: proc()
@@ -19639,7 +19639,7 @@ NavUpdateCreateMoveRequest :: proc()
 	// Update PageUp/PageDown/Home/End scroll
 	// FIXME-NAV: Consider enabling those keys even without the master ImGuiConfigFlags_NavEnableKeyboard flag?
 	scoring_rect_offset_y : f32 = 0.0
-	if window != nil && g.NavMoveDir != {} == ImGuiDir.ImGuiDir_None != 0 && nav_keyboard_active { scoring_rect_offset_y = NavUpdatePageUpPageDown() }
+	if window != nil && g.NavMoveDir == ImGuiDir.ImGuiDir_None && nav_keyboard_active { scoring_rect_offset_y = NavUpdatePageUpPageDown() }
 	if scoring_rect_offset_y != 0.0 {
 		g.NavScoringNoClipRect = window.InnerRect
 		TranslateY(&g.NavScoringNoClipRect, scoring_rect_offset_y)
@@ -19661,7 +19661,7 @@ NavUpdateCreateMoveRequest :: proc()
 	if g.NavMoveDir != ImGuiDir.ImGuiDir_None { NavMoveRequestSubmit(g.NavMoveDir, g.NavMoveClipDir, g.NavMoveFlags, g.NavMoveScrollFlags) }
 
 	// Moving with no reference triggers an init request (will be used as a fallback if the direction fails to find a match)
-	if g.NavMoveSubmitted && g.NavId != 0 == 0 {
+	if g.NavMoveSubmitted && g.NavId == 0 {
 		IMGUI_DEBUG_LOG_NAV("[nav] NavInitRequest: from move, window \"%s\", layer=%d\n", window != nil ? window.Name : "<NULL>", g.NavLayer)
 		g.NavInitRequestFromMove = true; g.NavInitRequest = g.NavInitRequestFromMove
 		g.NavInitResult.ID = 0
@@ -19671,7 +19671,7 @@ NavUpdateCreateMoveRequest :: proc()
 	// When using gamepad, we project the reference nav bounding box into window visible area.
 	// This is to allow resuming navigation inside the visible area after doing a large amount of scrolling,
 	// since with gamepad all movements are relative (can't focus a visible object like we can with the mouse).
-	if g.NavMoveSubmitted && g.NavInputSource != {} == ImGuiInputSource.ImGuiInputSource_Gamepad && g.NavLayer != {} == ImGuiNavLayer.ImGuiNavLayer_Main && window != nil {
+	if g.NavMoveSubmitted && g.NavInputSource == ImGuiInputSource.ImGuiInputSource_Gamepad && g.NavLayer == ImGuiNavLayer.ImGuiNavLayer_Main && window != nil {
 		// && (g.NavMoveFlags & ImGuiNavMoveFlags_Forwarded))
 		clamp_x : bool = (g.NavMoveFlags & (ImGuiNavMoveFlags_.ImGuiNavMoveFlags_LoopX | ImGuiNavMoveFlags_.ImGuiNavMoveFlags_WrapX)) == {}
 		clamp_y : bool = (g.NavMoveFlags & (ImGuiNavMoveFlags_.ImGuiNavMoveFlags_LoopY | ImGuiNavMoveFlags_.ImGuiNavMoveFlags_WrapY)) == {}
@@ -19723,7 +19723,7 @@ NavUpdateCreateTabbingRequest :: proc()
 	// (this is ALWAYS ENABLED, regardless of ImGuiConfigFlags_NavEnableKeyboard flag!)
 	// See NavProcessItemForTabbingRequest() for a description of the various forward/backward tabbing cases with and without wrapping.
 	nav_keyboard_active : bool = (g.IO.ConfigFlags & ImGuiConfigFlags_.ImGuiConfigFlags_NavEnableKeyboard) != {}
-	if nav_keyboard_active { g.NavTabbingDir = g.IO.KeyShift ? -1 : (g.NavCursorVisible == false && g.ActiveId != 0 == 0) ? 0 : +1 }
+	if nav_keyboard_active { g.NavTabbingDir = g.IO.KeyShift ? -1 : (g.NavCursorVisible == false && g.ActiveId == 0) ? 0 : +1 }
 	else { g.NavTabbingDir = g.IO.KeyShift ? -1 : (g.ActiveId == 0) ? 0 : +1 }
 	move_flags : ImGuiNavMoveFlags = ImGuiNavMoveFlags_.ImGuiNavMoveFlags_IsTabbing | ImGuiNavMoveFlags_.ImGuiNavMoveFlags_Activate
 	scroll_flags : ImGuiScrollFlags = window.Appearing ? ImGuiScrollFlags_.ImGuiScrollFlags_KeepVisibleEdgeX | ImGuiScrollFlags_.ImGuiScrollFlags_AlwaysCenterY : ImGuiScrollFlags_.ImGuiScrollFlags_KeepVisibleEdgeX | ImGuiScrollFlags_.ImGuiScrollFlags_KeepVisibleEdgeY
@@ -19746,13 +19746,13 @@ NavMoveRequestApplyResult :: proc()
 	result : ^ImGuiNavItemData = (g.NavMoveResultLocal.ID != 0) ? &g.NavMoveResultLocal : (g.NavMoveResultOther.ID != 0) ? &g.NavMoveResultOther : nil
 
 	// Tabbing forward wrap
-	if (g.NavMoveFlags & ImGuiNavMoveFlags_.ImGuiNavMoveFlags_IsTabbing) != {} && result != nil == nil { if (g.NavTabbingCounter == 1 || g.NavTabbingDir != 0 == 0) && g.NavTabbingResultFirst.ID != 0 { result = &g.NavTabbingResultFirst } }
+	if (g.NavMoveFlags & ImGuiNavMoveFlags_.ImGuiNavMoveFlags_IsTabbing) != {} && result == nil { if (g.NavTabbingCounter == 1 || g.NavTabbingDir == 0) && g.NavTabbingResultFirst.ID != 0 { result = &g.NavTabbingResultFirst } }
 
 	// In a situation when there are no results but NavId != 0, re-enable the Navigation highlight (because g.NavId is not considered as a possible result)
-	axis : ImGuiAxis = (g.NavMoveDir == ImGuiDir.ImGuiDir_Up != 0 || g.NavMoveDir != {} == ImGuiDir.ImGuiDir_Down) ? ImGuiAxis.ImGuiAxis_Y : ImGuiAxis.ImGuiAxis_X
+	axis : ImGuiAxis = (g.NavMoveDir == ImGuiDir.ImGuiDir_Up || g.NavMoveDir == ImGuiDir.ImGuiDir_Down) ? ImGuiAxis.ImGuiAxis_Y : ImGuiAxis.ImGuiAxis_X
 	if result == nil {
 		if (g.NavMoveFlags & ImGuiNavMoveFlags_.ImGuiNavMoveFlags_IsTabbing) != {} { g.NavMoveFlags |= ImGuiNavMoveFlags_.ImGuiNavMoveFlags_NoSetNavCursorVisible }
-		if g.NavId != 0 && (g.NavMoveFlags & ImGuiNavMoveFlags_.ImGuiNavMoveFlags_NoSetNavCursorVisible) != {} == 0 { SetNavCursorVisibleAfterMove() }
+		if g.NavId != 0 && (g.NavMoveFlags & ImGuiNavMoveFlags_.ImGuiNavMoveFlags_NoSetNavCursorVisible) == {} { SetNavCursorVisibleAfterMove() }
 		NavClearPreferredPosForAxis(axis); // On a failed move, clear preferred pos for this axis.
 		IMGUI_DEBUG_LOG_NAV("[nav] NavMoveSubmitted but not led to a result!\n")
 		return
@@ -19762,7 +19762,7 @@ NavMoveRequestApplyResult :: proc()
 	if (g.NavMoveFlags & ImGuiNavMoveFlags_.ImGuiNavMoveFlags_AlsoScoreVisibleSet) != {} { if g.NavMoveResultLocalVisible.ID != 0 && g.NavMoveResultLocalVisible.ID != g.NavId { result = &g.NavMoveResultLocalVisible } }
 
 	// Maybe entering a flattened child from the outside? In this case solve the tie using the regular scoring rules.
-	if result != &g.NavMoveResultOther && g.NavMoveResultOther.ID != 0 && g.NavMoveResultOther.Window.ParentWindow != nil == g.NavWindow { if (g.NavMoveResultOther.DistBox < result.DistBox) || (g.NavMoveResultOther.DistBox == result.DistBox != 0 && g.NavMoveResultOther.DistCenter < result.DistCenter) { result = &g.NavMoveResultOther } }
+	if result != &g.NavMoveResultOther && g.NavMoveResultOther.ID != 0 && g.NavMoveResultOther.Window.ParentWindow == g.NavWindow { if (g.NavMoveResultOther.DistBox < result.DistBox) || (g.NavMoveResultOther.DistBox == result.DistBox && g.NavMoveResultOther.DistCenter < result.DistCenter) { result = &g.NavMoveResultOther } }
 	IM_ASSERT(g.NavWindow != nil && result.Window != nil)
 
 	// Scroll to keep newly navigated item fully into view.
@@ -19786,11 +19786,11 @@ NavMoveRequestApplyResult :: proc()
 	// Clear active id unless requested not to
 	// FIXME: ImGuiNavMoveFlags_NoClearActiveId is currently unused as we don't have a clear strategy to preserve active id after interaction,
 	// so this is mostly provided as a gateway for further experiments (see #1418, #2890)
-	if g.ActiveId != result.ID && (g.NavMoveFlags & ImGuiNavMoveFlags_.ImGuiNavMoveFlags_NoClearActiveId) != {} == 0 { ClearActiveID() }
+	if g.ActiveId != result.ID && (g.NavMoveFlags & ImGuiNavMoveFlags_.ImGuiNavMoveFlags_NoClearActiveId) == {} { ClearActiveID() }
 
 	// Don't set NavJustMovedToId if just landed on the same spot (which may happen with ImGuiNavMoveFlags_AllowCurrentNavId)
 	// PageUp/PageDown however sets always set NavJustMovedTo (vs Home/End which doesn't) mimicking Windows behavior.
-	if (g.NavId != result.ID || (g.NavMoveFlags & ImGuiNavMoveFlags_.ImGuiNavMoveFlags_IsPageMove) != {}) && (g.NavMoveFlags & ImGuiNavMoveFlags_.ImGuiNavMoveFlags_NoSelect) != {} == 0 {
+	if (g.NavId != result.ID || (g.NavMoveFlags & ImGuiNavMoveFlags_.ImGuiNavMoveFlags_IsPageMove) != {}) && (g.NavMoveFlags & ImGuiNavMoveFlags_.ImGuiNavMoveFlags_NoSelect) == {} {
 		g.NavJustMovedFromFocusScopeId = g.NavFocusScopeId
 		g.NavJustMovedToId = result.ID
 		g.NavJustMovedToFocusScopeId = result.FocusScopeId
@@ -19814,7 +19814,7 @@ NavMoveRequestApplyResult :: proc()
 	}
 
 	// Tabbing: Activates Inputable, otherwise only Focus
-	if (g.NavMoveFlags & ImGuiNavMoveFlags_.ImGuiNavMoveFlags_IsTabbing) != {} && (result.ItemFlags & ImGuiItemFlagsPrivate_.ImGuiItemFlags_Inputable) != {} == 0 { g.NavMoveFlags &= ~ImGuiNavMoveFlags_.ImGuiNavMoveFlags_Activate }
+	if (g.NavMoveFlags & ImGuiNavMoveFlags_.ImGuiNavMoveFlags_IsTabbing) != {} && (result.ItemFlags & ImGuiItemFlagsPrivate_.ImGuiItemFlags_Inputable) == {} { g.NavMoveFlags &= ~ImGuiNavMoveFlags_.ImGuiNavMoveFlags_Activate }
 
 	// Activate
 	if (g.NavMoveFlags & ImGuiNavMoveFlags_.ImGuiNavMoveFlags_Activate) != {} {
@@ -19948,7 +19948,7 @@ NavEndFrame :: proc()
 	// Perform wrap-around in menus
 	// FIXME-NAV: Wrap may need to apply a weight bias on the other axis. e.g. 4x4 grid with 2 last items missing on last item won't handle LoopY/WrapY correctly.
 	// FIXME-NAV: Wrap (not Loop) support could be handled by the scoring function and then WrapX would function without an extra frame.
-	if g.NavWindow != nil && NavMoveRequestButNoResultYet() && (g.NavMoveFlags & ImGuiNavMoveFlags_.ImGuiNavMoveFlags_WrapMask_) != {} && (g.NavMoveFlags & ImGuiNavMoveFlags_.ImGuiNavMoveFlags_Forwarded) != {} == 0 { NavUpdateCreateWrappingRequest() }
+	if g.NavWindow != nil && NavMoveRequestButNoResultYet() && (g.NavMoveFlags & ImGuiNavMoveFlags_.ImGuiNavMoveFlags_WrapMask_) != {} && (g.NavMoveFlags & ImGuiNavMoveFlags_.ImGuiNavMoveFlags_Forwarded) == {} { NavUpdateCreateWrappingRequest() }
 }
 
 NavUpdateCreateWrappingRequest :: proc()
@@ -19962,7 +19962,7 @@ NavUpdateCreateWrappingRequest :: proc()
 
 	move_flags : ImGuiNavMoveFlags = g.NavMoveFlags
 	//const ImGuiAxis move_axis = (g.NavMoveDir == ImGuiDir_Up || g.NavMoveDir == ImGuiDir_Down) ? ImGuiAxis_Y : ImGuiAxis_X;
-	if g.NavMoveDir == ImGuiDir.ImGuiDir_Left != 0 && (move_flags & (ImGuiNavMoveFlags_.ImGuiNavMoveFlags_WrapX | ImGuiNavMoveFlags_.ImGuiNavMoveFlags_LoopX)) != {} {
+	if g.NavMoveDir == ImGuiDir.ImGuiDir_Left && (move_flags & (ImGuiNavMoveFlags_.ImGuiNavMoveFlags_WrapX | ImGuiNavMoveFlags_.ImGuiNavMoveFlags_LoopX)) != {} {
 		bb_rel.Max.x = window.ContentSize.x + window.WindowPadding.x; bb_rel.Min.x = bb_rel.Max.x
 		if (move_flags & ImGuiNavMoveFlags_.ImGuiNavMoveFlags_WrapX) != {} {
 			TranslateY(&bb_rel, -GetHeight(&bb_rel)); // Previous row
@@ -19970,7 +19970,7 @@ NavUpdateCreateWrappingRequest :: proc()
 		}
 		do_forward = true
 	}
-	if g.NavMoveDir == ImGuiDir.ImGuiDir_Right != 0 && (move_flags & (ImGuiNavMoveFlags_.ImGuiNavMoveFlags_WrapX | ImGuiNavMoveFlags_.ImGuiNavMoveFlags_LoopX)) != {} {
+	if g.NavMoveDir == ImGuiDir.ImGuiDir_Right && (move_flags & (ImGuiNavMoveFlags_.ImGuiNavMoveFlags_WrapX | ImGuiNavMoveFlags_.ImGuiNavMoveFlags_LoopX)) != {} {
 		bb_rel.Max.x = -window.WindowPadding.x; bb_rel.Min.x = bb_rel.Max.x
 		if (move_flags & ImGuiNavMoveFlags_.ImGuiNavMoveFlags_WrapX) != {} {
 			TranslateY(&bb_rel, +GetHeight(&bb_rel)); // Next row
@@ -19978,7 +19978,7 @@ NavUpdateCreateWrappingRequest :: proc()
 		}
 		do_forward = true
 	}
-	if g.NavMoveDir == ImGuiDir.ImGuiDir_Up != 0 && (move_flags & (ImGuiNavMoveFlags_.ImGuiNavMoveFlags_WrapY | ImGuiNavMoveFlags_.ImGuiNavMoveFlags_LoopY)) != {} {
+	if g.NavMoveDir == ImGuiDir.ImGuiDir_Up && (move_flags & (ImGuiNavMoveFlags_.ImGuiNavMoveFlags_WrapY | ImGuiNavMoveFlags_.ImGuiNavMoveFlags_LoopY)) != {} {
 		bb_rel.Max.y = window.ContentSize.y + window.WindowPadding.y; bb_rel.Min.y = bb_rel.Max.y
 		if (move_flags & ImGuiNavMoveFlags_.ImGuiNavMoveFlags_WrapY) != {} {
 			TranslateX(&bb_rel, -GetWidth(&bb_rel)); // Previous column
@@ -19986,7 +19986,7 @@ NavUpdateCreateWrappingRequest :: proc()
 		}
 		do_forward = true
 	}
-	if g.NavMoveDir == ImGuiDir.ImGuiDir_Down != 0 && (move_flags & (ImGuiNavMoveFlags_.ImGuiNavMoveFlags_WrapY | ImGuiNavMoveFlags_.ImGuiNavMoveFlags_LoopY)) != {} {
+	if g.NavMoveDir == ImGuiDir.ImGuiDir_Down && (move_flags & (ImGuiNavMoveFlags_.ImGuiNavMoveFlags_WrapY | ImGuiNavMoveFlags_.ImGuiNavMoveFlags_LoopY)) != {} {
 		bb_rel.Max.y = -window.WindowPadding.y; bb_rel.Min.y = bb_rel.Max.y
 		if (move_flags & ImGuiNavMoveFlags_.ImGuiNavMoveFlags_WrapY) != {} {
 			TranslateX(&bb_rel, +GetWidth(&bb_rel)); // Next column
@@ -20006,7 +20006,7 @@ NavUpdateCreateWrappingRequest :: proc()
 // If you want a window to never be focused, you may use the e.g. NoInputs flag.
 IsWindowNavFocusable :: proc(window : ^ImGuiWindow) -> bool
 {
-	return window.WasActive && window != nil == window.RootWindow != nil && (window.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_NoNavFocus) == {}
+	return window.WasActive && window == window.RootWindow && (window.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_NoNavFocus) == {}
 }
 
 // FIXME-OPT O(N)
@@ -20051,7 +20051,7 @@ NavUpdateWindowing :: proc()
 	if !allow_windowing { g.NavWindowingTarget = nil }
 
 	// Fade out
-	if g.NavWindowingTargetAnim != nil && g.NavWindowingTarget != nil == nil {
+	if g.NavWindowingTargetAnim != nil && g.NavWindowingTarget == nil {
 		g.NavWindowingHighlightAlpha = ImMax(g.NavWindowingHighlightAlpha - io.DeltaTime * 10.0, 0.0)
 		if g.DimBgRatio <= 0.0 && g.NavWindowingHighlightAlpha <= 0.0 { g.NavWindowingTargetAnim = nil }
 	}
@@ -20080,7 +20080,7 @@ NavUpdateWindowing :: proc()
 
 	// Gamepad update
 	g.NavWindowingTimer += io.DeltaTime
-	if g.NavWindowingTarget != nil && g.NavInputSource != {} == ImGuiInputSource.ImGuiInputSource_Gamepad {
+	if g.NavWindowingTarget != nil && g.NavInputSource == ImGuiInputSource.ImGuiInputSource_Gamepad {
 		// Highlight only appears after a brief time holding the button, so that a fast tap on PadMenu (to toggle NavLayer) doesn't add visual noise
 		g.NavWindowingHighlightAlpha = ImMax(g.NavWindowingHighlightAlpha, ImSaturate((g.NavWindowingTimer - NAV_WINDOWING_HIGHLIGHT_DELAY) / 0.05))
 
@@ -20101,7 +20101,7 @@ NavUpdateWindowing :: proc()
 	}
 
 	// Keyboard: Focus
-	if g.NavWindowingTarget != nil && g.NavInputSource != {} == ImGuiInputSource.ImGuiInputSource_Keyboard {
+	if g.NavWindowingTarget != nil && g.NavInputSource == ImGuiInputSource.ImGuiInputSource_Keyboard {
 		// Visuals only appears after a brief time after pressing TAB the first time, so that a fast CTRL+TAB doesn't add visual noise
 		shared_mods : ImGuiKeyChord = ((g.ConfigNavWindowingKeyNext != {} ? g.ConfigNavWindowingKeyNext : ImGuiKey.ImGuiMod_Mask_) & (g.ConfigNavWindowingKeyPrev != {} ? g.ConfigNavWindowingKeyPrev : ImGuiKey.ImGuiMod_Mask_)) & ImGuiKey.ImGuiMod_Mask_
 		IM_ASSERT(shared_mods != {}); // Next/Prev shortcut currently needs a shared modifier to "hold", otherwise Prev actions would keep cycling between two windows.
@@ -20120,13 +20120,13 @@ NavUpdateWindowing :: proc()
 	g.NavInputSource = ImGuiInputSource.ImGuiInputSource_Keyboard
 	break
 } } }
-	if g.NavWindowingToggleLayer && g.NavInputSource != {} == ImGuiInputSource.ImGuiInputSource_Keyboard {
+	if g.NavWindowingToggleLayer && g.NavInputSource == ImGuiInputSource.ImGuiInputSource_Keyboard {
 		// We cancel toggling nav layer when any text has been typed (generally while holding Alt). (See #370)
 		// We cancel toggling nav layer when other modifiers are pressed. (See #4439)
 		// - AltGR is Alt+Ctrl on some layout but we can't reliably detect it (not all backends/systems/layout emit it as Alt+Ctrl).
 		// We cancel toggling nav layer if an owner has claimed the key.
 		if io.InputQueueCharacters.Size > 0 || io.KeyCtrl || io.KeyShift || io.KeySuper { g.NavWindowingToggleLayer = false }
-		else if windowing_toggle_layer_start == false && g.LastKeyboardKeyPressTime != 0 == g.Time { g.NavWindowingToggleLayer = false }
+		else if windowing_toggle_layer_start == false && g.LastKeyboardKeyPressTime == g.Time { g.NavWindowingToggleLayer = false }
 		else if TestKeyOwner(g.NavWindowingToggleKey, ImGuiKeyOwner_NoOwner) == false || TestKeyOwner(ImGuiKey.ImGuiMod_Alt, ImGuiKeyOwner_NoOwner) == false { g.NavWindowingToggleLayer = false }
 
 		// Apply layer toggle on Alt release
@@ -20186,7 +20186,7 @@ NavUpdateWindowing :: proc()
 
 		// Move to parent menu if necessary
 		new_nav_window : ^ImGuiWindow = g.NavWindow
-		for new_nav_window.ParentWindow != nil && (new_nav_window.DC.NavLayersActiveMask & (1 << ImGuiNavLayer.ImGuiNavLayer_Menu)) != 0 == 0 && (new_nav_window.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_ChildWindow) != {} && (new_nav_window.Flags & (ImGuiWindowFlags_.ImGuiWindowFlags_Popup | ImGuiWindowFlags_.ImGuiWindowFlags_ChildMenu)) != {} == 0 { new_nav_window = new_nav_window.ParentWindow }
+		for new_nav_window.ParentWindow != nil && (new_nav_window.DC.NavLayersActiveMask & (1 << ImGuiNavLayer.ImGuiNavLayer_Menu)) == 0 && (new_nav_window.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_ChildWindow) != {} && (new_nav_window.Flags & (ImGuiWindowFlags_.ImGuiWindowFlags_Popup | ImGuiWindowFlags_.ImGuiWindowFlags_ChildMenu)) == {} { new_nav_window = new_nav_window.ParentWindow }
 
 		if new_nav_window != g.NavWindow {
 			old_nav_window : ^ImGuiWindow = g.NavWindow
@@ -20210,7 +20210,7 @@ NavUpdateWindowing :: proc()
 GetFallbackWindowNameForWindowingList :: proc(window : ^ImGuiWindow) -> ^u8
 {
 	if (window.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_Popup) != {} { return LocalizeGetMsg(ImGuiLocKey.ImGuiLocKey_WindowingPopup) }
-	if (window.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_MenuBar) != {} && strcmp(window.Name, "##MainMenuBar") != 0 == 0 { return LocalizeGetMsg(ImGuiLocKey.ImGuiLocKey_WindowingMainMenuBar) }
+	if (window.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_MenuBar) != {} && strcmp(window.Name, "##MainMenuBar") == 0 { return LocalizeGetMsg(ImGuiLocKey.ImGuiLocKey_WindowingMainMenuBar) }
 	if window.DockNodeAsHost != nil {
 		// Not normally shown to user.
 		return "(Dock node)"
@@ -20310,7 +20310,7 @@ BeginDragDropSource :: proc(flags : ImGuiDragDropFlags) -> bool
 		else {
 			// Uncommon path: items without ID
 			if g.IO.MouseDown[mouse_button] == false || window.SkipItems { return false }
-			if (g.LastItemData.StatusFlags & ImGuiItemStatusFlags_.ImGuiItemStatusFlags_HoveredRect) == 0 && (g.ActiveId == 0 || g.ActiveIdWindow != window) { return false }
+			if (g.LastItemData.StatusFlags & ImGuiItemStatusFlags_.ImGuiItemStatusFlags_HoveredRect) == {} && (g.ActiveId == 0 || g.ActiveIdWindow != window) { return false }
 
 			// If you want to use BeginDragDropSource() on an item with no unique identifier for interaction, such as Text() or Image(), you need to:
 			// A) Read the explanation below, B) Use the ImGuiDragDropFlags_SourceAllowNullID flag.
@@ -20408,11 +20408,11 @@ SetDragDropPayload :: proc(type : ^u8, data : rawptr, data_size : uint, cond : I
 
 	IM_ASSERT(type != nil)
 	IM_ASSERT(strlen(type) < IM_ARRAYSIZE(payload.DataType) && "Payload type can be at most 32 characters long")
-	IM_ASSERT((data != nil && data_size > 0) || (data == nil && data_size != {} == 0))
-	IM_ASSERT(cond == ImGuiCond_.ImGuiCond_Always || cond != {} == ImGuiCond_.ImGuiCond_Once)
+	IM_ASSERT((data != nil && data_size > 0) || (data == nil && data_size == {}))
+	IM_ASSERT(cond == ImGuiCond_.ImGuiCond_Always || cond == ImGuiCond_.ImGuiCond_Once)
 	IM_ASSERT(payload.SourceId != 0); // Not called between BeginDragDropSource() and EndDragDropSource()
 
-	if cond == ImGuiCond_.ImGuiCond_Always || payload.DataFrameCount != 0 == -1 {
+	if cond == ImGuiCond_.ImGuiCond_Always || payload.DataFrameCount == -1 {
 		// Copy payload
 		ImStrncpy(payload.DataType, type, IM_ARRAYSIZE(payload.DataType))
 		resize(&g.DragDropPayloadBufHeap, 0)
@@ -20521,7 +20521,7 @@ AcceptDragDropPayload :: proc(type : ^u8, flags : ImGuiDragDropFlags) -> ^ImGuiP
 	if (flags & ImGuiDragDropFlags_.ImGuiDragDropFlags_AcceptNoDrawDefaultRect) == {} && payload.Preview { RenderDragDropTargetRect(r, g.DragDropTargetClipRect) }
 
 	g.DragDropAcceptFrameCount = g.FrameCount
-	if (g.DragDropSourceFlags & ImGuiDragDropFlags_.ImGuiDragDropFlags_SourceExtern) != {} && g.DragDropMouseButton != 0 == -1 { payload.Delivery = was_accepted_previously && (g.DragDropSourceFrameCount < g.FrameCount) }
+	if (g.DragDropSourceFlags & ImGuiDragDropFlags_.ImGuiDragDropFlags_SourceExtern) != {} && g.DragDropMouseButton == -1 { payload.Delivery = was_accepted_previously && (g.DragDropSourceFrameCount < g.FrameCount) }
 	else {
 		// For extern drag sources affecting OS window focus, it's easier to just test !IsMouseDown() instead of IsMouseReleased()
 		payload.Delivery = was_accepted_previously && !IsMouseDown(g.DragDropMouseButton)
@@ -20914,14 +20914,14 @@ LoadIniSettingsFromMemory :: proc(ini_data : ^u8, ini_size : uint)
 	line_end : ^u8 = nil
 	for line : ^u8 = buf; line < buf_end; line = line_end + 1 {
 		// Skip new lines markers, then find end of the line
-		for line^ == '\n' || line^ != 0 == '\r' { post_incr(&line) }
+		for line^ == '\n' || line^ == '\r' { post_incr(&line) }
 
 		line_end = line
 		for line_end < buf_end && line_end^ != '\n' && line_end^ != '\r' { post_incr(&line_end) }
 
 		line_end[0] = 0
 		if line[0] == ';' { continue }
-		if line[0] == '[' && line_end > line && line_end[-1] != 0 == ']' {
+		if line[0] == '[' && line_end > line && line_end[-1] == ']' {
 			// Parse "[Type][Name]". Note that 'Name' can itself contains [] characters, which is acceptable with the current format and parsing code.
 			line_end[-1] = 0
 			name_end : ^u8 = line_end - 1
@@ -21002,7 +21002,7 @@ CreateNewWindowSettings :: proc(name : ^u8) -> ^ImGuiWindowSettings
 FindWindowSettingsByID :: proc(id : ImGuiID) -> ^ImGuiWindowSettings
 {
 	g : ^ImGuiContext = GImGui
-	for settings : ^ImGuiWindowSettings = begin(&g.SettingsWindows); settings != nil; settings = next_chunk(&g.SettingsWindows, settings) { if settings.ID == id != 0 && !settings.WantDelete { return settings } }
+	for settings : ^ImGuiWindowSettings = begin(&g.SettingsWindows); settings != nil; settings = next_chunk(&g.SettingsWindows, settings) { if settings.ID == id && !settings.WantDelete { return settings } }
 
 	return nil
 }
@@ -21099,7 +21099,7 @@ WindowSettingsHandler_WriteAll :: proc(ctx : ^ImGuiContext, handler : ^ImGuiSett
 		settings.Size = ImVec2ih(window.SizeFull)
 		settings.ViewportId = window.ViewportId
 		settings.ViewportPos = ImVec2ih(window.ViewportPos)
-		IM_ASSERT(window.DockNode == nil || window.DockNode.ID != 0 == window.DockId)
+		IM_ASSERT(window.DockNode == nil || window.DockNode.ID == window.DockId)
 		settings.DockId = window.DockId
 		settings.ClassId = window.WindowClass.ClassId
 		settings.DockOrder = window.DockOrder
@@ -21123,7 +21123,7 @@ WindowSettingsHandler_WriteAll :: proc(ctx : ^ImGuiContext, handler : ^ImGuiSett
 				appendf(buf, "ViewportPos=%d,%d\n", settings.ViewportPos.x, settings.ViewportPos.y)
 				appendf(buf, "ViewportId=0x%08X\n", settings.ViewportId)
 			}
-			if settings.Pos.x != 0 || settings.Pos.y != 0 || settings.ViewportId != 0 == ImGui_IMGUI_VIEWPORT_DEFAULT_ID { appendf(buf, "Pos=%d,%d\n", settings.Pos.x, settings.Pos.y) }
+			if settings.Pos.x != 0 || settings.Pos.y != 0 || settings.ViewportId == ImGui_IMGUI_VIEWPORT_DEFAULT_ID { appendf(buf, "Pos=%d,%d\n", settings.Pos.x, settings.Pos.y) }
 			if settings.Size.x != 0 || settings.Size.y != 0 { appendf(buf, "Size=%d,%d\n", settings.Size.x, settings.Size.y) }
 			appendf(buf, "Collapsed=%d\n", settings.Collapsed)
 			if settings.DockId != 0 {
@@ -21218,7 +21218,7 @@ SetCurrentViewport :: proc(current_window : ^ImGuiWindow, viewport : ^ImGuiViewp
 SetWindowViewport :: proc(window : ^ImGuiWindow, viewport : ^ImGuiViewportP)
 {
 	// Abandon viewport
-	if window.ViewportOwned && window.Viewport.Window != nil == window { window.Viewport.Size = ImVec2(0.0, 0.0) }
+	if window.ViewportOwned && window.Viewport.Window == window { window.Viewport.Size = ImVec2(0.0, 0.0) }
 
 	window.Viewport = viewport
 	window.ViewportId = viewport.ID
@@ -21229,7 +21229,7 @@ GetWindowAlwaysWantOwnViewport :: proc(window : ^ImGuiWindow) -> bool
 {
 	// Tooltips and menus are not automatically forced into their own viewport when the NoMerge flag is set, however the multiplication of viewports makes them more likely to protrude and create their own.
 	g : ^ImGuiContext = GImGui
-	if g.IO.ConfigViewportsNoAutoMerge || (window.WindowClass.ViewportFlagsOverrideSet & ImGuiViewportFlags_.ImGuiViewportFlags_NoAutoMerge) != {} { if (g.ConfigFlagsCurrFrame & ImGuiConfigFlags_.ImGuiConfigFlags_ViewportsEnable) != {} { if !window.DockIsActive { if (window.Flags & (ImGuiWindowFlags_.ImGuiWindowFlags_ChildWindow | ImGuiWindowFlags_.ImGuiWindowFlags_ChildMenu | ImGuiWindowFlags_.ImGuiWindowFlags_Tooltip)) == {} { if (window.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_Popup) == 0 || (window.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_Modal) != {} { return true } } } } }
+	if g.IO.ConfigViewportsNoAutoMerge || (window.WindowClass.ViewportFlagsOverrideSet & ImGuiViewportFlags_.ImGuiViewportFlags_NoAutoMerge) != {} { if (g.ConfigFlagsCurrFrame & ImGuiConfigFlags_.ImGuiConfigFlags_ViewportsEnable) != {} { if !window.DockIsActive { if (window.Flags & (ImGuiWindowFlags_.ImGuiWindowFlags_ChildWindow | ImGuiWindowFlags_.ImGuiWindowFlags_ChildMenu | ImGuiWindowFlags_.ImGuiWindowFlags_Tooltip)) == {} { if (window.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_Popup) == {} || (window.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_Modal) != {} { return true } } } } }
 	return false
 }
 
@@ -21279,7 +21279,7 @@ TranslateWindowsInViewport :: proc(viewport : ^ImGuiViewportP, old_pos : ^ImVec2
 	translate_all_windows : bool = (g.ConfigFlagsCurrFrame & ImGuiConfigFlags_.ImGuiConfigFlags_ViewportsEnable) != (g.ConfigFlagsLastFrame & ImGuiConfigFlags_.ImGuiConfigFlags_ViewportsEnable)
 	test_still_fit_rect : ImRect; init(&test_still_fit_rect, old_pos, old_pos + viewport.Size)
 	delta_pos : ImVec2 = new_pos - old_pos
-	for window in g.Windows { if translate_all_windows || (window.Viewport == viewport != nil && (old_size == new_size != nil || Contains(&test_still_fit_rect, Rect(window)))) { TranslateWindow(window, delta_pos) } }
+	for window in g.Windows { if translate_all_windows || (window.Viewport == viewport && (old_size == new_size || Contains(&test_still_fit_rect, Rect(window)))) { TranslateWindow(window, delta_pos) } }
 }
 
 // Scale all windows (position, size). Use when e.g. changing DPI. (This is a lossy operation!)
@@ -21510,8 +21510,8 @@ UpdateViewportsNewFrame :: proc()
 	// - consider the case of holding on a menu item to browse child menus: even thou a mouse button is held, there's no active id because menu items only react on mouse release.
 	// FIXME-VIEWPORT: This is essentially broken, when ImGuiBackendFlags_HasMouseHoveredViewport is set we want to trust when viewport_hovered==NULL and use that.
 	is_mouse_dragging_with_an_expected_destination : bool = g.DragDropActive
-	if is_mouse_dragging_with_an_expected_destination && viewport_hovered != nil == nil { viewport_hovered = g.MouseLastHoveredViewport }
-	if is_mouse_dragging_with_an_expected_destination || g.ActiveId != 0 == 0 || !IsAnyMouseDown() { if viewport_hovered != nil && viewport_hovered != g.MouseViewport && (viewport_hovered.Flags & ImGuiViewportFlags_.ImGuiViewportFlags_NoInputs) == {} { g.MouseViewport = viewport_hovered } }
+	if is_mouse_dragging_with_an_expected_destination && viewport_hovered == nil { viewport_hovered = g.MouseLastHoveredViewport }
+	if is_mouse_dragging_with_an_expected_destination || g.ActiveId == 0 || !IsAnyMouseDown() { if viewport_hovered != nil && viewport_hovered != g.MouseViewport && (viewport_hovered.Flags & ImGuiViewportFlags_.ImGuiViewportFlags_NoInputs) == {} { g.MouseViewport = viewport_hovered } }
 
 	IM_ASSERT(g.MouseViewport != nil)
 }
@@ -21544,7 +21544,7 @@ AddUpdateViewport :: proc(window : ^ImGuiWindow, id : ImGuiID, pos : ^ImVec2, si
 
 	flags |= ImGuiViewportFlags_.ImGuiViewportFlags_IsPlatformWindow
 	if window != nil {
-		if g.MovingWindow != nil && g.MovingWindow.RootWindowDockTree != nil == window { flags |= ImGuiViewportFlags_.ImGuiViewportFlags_NoInputs | ImGuiViewportFlags_.ImGuiViewportFlags_NoFocusOnAppearing }
+		if g.MovingWindow != nil && g.MovingWindow.RootWindowDockTree == window { flags |= ImGuiViewportFlags_.ImGuiViewportFlags_NoInputs | ImGuiViewportFlags_.ImGuiViewportFlags_NoFocusOnAppearing }
 		if (window.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_NoMouseInputs) != {} && (window.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_NoNavInputs) != {} { flags |= ImGuiViewportFlags_.ImGuiViewportFlags_NoInputs }
 		if (window.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_NoFocusOnAppearing) != {} { flags |= ImGuiViewportFlags_.ImGuiViewportFlags_NoFocusOnAppearing }
 	}
@@ -21552,8 +21552,8 @@ AddUpdateViewport :: proc(window : ^ImGuiWindow, id : ImGuiID, pos : ^ImVec2, si
 	viewport : ^ImGuiViewportP = cast(^ImGuiViewportP) FindViewportByID(id)
 	if viewport != nil {
 		// Always update for main viewport as we are already pulling correct platform pos/size (see #4900)
-		if !viewport.PlatformRequestMove || viewport.ID != 0 == IMGUI_VIEWPORT_DEFAULT_ID { viewport.Pos = pos }
-		if !viewport.PlatformRequestResize || viewport.ID != 0 == IMGUI_VIEWPORT_DEFAULT_ID { viewport.Size = size }
+		if !viewport.PlatformRequestMove || viewport.ID == IMGUI_VIEWPORT_DEFAULT_ID { viewport.Pos = pos }
+		if !viewport.PlatformRequestResize || viewport.ID == IMGUI_VIEWPORT_DEFAULT_ID { viewport.Size = size }
 		viewport.Flags = flags | (viewport.Flags & (ImGuiViewportFlags_.ImGuiViewportFlags_IsMinimized | ImGuiViewportFlags_.ImGuiViewportFlags_IsFocused)); // Preserve existing flags
 	}
 	else {
@@ -21584,7 +21584,7 @@ AddUpdateViewport :: proc(window : ^ImGuiWindow, id : ImGuiID, pos : ^ImVec2, si
 	viewport.Window = window
 	viewport.LastFrameActive = g.FrameCount
 	UpdateWorkRect(viewport)
-	IM_ASSERT(window == nil || viewport.ID != 0 == window.ID)
+	IM_ASSERT(window == nil || viewport.ID == window.ID)
 
 	if window != nil { window.ViewportOwned = true }
 
@@ -21670,14 +21670,14 @@ WindowSelectViewport :: proc(window : ^ImGuiWindow)
 	else if GetWindowAlwaysWantOwnViewport(window) {
 		window.Viewport = AddUpdateViewport(window, window.ID, window.Pos, window.Size, ImGuiViewportFlags_.ImGuiViewportFlags_None)
 	}
-	else if g.MovingWindow != nil && g.MovingWindow.RootWindowDockTree != nil == window != nil && IsMousePosValid() {
-		if window.Viewport != nil && window.Viewport.Window != nil == window { window.Viewport = AddUpdateViewport(window, window.ID, window.Pos, window.Size, ImGuiViewportFlags_.ImGuiViewportFlags_None) }
+	else if g.MovingWindow != nil && g.MovingWindow.RootWindowDockTree == window && IsMousePosValid() {
+		if window.Viewport != nil && window.Viewport.Window == window { window.Viewport = AddUpdateViewport(window, window.ID, window.Pos, window.Size, ImGuiViewportFlags_.ImGuiViewportFlags_None) }
 	}
 	else {
 		// Merge into host viewport?
 		// We cannot test window->ViewportOwned as it set lower in the function.
 		// Testing (g.ActiveId == 0 || g.ActiveIdAllowOverlap) to avoid merging during a short-term widget interaction. Main intent was to avoid during resize (see #4212)
-		try_to_merge_into_host_viewport : bool = (window.Viewport != nil && window != nil == window.Viewport.Window != nil && (g.ActiveId == 0 || g.ActiveIdAllowOverlap))
+		try_to_merge_into_host_viewport : bool = (window.Viewport != nil && window == window.Viewport.Window && (g.ActiveId == 0 || g.ActiveIdAllowOverlap))
 		if try_to_merge_into_host_viewport { UpdateTryMergeWindowIntoHostViewports(window) }
 	}
 
@@ -21695,7 +21695,7 @@ WindowSelectViewport :: proc(window : ^ImGuiWindow)
 			if (window.Appearing || (flags & (ImGuiWindowFlags_.ImGuiWindowFlags_Tooltip | ImGuiWindowFlags_.ImGuiWindowFlags_ChildMenu)) != {}) && (!use_mouse_ref || mouse_valid) { window.ViewportAllowPlatformMonitorExtend = FindPlatformMonitorForPos((use_mouse_ref && mouse_valid) ? mouse_ref : NavCalcPreferredRefPos()) }
 			else { window.ViewportAllowPlatformMonitorExtend = window.Viewport.PlatformMonitor }
 		}
-		else if window.Viewport != nil && window != window.Viewport.Window && window.Viewport.Window != nil && (flags & ImGuiWindowFlags_.ImGuiWindowFlags_ChildWindow) == {} && window.DockNode != nil == nil {
+		else if window.Viewport != nil && window != window.Viewport.Window && window.Viewport.Window != nil && (flags & ImGuiWindowFlags_.ImGuiWindowFlags_ChildWindow) == {} && window.DockNode == nil {
 			// When called from Begin() we don't have access to a proper version of the Hidden flag yet, so we replicate this code.
 			will_be_visible : bool = (window.DockIsActive && !window.DockTabIsVisible) ? false : true
 			if (window.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_DockNodeHost) != {} && window.Viewport.LastFrameActive < g.FrameCount && will_be_visible {
@@ -21711,7 +21711,7 @@ WindowSelectViewport :: proc(window : ^ImGuiWindow)
 				window.Viewport = AddUpdateViewport(window, window.ID, window.Pos, window.Size, ImGuiViewportFlags_.ImGuiViewportFlags_NoFocusOnAppearing)
 			}
 		}
-		else if window.ViewportAllowPlatformMonitorExtend < 0 && (flags & ImGuiWindowFlags_.ImGuiWindowFlags_ChildWindow) != {} == 0 {
+		else if window.ViewportAllowPlatformMonitorExtend < 0 && (flags & ImGuiWindowFlags_.ImGuiWindowFlags_ChildWindow) == {} {
 			// Regular (non-child, non-popup) windows by default are also allowed to protrude
 			// Child windows are kept contained within their parent.
 			window.ViewportAllowPlatformMonitorExtend = window.Viewport.PlatformMonitor
@@ -21803,7 +21803,7 @@ WindowSyncOwnedViewport :: proc(window : ^ImGuiWindow, parent_window_in_stack : 
 UpdatePlatformWindows :: proc()
 {
 	g : ^ImGuiContext = GImGui
-	IM_ASSERT(g.FrameCountEnded == g.FrameCount != 0 && "Forgot to call Render() or EndFrame() before UpdatePlatformWindows()?")
+	IM_ASSERT(g.FrameCountEnded == g.FrameCount && "Forgot to call Render() or EndFrame() before UpdatePlatformWindows()?")
 	IM_ASSERT(g.FrameCountPlatformEnded < g.FrameCount)
 	g.FrameCountPlatformEnded = g.FrameCount
 	if (g.ConfigFlagsCurrFrame & ImGuiConfigFlags_.ImGuiConfigFlags_ViewportsEnable) == {} { return }
@@ -21980,14 +21980,14 @@ DestroyPlatformWindow :: proc(viewport : ^ImGuiViewportP)
 		IMGUI_DEBUG_LOG_VIEWPORT("[viewport] Destroy Platform Window %08X '%s'\n", viewport.ID, viewport.Window != nil ? viewport.Window.Name : "n/a")
 		if g.PlatformIO.Renderer_DestroyWindow != nil { Renderer_DestroyWindow(&g.PlatformIO, viewport) }
 		if g.PlatformIO.Platform_DestroyWindow != nil { Platform_DestroyWindow(&g.PlatformIO, viewport) }
-		IM_ASSERT(viewport.RendererUserData == nil && viewport.PlatformUserData != nil == nil)
+		IM_ASSERT(viewport.RendererUserData == nil && viewport.PlatformUserData == nil)
 
 		// Don't clear PlatformWindowCreated for the main viewport, as we initially set that up to true in Initialize()
 		// The righter way may be to leave it to the backend to set this flag all-together, and made the flag public.
 		if viewport.ID != IMGUI_VIEWPORT_DEFAULT_ID { viewport.PlatformWindowCreated = false }
 	}
 	else {
-		IM_ASSERT(viewport.RendererUserData == nil && viewport.PlatformUserData != nil == nil && viewport.PlatformHandle != nil == nil)
+		IM_ASSERT(viewport.RendererUserData == nil && viewport.PlatformUserData == nil && viewport.PlatformHandle == nil)
 	}
 	viewport.PlatformHandle = nil; viewport.PlatformUserData = viewport.PlatformHandle; viewport.RendererUserData = viewport.PlatformUserData
 	ClearRequestFlags(viewport)
@@ -22289,7 +22289,7 @@ DockContextEndFrame :: proc(ctx : ^ImGuiContext)
 	// Draw backgrounds of node missing their window
 	g : ^ImGuiContext = ctx
 	dc : ^ImGuiDockContext = &g.DockContext
-	for n : i32 = 0; n < dc.Nodes.Data.Size; post_incr(&n) { if node : ^ImGuiDockNode = cast(^ImGuiDockNode) dc.Nodes.Data[n].val_p; node { if node.LastFrameActive == g.FrameCount != 0 && node.IsVisible && node.HostWindow != nil && IsLeafNode(node) && !node.IsBgDrawnThisFrame {
+	for n : i32 = 0; n < dc.Nodes.Data.Size; post_incr(&n) { if node : ^ImGuiDockNode = cast(^ImGuiDockNode) dc.Nodes.Data[n].val_p; node { if node.LastFrameActive == g.FrameCount && node.IsVisible && node.HostWindow != nil && IsLeafNode(node) && !node.IsBgDrawnThisFrame {
 	bg_rect : ImRect; init(&bg_rect, node.Pos + ImVec2(0.0, GetFrameHeight()), node.Pos + node.Size)
 	bg_rounding_flags : ImDrawFlags = CalcRoundingFlagsForRectInRect(bg_rect, Rect(node.HostWindow), g.Style.DockingSeparatorSize)
 	ChannelsSetCurrent(node.HostWindow.DrawList, DOCKING_HOST_DRAW_CHANNEL_BG)
@@ -22334,7 +22334,7 @@ DockContextRemoveNode :: proc(ctx : ^ImGuiContext, node : ^ImGuiDockNode, merge_
 
 	IMGUI_DEBUG_LOG_DOCKING("[docking] DockContextRemoveNode 0x%08X\n", node.ID)
 	IM_ASSERT(DockContextFindNodeByID(ctx, node.ID) == node)
-	IM_ASSERT(node.ChildNodes[0] == nil && node.ChildNodes[1] != nil == nil)
+	IM_ASSERT(node.ChildNodes[0] == nil && node.ChildNodes[1] == nil)
 	IM_ASSERT(node.Windows.Size == 0)
 
 	if node.HostWindow != nil { node.HostWindow.DockNodeAsHost = nil }
@@ -22342,8 +22342,8 @@ DockContextRemoveNode :: proc(ctx : ^ImGuiContext, node : ^ImGuiDockNode, merge_
 	parent_node : ^ImGuiDockNode = node.ParentNode
 	merge : bool = (merge_sibling_into_parent_node && parent_node != nil)
 	if merge {
-		IM_ASSERT(parent_node.ChildNodes[0] == node != nil || parent_node.ChildNodes[1] != nil == node)
-		sibling_node : ^ImGuiDockNode = (parent_node.ChildNodes[0] == node != nil ? parent_node.ChildNodes[1] : parent_node.ChildNodes[0])
+		IM_ASSERT(parent_node.ChildNodes[0] == node || parent_node.ChildNodes[1] == node)
+		sibling_node : ^ImGuiDockNode = (parent_node.ChildNodes[0] == node ? parent_node.ChildNodes[1] : parent_node.ChildNodes[0])
 		DockNodeTreeMerge(&g, parent_node, sibling_node)
 	}
 	else {
@@ -22412,8 +22412,8 @@ DockContextPruneUnusedSettingsNodes :: proc(ctx : ^ImGuiContext)
 		data_root : ^ImGuiDockContextPruneNodeData = (data.RootId == settings.ID) ? data : GetByKey(&pool, data.RootId)
 
 		remove : bool = false
-		remove |= (data.CountWindows == 1 && settings.ParentNodeId != 0 == 0 && data.CountChildNodes != 0 == 0 && (settings.Flags & ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_CentralNode) == {}); // Floating root node with only 1 window
-		remove |= (data.CountWindows == 0 && settings.ParentNodeId != 0 == 0 && data.CountChildNodes != 0 == 0); // Leaf nodes with 0 window
+		remove |= (data.CountWindows == 1 && settings.ParentNodeId == 0 && data.CountChildNodes == 0 && (settings.Flags & ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_CentralNode) == {}); // Floating root node with only 1 window
+		remove |= (data.CountWindows == 0 && settings.ParentNodeId == 0 && data.CountChildNodes == 0); // Leaf nodes with 0 window
 		remove |= (data_root.CountChildWindows == 0)
 		if remove {
 			IMGUI_DEBUG_LOG_DOCKING("[docking] DockContextPruneUnusedSettingsNodes: Prune 0x%08X\n", settings.ID)
@@ -22435,8 +22435,8 @@ DockContextBuildNodesFromSettings :: proc(ctx : ^ImGuiContext, node_settings_arr
 		node.Size = ImVec2(settings.Size.x, settings.Size.y)
 		node.SizeRef = ImVec2(settings.SizeRef.x, settings.SizeRef.y)
 		node.AuthorityForViewport = ImGuiDataAuthority_.ImGuiDataAuthority_DockNode; node.AuthorityForSize = node.AuthorityForViewport; node.AuthorityForPos = node.AuthorityForSize
-		if node.ParentNode != nil && node.ParentNode.ChildNodes[0] != nil == nil { node.ParentNode.ChildNodes[0] = node }
-		else if node.ParentNode != nil && node.ParentNode.ChildNodes[1] != nil == nil { node.ParentNode.ChildNodes[1] = node }
+		if node.ParentNode != nil && node.ParentNode.ChildNodes[0] == nil { node.ParentNode.ChildNodes[0] = node }
+		else if node.ParentNode != nil && node.ParentNode.ChildNodes[1] == nil { node.ParentNode.ChildNodes[1] = node }
 		node.SelectedTabId = settings.SelectedTabId
 		node.SplitAxis = cast(ImGuiAxis) settings.SplitAxis
 		SetLocalFlags(node, settings.Flags & ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_SavedFlagsMask_)
@@ -22459,7 +22459,7 @@ DockContextBuildAddWindowsToNodes :: proc(ctx : ^ImGuiContext, root_id : ImGuiID
 
 		node : ^ImGuiDockNode = DockContextFindNodeByID(ctx, window.DockId)
 		IM_ASSERT(node != nil); // This should have been called after DockContextBuildNodesFromSettings()
-		if root_id == 0 || DockNodeGetRootNode(node).ID != 0 == root_id { DockNodeAddWindow(node, window, true) }
+		if root_id == 0 || DockNodeGetRootNode(node).ID == root_id { DockNodeAddWindow(node, window, true) }
 	}
 }
 
@@ -22514,7 +22514,7 @@ DockContextQueueNotifyRemovedNode :: proc(ctx : ^ImGuiContext, node : ^ImGuiDock
 
 DockContextProcessDock :: proc(ctx : ^ImGuiContext, req : ^ImGuiDockRequest)
 {
-	IM_ASSERT((req.Type == ImGuiDockRequestType.ImGuiDockRequestType_Dock && req.DockPayload != nil) || (req.Type == ImGuiDockRequestType.ImGuiDockRequestType_Split && req.DockPayload != nil == nil))
+	IM_ASSERT((req.Type == ImGuiDockRequestType.ImGuiDockRequestType_Dock && req.DockPayload != nil) || (req.Type == ImGuiDockRequestType.ImGuiDockRequestType_Split && req.DockPayload == nil))
 	IM_ASSERT(req.DockTargetWindow != nil || req.DockTargetNode != nil)
 
 	g : ^ImGuiContext = ctx
@@ -22539,7 +22539,7 @@ DockContextProcessDock :: proc(ctx : ^ImGuiContext, req : ^ImGuiDockRequest)
 	// FIXME-DOCK: When we are trying to dock an existing single-window node into a loose window, transfer Node ID as well
 	// When processing an interactive split, usually LastFrameAlive will be < g.FrameCount. But DockBuilder operations can make it ==.
 	if node != nil { IM_ASSERT(node.LastFrameAlive <= g.FrameCount) }
-	if node != nil && target_window != nil && node != nil == target_window.DockNodeAsHost { IM_ASSERT(node.Windows.Size > 0 || IsSplitNode(node) || IsCentralNode(node)) }
+	if node != nil && target_window != nil && node == target_window.DockNodeAsHost { IM_ASSERT(node.Windows.Size > 0 || IsSplitNode(node) || IsCentralNode(node)) }
 
 	// Create new node and add existing window to it
 	if node == nil {
@@ -22556,8 +22556,8 @@ DockContextProcessDock :: proc(ctx : ^ImGuiContext, req : ^ImGuiDockRequest)
 	split_dir : ImGuiDir = req.DockSplitDir
 	if split_dir != ImGuiDir.ImGuiDir_None {
 		// Split into two, one side will be our payload node unless we are dropping a loose window
-		split_axis : ImGuiAxis = (split_dir == ImGuiDir.ImGuiDir_Left != 0 || split_dir != {} == ImGuiDir.ImGuiDir_Right) ? ImGuiAxis.ImGuiAxis_X : ImGuiAxis.ImGuiAxis_Y
-		split_inheritor_child_idx : i32 = (split_dir == ImGuiDir.ImGuiDir_Left != 0 || split_dir != {} == ImGuiDir.ImGuiDir_Up) ? 1 : 0; // Current contents will be moved to the opposite side
+		split_axis : ImGuiAxis = (split_dir == ImGuiDir.ImGuiDir_Left || split_dir == ImGuiDir.ImGuiDir_Right) ? ImGuiAxis.ImGuiAxis_X : ImGuiAxis.ImGuiAxis_Y
+		split_inheritor_child_idx : i32 = (split_dir == ImGuiDir.ImGuiDir_Left || split_dir == ImGuiDir.ImGuiDir_Up) ? 1 : 0; // Current contents will be moved to the opposite side
 		split_ratio : f32 = req.DockSplitRatio
 		DockNodeTreeSplit(ctx, node, split_axis, split_inheritor_child_idx, split_ratio, payload_node); // payload_node may be NULL here!
 		new_node : ^ImGuiDockNode = node.ChildNodes[split_inheritor_child_idx ~ 1]
@@ -22568,7 +22568,7 @@ DockContextProcessDock :: proc(ctx : ^ImGuiContext, req : ^ImGuiDockRequest)
 
 	if node != payload_node {
 		// Create tab bar before we call DockNodeMoveWindows (which would attempt to move the old tab-bar, which would lead us to payload tabs wrongly appearing before target tabs!)
-		if node.Windows.Size > 0 && node.TabBar != nil == nil {
+		if node.Windows.Size > 0 && node.TabBar == nil {
 			DockNodeAddTabBar(node)
 			for n : i32 = 0; n < node.Windows.Size; post_incr(&n) { TabBarAddTab(node.TabBar, ImGuiTabItemFlags_.ImGuiTabItemFlags_None, node.Windows[n]) }
 		}
@@ -22681,7 +22681,7 @@ DockContextProcessUndockNode :: proc(ctx : ^ImGuiContext, node : ^ImGuiDockNode)
 	}
 	else {
 		// Otherwise extract our node and merge our sibling back into the parent node.
-		IM_ASSERT(node.ParentNode.ChildNodes[0] == node != nil || node.ParentNode.ChildNodes[1] != nil == node)
+		IM_ASSERT(node.ParentNode.ChildNodes[0] == node || node.ParentNode.ChildNodes[1] == node)
 		index_in_parent : i32 = (node.ParentNode.ChildNodes[0] == node) ? 0 : 1
 		node.ParentNode.ChildNodes[index_in_parent] = nil
 		DockNodeTreeMerge(ctx, node.ParentNode, node.ParentNode.ChildNodes[index_in_parent ~ 1])
@@ -22703,11 +22703,11 @@ DockContextProcessUndockNode :: proc(ctx : ^ImGuiContext, node : ^ImGuiDockNode)
 // This is mostly used for automation.
 DockContextCalcDropPosForDocking :: proc(target : ^ImGuiWindow, target_node : ^ImGuiDockNode, payload_window : ^ImGuiWindow, payload_node : ^ImGuiDockNode, split_dir : ImGuiDir, split_outer : bool, out_pos : ^ImVec2) -> bool
 {
-	if target != nil && target_node != nil == nil { target_node = target.DockNode }
+	if target != nil && target_node == nil { target_node = target.DockNode }
 
 	// In DockNodePreviewDockSetup() for a root central node instead of showing both "inner" and "outer" drop rects
 	// (which would be functionally identical) we only show the outer one. Reflect this here.
-	if target_node != nil && target_node.ParentNode != nil == nil && IsCentralNode(target_node) && split_dir != ImGuiDir.ImGuiDir_None { split_outer = true }
+	if target_node != nil && target_node.ParentNode == nil && IsCentralNode(target_node) && split_dir != ImGuiDir.ImGuiDir_None { split_outer = true }
 	split_data : ImGuiDockPreviewData
 	DockNodePreviewDockSetup(target, target_node, payload_window, payload_node, &split_data, false, split_outer)
 	if IsInverted(&split_data.DropRectsDraw[split_dir + 1]) { return false }
@@ -22803,13 +22803,13 @@ DockNodeAddWindow :: proc(node : ^ImGuiDockNode, window : ^ImGuiWindow, add_to_t
 		IM_ASSERT(window.DockNode.ID != node.ID)
 		DockNodeRemoveWindow(window.DockNode, window, 0)
 	}
-	IM_ASSERT(window.DockNode == nil || window.DockNodeAsHost != nil == nil)
+	IM_ASSERT(window.DockNode == nil || window.DockNodeAsHost == nil)
 	IMGUI_DEBUG_LOG_DOCKING("[docking] DockNodeAddWindow node 0x%08X window '%s'\n", node.ID, window.Name)
 
 	// If more than 2 windows appeared on the same frame leading to the creation of a new hosting window,
 	// we'll hide windows until the host window is ready. Hide the 1st window after its been output (so it is not visible for one frame).
 	// We will call DockNodeHideWindowDuringHostWindowCreation() on ourselves in Begin()
-	if node.HostWindow == nil && node.Windows.Size != 0 == 1 && node.Windows[0].WasActive == false { DockNodeHideWindowDuringHostWindowCreation(node.Windows[0]) }
+	if node.HostWindow == nil && node.Windows.Size == 1 && node.Windows[0].WasActive == false { DockNodeHideWindowDuringHostWindowCreation(node.Windows[0]) }
 
 	push_back(&node.Windows, window)
 	node.WantHiddenTabBarUpdate = true
@@ -22850,7 +22850,7 @@ DockNodeRemoveWindow :: proc(node : ^ImGuiDockNode, window : ^ImGuiWindow, save_
 	IM_ASSERT(window.DockNode == node)
 	//IM_ASSERT(window->RootWindowDockTree == node->HostWindow);
 	//IM_ASSERT(window->LastFrameActive < g.FrameCount);    // We may call this from Begin()
-	IM_ASSERT(save_dock_id == 0 || save_dock_id != 0 == node.ID)
+	IM_ASSERT(save_dock_id == 0 || save_dock_id == node.ID)
 	IMGUI_DEBUG_LOG_DOCKING("[docking] DockNodeRemoveWindow node 0x%08X window '%s'\n", node.ID, window.Name)
 
 	window.DockNode = nil
@@ -23008,7 +23008,7 @@ DockNodeFindWindowByID :: proc(node : ^ImGuiDockNode, id : ImGuiID) -> ^ImGuiWin
 DockNodeUpdateFlagsAndCollapse :: proc(node : ^ImGuiDockNode)
 {
 	g : ^ImGuiContext = GImGui
-	IM_ASSERT(node.ParentNode == nil || node.ParentNode.ChildNodes[0] != nil == node != nil || node.ParentNode.ChildNodes[1] != nil == node)
+	IM_ASSERT(node.ParentNode == nil || node.ParentNode.ChildNodes[0] == node || node.ParentNode.ChildNodes[1] == node)
 
 	// Inherit most flags
 	if node.ParentNode != nil { node.SharedFlags = node.ParentNode.SharedFlags & ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_SharedFlagsInheritMask_ }
@@ -23031,7 +23031,7 @@ DockNodeUpdateFlagsAndCollapse :: proc(node : ^ImGuiDockNode)
 		node_was_active : bool = (node.LastFrameActive + 1 == g.FrameCount)
 		remove : bool = false
 		remove |= node_was_active && (window.LastFrameActive + 1 < g.FrameCount)
-		remove |= node_was_active && (node.WantCloseAll || node.WantCloseTabId != 0 == window.TabId) && window.HasCloseButton && (window.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_UnsavedDocument) == {}; // Submit all _expected_ closure from last frame
+		remove |= node_was_active && (node.WantCloseAll || node.WantCloseTabId == window.TabId) && window.HasCloseButton && (window.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_UnsavedDocument) == {}; // Submit all _expected_ closure from last frame
 		remove |= (window.DockTabWantClose)
 		if remove {
 			window.DockTabWantClose = false
@@ -23055,7 +23055,7 @@ DockNodeUpdateFlagsAndCollapse :: proc(node : ^ImGuiDockNode)
 
 	// Auto-hide tab bar option
 	node_flags : ImGuiDockNodeFlags = node.MergedFlags
-	if node.WantHiddenTabBarUpdate && node.Windows.Size != 0 == 1 && (node_flags & ImGuiDockNodeFlags_.ImGuiDockNodeFlags_AutoHideTabBar) != {} && !IsHiddenTabBar(node) { node.WantHiddenTabBarToggle = true }
+	if node.WantHiddenTabBarUpdate && node.Windows.Size == 1 && (node_flags & ImGuiDockNodeFlags_.ImGuiDockNodeFlags_AutoHideTabBar) != {} && !IsHiddenTabBar(node) { node.WantHiddenTabBarToggle = true }
 	node.WantHiddenTabBarUpdate = false
 
 	// Cancel toggling if we know our tab bar is enforced to be hidden at all times
@@ -23144,7 +23144,7 @@ DockNodeSetupHostWindow :: proc(node : ^ImGuiDockNode, host_window : ^ImGuiWindo
 	//  - N+0: DockBuilderAddNode(id, 0)    // missing ImGuiDockNodeFlags_DockSpace
 	//  - N+1: NewFrame()                   // will create floating host window for that node
 	//  - N+1: DockSpace(id)                // requalify node as dockspace, moving host window
-	if node.HostWindow != nil && node.HostWindow != host_window && node.HostWindow.DockNodeAsHost != nil == node { node.HostWindow.DockNodeAsHost = nil }
+	if node.HostWindow != nil && node.HostWindow != host_window && node.HostWindow.DockNodeAsHost == node { node.HostWindow.DockNodeAsHost = nil }
 
 	host_window.DockNodeAsHost = node
 	node.HostWindow = host_window
@@ -23178,7 +23178,7 @@ DockNodeUpdate :: proc(node : ^ImGuiDockNode)
 			node.AuthorityForViewport = ImGuiDataAuthority_.ImGuiDataAuthority_Window; node.AuthorityForSize = node.AuthorityForViewport; node.AuthorityForPos = node.AuthorityForSize
 
 			// Transfer focus immediately so when we revert to a regular window it is immediately selected
-			if node.HostWindow != nil && g.NavWindow != nil == node.HostWindow { FocusWindow(single_window) }
+			if node.HostWindow != nil && g.NavWindow == node.HostWindow { FocusWindow(single_window) }
 			if node.HostWindow != nil {
 				IMGUI_DEBUG_LOG_VIEWPORT("[viewport] Node %08X transfer Viewport %08X->%08X to Window '%s'\n", node.ID, node.HostWindow.Viewport.ID, single_window.ID, single_window.Name)
 				single_window.Viewport = node.HostWindow.Viewport
@@ -23199,7 +23199,7 @@ DockNodeUpdate :: proc(node : ^ImGuiDockNode)
 		node.HasWindowMenuButton = false; node.HasCloseButton = node.HasWindowMenuButton
 		node.LastFrameActive = g.FrameCount
 
-		if node.WantMouseMove && node.Windows.Size != 0 == 1 { DockNodeStartMouseMovingWindow(node, node.Windows[0]) }
+		if node.WantMouseMove && node.Windows.Size == 1 { DockNodeStartMouseMovingWindow(node, node.Windows[0]) }
 		return
 	}
 
@@ -23213,7 +23213,7 @@ DockNodeUpdate :: proc(node : ^ImGuiDockNode)
 	// We could remove this frame if we could reliably calculate the expected window size during node update, before the Begin() code.
 	// It would require a generalization of CalcWindowExpectedSize(), probably extracting code away from Begin().
 	// In reality it isn't very important as user quickly ends up with size data in .ini file.
-	if node.IsVisible && node.HostWindow != nil == nil && IsFloatingNode(node) && IsLeafNode(node) {
+	if node.IsVisible && node.HostWindow == nil && IsFloatingNode(node) && IsLeafNode(node) {
 		IM_ASSERT(node.Windows.Size > 0)
 		ref_window : ^ImGuiWindow = nil
 		if node.SelectedTabId != 0 {
@@ -23229,7 +23229,7 @@ DockNodeUpdate :: proc(node : ^ImGuiDockNode)
 	node_flags : ImGuiDockNodeFlags = node.MergedFlags
 
 	// Decide if the node will have a close button and a window menu button
-	node.HasWindowMenuButton = (node.Windows.Size > 0) && (node_flags & ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_NoWindowMenuButton) != {} == 0
+	node.HasWindowMenuButton = (node.Windows.Size > 0) && (node_flags & ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_NoWindowMenuButton) == {}
 	node.HasCloseButton = false
 	for window in node.Windows {
 		// FIXME-DOCK: Setting DockIsActive here means that for single active window in a leaf node, DockIsActive will be cleared until the next Begin() call.
@@ -23454,7 +23454,7 @@ DockNodeWindowMenuUpdate :: proc(node : ^ImGuiDockNode, tab_bar : ^ImGuiTabBar)
 // User helper to append/amend into a dock node tab bar. Most commonly used to add e.g. a "+" button.
 DockNodeBeginAmendTabBar :: proc(node : ^ImGuiDockNode) -> bool
 {
-	if node.TabBar == nil || node.HostWindow != nil == nil { return false }
+	if node.TabBar == nil || node.HostWindow == nil { return false }
 	if (node.MergedFlags & ImGuiDockNodeFlags_.ImGuiDockNodeFlags_KeepAliveOnly) != {} { return false }
 	if node.TabBar.ID == 0 { return false }
 	Begin(node.HostWindow.Name)
@@ -23479,7 +23479,7 @@ IsDockNodeTitleBarHighlighted :: proc(node : ^ImGuiDockNode, root_node : ^ImGuiD
 	if g.NavWindowingTarget != nil { return (g.NavWindowingTarget.DockNode == node) }
 
 	// FIXME-DOCKING: May want alternative to treat central node void differently? e.g. if (g.NavWindow == host_window)
-	if g.NavWindow != nil && root_node.LastFocusedNodeId != 0 == node.ID {
+	if g.NavWindow != nil && root_node.LastFocusedNodeId == node.ID {
 		// FIXME: This could all be backed in RootWindowForTitleBarHighlight? Probably need to reorganize for both dock nodes + other RootWindowForTitleBarHighlight users (not-node)
 		parent_window : ^ImGuiWindow = g.NavWindow.RootWindow
 		for (parent_window.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_ChildMenu) != {} { parent_window = parent_window.ParentWindow.RootWindow }
@@ -23514,7 +23514,7 @@ DockNodeUpdateTabBar :: proc(node : ^ImGuiDockNode, host_window : ^ImGuiWindow)
 		if is_focused { node.LastFrameFocused = g.FrameCount }
 		if node.VisibleWindow != nil {
 			// Notify root of visible window (used to display title in OS task bar)
-			if is_focused || root_node.VisibleWindow != nil == nil { root_node.VisibleWindow = node.VisibleWindow }
+			if is_focused || root_node.VisibleWindow == nil { root_node.VisibleWindow = node.VisibleWindow }
 			if node.TabBar != nil { node.TabBar.VisibleTabId = node.VisibleWindow.TabId }
 		}
 		return
@@ -23542,7 +23542,7 @@ DockNodeUpdateTabBar :: proc(node : ^ImGuiDockNode, host_window : ^ImGuiWindow)
 	node.IsFocused = is_focused
 
 	node_flags : ImGuiDockNodeFlags = node.MergedFlags
-	has_window_menu_button : bool = (node_flags & ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_NoWindowMenuButton) == 0 && (style.WindowMenuButtonPosition != ImGuiDir.ImGuiDir_None)
+	has_window_menu_button : bool = (node_flags & ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_NoWindowMenuButton) == {} && (style.WindowMenuButtonPosition != ImGuiDir.ImGuiDir_None)
 
 	// In a dock node, the Collapse Button turns into the Window Menu button.
 	// FIXME-DOCK FIXME-OPT: Could we recycle popups id across multiple dock nodes?
@@ -23602,7 +23602,7 @@ DockNodeUpdateTabBar :: proc(node : ^ImGuiDockNode, host_window : ^ImGuiWindow)
 	}
 
 	// Apply NavWindow focus back to the tab bar
-	if g.NavWindow != nil && g.NavWindow.RootWindow.DockNode != nil == node { tab_bar.SelectedTabId = g.NavWindow.RootWindow.TabId }
+	if g.NavWindow != nil && g.NavWindow.RootWindow.DockNode == node { tab_bar.SelectedTabId = g.NavWindow.RootWindow.TabId }
 
 	// Selected newly added tabs, or persistent tab ID if the tab bar was just recreated
 	if tab_bar_is_recreated && TabBarFindTabByID(tab_bar, node.SelectedTabId) != nil { tab_bar.NextSelectedTabId = node.SelectedTabId; tab_bar.SelectedTabId = tab_bar.NextSelectedTabId }
@@ -23627,7 +23627,7 @@ DockNodeUpdateTabBar :: proc(node : ^ImGuiDockNode, host_window : ^ImGuiWindow)
 	node.VisibleWindow = nil
 	for window_n : i32 = 0; window_n < node.Windows.Size; post_incr(&window_n) {
 		window : ^ImGuiWindow = node.Windows[window_n]
-		if (closed_all || closed_one != 0 == window.TabId) && window.HasCloseButton && (window.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_UnsavedDocument) == {} { continue }
+		if (closed_all || closed_one == window.TabId) && window.HasCloseButton && (window.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_UnsavedDocument) == {} { continue }
 		if window.LastFrameActive + 1 >= g.FrameCount || !node_was_active {
 			tab_item_flags : ImGuiTabItemFlags = 0
 			tab_item_flags |= window.WindowClass.TabItemFlagsOverrideSet
@@ -23648,7 +23648,7 @@ DockNodeUpdateTabBar :: proc(node : ^ImGuiDockNode, host_window : ^ImGuiWindow)
 			window.DockTabItemRect = g.LastItemData.Rect
 
 			// Update navigation ID on menu layer
-			if g.NavWindow != nil && g.NavWindow.RootWindow != nil == window != nil && (window.DC.NavLayersActiveMask & (1 << ImGuiNavLayer.ImGuiNavLayer_Menu)) != 0 == 0 { host_window.NavLastIds[1] = window.TabId }
+			if g.NavWindow != nil && g.NavWindow.RootWindow == window && (window.DC.NavLayersActiveMask & (1 << ImGuiNavLayer.ImGuiNavLayer_Menu)) == 0 { host_window.NavLastIds[1] = window.TabId }
 		}
 	}
 
@@ -23656,7 +23656,7 @@ DockNodeUpdateTabBar :: proc(node : ^ImGuiDockNode, host_window : ^ImGuiWindow)
 	for color_n : i32 = 0; color_n < ImGuiWindowDockStyleCol.ImGuiWindowDockStyleCol_COUNT; post_incr(&color_n) { g.Style.Colors[GWindowDockStyleColors[color_n]] = backup_style_cols[color_n] }
 
 	// Notify root of visible window (used to display title in OS task bar)
-	if node.VisibleWindow != nil { if is_focused || root_node.VisibleWindow != nil == nil { root_node.VisibleWindow = node.VisibleWindow } }
+	if node.VisibleWindow != nil { if is_focused || root_node.VisibleWindow == nil { root_node.VisibleWindow = node.VisibleWindow } }
 
 	// Close button (after VisibleWindow was updated)
 	// Note that VisibleWindow may have been overrided by CTRL+Tabbing, so VisibleWindow->TabId may be != from tab_bar->SelectedTabId
@@ -23683,7 +23683,7 @@ DockNodeUpdateTabBar :: proc(node : ^ImGuiDockNode, host_window : ^ImGuiWindow)
 	// When clicking on the title bar outside of tabs, we still focus the selected tab for that node
 	// FIXME: TabItems submitted earlier use AllowItemOverlap so we manually perform a more specific test for now (hovered || held) in order to not cover them.
 	title_bar_id : ImGuiID = GetID(host_window, "#TITLEBAR")
-	if g.HoveredId == 0 || g.HoveredId != 0 == title_bar_id != 0 || g.ActiveId != 0 == title_bar_id {
+	if g.HoveredId == 0 || g.HoveredId == title_bar_id || g.ActiveId == title_bar_id {
 		// AllowOverlap mode required for appending into dock node tab bar,
 		// otherwise dragging window will steal HoveredId and amended tabs cannot get them.
 		held : bool
@@ -23748,8 +23748,8 @@ DockNodeIsDropAllowedOne :: proc(payload : ^ImGuiWindow, host_window : ^ImGuiWin
 	payload_class : ^ImGuiWindowClass = &payload.WindowClass
 	if host_class.ClassId != payload_class.ClassId {
 		pass : bool = false
-		if host_class.ClassId != 0 && host_class.DockingAllowUnclassed && payload_class.ClassId != 0 == 0 { pass = true }
-		if payload_class.ClassId != 0 && payload_class.DockingAllowUnclassed && host_class.ClassId != 0 == 0 { pass = true }
+		if host_class.ClassId != 0 && host_class.DockingAllowUnclassed && payload_class.ClassId == 0 { pass = true }
+		if payload_class.ClassId != 0 && payload_class.DockingAllowUnclassed && host_class.ClassId == 0 { pass = true }
 		if !pass { return false }
 	}
 
@@ -23802,10 +23802,10 @@ DockNodeCalcTabBarLayout :: proc(node : ^ImGuiDockNode, out_title_rect : ^ImRect
 		if out_close_button_pos != nil { out_close_button_pos^ = ImVec2(r.Max.x - button_sz, r.Min.y + style.FramePadding.y) }
 		r.Max.x -= button_sz + style.ItemInnerSpacing.x
 	}
-	if node.HasWindowMenuButton && style.WindowMenuButtonPosition != {} == ImGuiDir.ImGuiDir_Left {
+	if node.HasWindowMenuButton && style.WindowMenuButtonPosition == ImGuiDir.ImGuiDir_Left {
 		r.Min.x += button_sz + style.ItemInnerSpacing.x
 	}
-	else if node.HasWindowMenuButton && style.WindowMenuButtonPosition != {} == ImGuiDir.ImGuiDir_Right {
+	else if node.HasWindowMenuButton && style.WindowMenuButtonPosition == ImGuiDir.ImGuiDir_Right {
 		window_menu_button_pos = ImVec2(r.Max.x - button_sz, r.Min.y + style.FramePadding.y)
 		r.Max.x -= button_sz + style.ItemInnerSpacing.x
 	}
@@ -23817,7 +23817,7 @@ DockNodeCalcSplitRects :: proc(pos_old : ^ImVec2, size_old : ^ImVec2, pos_new : 
 {
 	g : ^ImGuiContext = GImGui
 	dock_spacing : f32 = g.Style.ItemInnerSpacing.x
-	axis : ImGuiAxis = (dir == ImGuiDir.ImGuiDir_Left != 0 || dir != {} == ImGuiDir.ImGuiDir_Right) ? ImGuiAxis.ImGuiAxis_X : ImGuiAxis.ImGuiAxis_Y
+	axis : ImGuiAxis = (dir == ImGuiDir.ImGuiDir_Left || dir == ImGuiDir.ImGuiDir_Right) ? ImGuiAxis.ImGuiAxis_X : ImGuiAxis.ImGuiAxis_Y
 	pos_new[axis ~ 1] = pos_old[axis ~ 1]
 	size_new[axis ~ 1] = size_old[axis ~ 1]
 
@@ -23833,10 +23833,10 @@ DockNodeCalcSplitRects :: proc(pos_old : ^ImVec2, size_old : ^ImVec2, pos_new : 
 	}
 
 	// Position each node
-	if dir == ImGuiDir.ImGuiDir_Right != 0 || dir != {} == ImGuiDir.ImGuiDir_Down {
+	if dir == ImGuiDir.ImGuiDir_Right || dir == ImGuiDir.ImGuiDir_Down {
 		pos_new[axis] = pos_old[axis] + size_old[axis] + dock_spacing
 	}
-	else if dir == ImGuiDir.ImGuiDir_Left != 0 || dir != {} == ImGuiDir.ImGuiDir_Up {
+	else if dir == ImGuiDir.ImGuiDir_Left || dir == ImGuiDir.ImGuiDir_Up {
 		pos_new[axis] = pos_old[axis]
 		pos_old[axis] = pos_new[axis] + size_new[axis] + dock_spacing
 	}
@@ -23917,7 +23917,7 @@ DockNodePreviewDockSetup :: proc(host_window : ^ImGuiWindow, host_node : ^ImGuiD
 
 	data.IsSidesAvailable = true
 	if (dst_node_flags & ImGuiDockNodeFlags_.ImGuiDockNodeFlags_NoDockingSplit) != {} || g.IO.ConfigDockingNoSplit { data.IsSidesAvailable = false }
-	else if !is_outer_docking && host_node != nil && host_node.ParentNode != nil == nil && IsCentralNode(host_node) { data.IsSidesAvailable = false }
+	else if !is_outer_docking && host_node != nil && host_node.ParentNode == nil && IsCentralNode(host_node) { data.IsSidesAvailable = false }
 	else if (src_node_flags & ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_NoDockingSplitOther) != {} { data.IsSidesAvailable = false }
 
 	// Build a tentative future node (reuse same structure because it is practical. Shape will be readjusted when previewing a split)
@@ -23932,7 +23932,7 @@ DockNodePreviewDockSetup :: proc(host_window : ^ImGuiWindow, host_node : ^ImGuiD
 	data.SplitDir = ImGuiDir.ImGuiDir_None
 	data.IsSplitDirExplicit = false
 	if !host_window.Collapsed { for dir : i32 = ImGuiDir.ImGuiDir_None; dir < ImGuiDir.ImGuiDir_COUNT; post_incr(&dir) {
-	if dir == ImGuiDir.ImGuiDir_None != 0 && !data.IsCenterAvailable { continue }
+	if dir == ImGuiDir.ImGuiDir_None && !data.IsCenterAvailable { continue }
 	if dir != ImGuiDir.ImGuiDir_None && !data.IsSidesAvailable { continue }
 	if DockNodeCalcDropRectsAndTestMousePos(Rect(&data.FutureNode), cast(ImGuiDir) dir, data.DropRectsDraw[dir + 1], is_outer_docking, &g.IO.MousePos) {
 		data.SplitDir = cast(ImGuiDir) dir
@@ -23948,7 +23948,7 @@ DockNodePreviewDockSetup :: proc(host_window : ^ImGuiWindow, host_node : ^ImGuiD
 	data.SplitRatio = 0.0
 	if data.SplitDir != ImGuiDir.ImGuiDir_None {
 		split_dir : ImGuiDir = data.SplitDir
-		split_axis : ImGuiAxis = (split_dir == ImGuiDir.ImGuiDir_Left != 0 || split_dir != {} == ImGuiDir.ImGuiDir_Right) ? ImGuiAxis.ImGuiAxis_X : ImGuiAxis.ImGuiAxis_Y
+		split_axis : ImGuiAxis = (split_dir == ImGuiDir.ImGuiDir_Left || split_dir == ImGuiDir.ImGuiDir_Right) ? ImGuiAxis.ImGuiAxis_X : ImGuiAxis.ImGuiAxis_Y
 		pos_new : ImVec2; pos_old : ImVec2 = data.FutureNode.Pos
 		size_new : ImVec2; size_old : ImVec2 = data.FutureNode.Size
 		DockNodeCalcSplitRects(pos_old, size_old, pos_new, size_new, split_dir, payload_window.Size)
@@ -23957,7 +23957,7 @@ DockNodePreviewDockSetup :: proc(host_window : ^ImGuiWindow, host_node : ^ImGuiD
 		split_ratio : f32 = ImSaturate(size_new[split_axis] / data.FutureNode.Size[split_axis])
 		data.FutureNode.Pos = pos_new
 		data.FutureNode.Size = size_new
-		data.SplitRatio = (split_dir == ImGuiDir.ImGuiDir_Right != 0 || split_dir != {} == ImGuiDir.ImGuiDir_Down) ? (1.0 - split_ratio) : (split_ratio)
+		data.SplitRatio = (split_dir == ImGuiDir.ImGuiDir_Right || split_dir == ImGuiDir.ImGuiDir_Down) ? (1.0 - split_ratio) : (split_ratio)
 	}
 }
 
@@ -23986,12 +23986,12 @@ DockNodePreviewDockRender :: proc(host_window : ^ImGuiWindow, host_node : ^ImGui
 	can_preview_tabs : bool = (root_payload.DockNodeAsHost == nil || root_payload.DockNodeAsHost.Windows.Size > 0)
 	if data.IsDropAllowed {
 		overlay_rect : ImRect = Rect(&data.FutureNode)
-		if data.SplitDir == ImGuiDir.ImGuiDir_None != 0 && can_preview_tabs { overlay_rect.Min.y += GetFrameHeight() }
+		if data.SplitDir == ImGuiDir.ImGuiDir_None && can_preview_tabs { overlay_rect.Min.y += GetFrameHeight() }
 		if data.SplitDir != ImGuiDir.ImGuiDir_None || data.IsCenterAvailable { for overlay_n : i32 = 0; overlay_n < overlay_draw_lists_count; post_incr(&overlay_n) { AddRectFilled(overlay_draw_lists[overlay_n], overlay_rect.Min, overlay_rect.Max, overlay_col_main, host_window.WindowRounding, CalcRoundingFlagsForRectInRect(overlay_rect, Rect(host_window), g.Style.DockingSeparatorSize)) } }
 	}
 
 	// Display tab shape/label preview unless we are splitting node (it generally makes the situation harder to read)
-	if data.IsDropAllowed && can_preview_tabs && data.SplitDir != {} == ImGuiDir.ImGuiDir_None != 0 && data.IsCenterAvailable {
+	if data.IsDropAllowed && can_preview_tabs && data.SplitDir == ImGuiDir.ImGuiDir_None && data.IsCenterAvailable {
 		// Compute target tab bar geometry so we can locate our preview tabs
 		tab_bar_rect : ImRect
 		DockNodeCalcTabBarLayout(&data.FutureNode, nil, &tab_bar_rect, nil, nil)
@@ -24014,7 +24014,7 @@ DockNodePreviewDockRender :: proc(host_window : ^ImGuiWindow, host_node : ^ImGui
 		for payload_n : i32 = 0; payload_n < payload_count; post_incr(&payload_n) {
 			// DockNode's TabBar may have non-window Tabs manually appended by user
 			payload_window : ^ImGuiWindow = tab_bar_with_payload != nil ? tab_bar_with_payload.Tabs[payload_n].Window : root_payload
-			if tab_bar_with_payload != nil && payload_window != nil == nil { continue }
+			if tab_bar_with_payload != nil && payload_window == nil { continue }
 			if !DockNodeIsDropAllowedOne(payload_window, host_window) { continue }
 
 			// Calculate the tab bounding box for each payload window
@@ -24043,13 +24043,13 @@ DockNodePreviewDockRender :: proc(host_window : ^ImGuiWindow, host_node : ^ImGui
 			draw_r : ImRect = data.DropRectsDraw[dir + 1]
 			draw_r_in : ImRect = draw_r
 			Expand(&draw_r_in, -2.0)
-			overlay_col : ImU32 = (data.SplitDir == (cast(ImGuiDir) dir) != {} && data.IsSplitDirExplicit) ? overlay_col_drop_hovered : overlay_col_drop
+			overlay_col : ImU32 = (data.SplitDir == cast(ImGuiDir) dir && data.IsSplitDirExplicit) ? overlay_col_drop_hovered : overlay_col_drop
 			for overlay_n : i32 = 0; overlay_n < overlay_draw_lists_count; post_incr(&overlay_n) {
 				center : ImVec2 = ImFloor(GetCenter(&draw_r_in))
 				AddRectFilled(overlay_draw_lists[overlay_n], draw_r.Min, draw_r.Max, overlay_col, overlay_rounding)
 				AddRect(overlay_draw_lists[overlay_n], draw_r_in.Min, draw_r_in.Max, overlay_col_lines, overlay_rounding)
-				if dir == ImGuiDir.ImGuiDir_Left != 0 || dir != 0 == ImGuiDir.ImGuiDir_Right { AddLine(overlay_draw_lists[overlay_n], ImVec2(center.x, draw_r_in.Min.y), ImVec2(center.x, draw_r_in.Max.y), overlay_col_lines) }
-				if dir == ImGuiDir.ImGuiDir_Up != 0 || dir != 0 == ImGuiDir.ImGuiDir_Down { AddLine(overlay_draw_lists[overlay_n], ImVec2(draw_r_in.Min.x, center.y), ImVec2(draw_r_in.Max.x, center.y), overlay_col_lines) }
+				if dir == ImGuiDir.ImGuiDir_Left || dir == ImGuiDir.ImGuiDir_Right { AddLine(overlay_draw_lists[overlay_n], ImVec2(center.x, draw_r_in.Min.y), ImVec2(center.x, draw_r_in.Max.y), overlay_col_lines) }
+				if dir == ImGuiDir.ImGuiDir_Up || dir == ImGuiDir.ImGuiDir_Down { AddLine(overlay_draw_lists[overlay_n], ImVec2(draw_r_in.Min.x, center.y), ImVec2(draw_r_in.Max.x, center.y), overlay_col_lines) }
 			}
 		}
 
@@ -24120,7 +24120,7 @@ DockNodeTreeMerge :: proc(ctx : ^ImGuiContext, parent_node : ^ImGuiDockNode, mer
 	child_0 : ^ImGuiDockNode = parent_node.ChildNodes[0]
 	child_1 : ^ImGuiDockNode = parent_node.ChildNodes[1]
 	IM_ASSERT(child_0 != nil || child_1 != nil)
-	IM_ASSERT(merge_lead_child == child_0 != nil || merge_lead_child != nil == child_1)
+	IM_ASSERT(merge_lead_child == child_0 || merge_lead_child == child_1)
 	if (child_0 != nil && child_0.Windows.Size > 0) || (child_1 != nil && child_1.Windows.Size > 0) {
 		IM_ASSERT(parent_node.TabBar == nil)
 		IM_ASSERT(parent_node.Windows.Size == 0)
@@ -24166,7 +24166,7 @@ DockNodeTreeUpdatePosSize :: proc(node : ^ImGuiDockNode, pos : ImVec2, size : Im
 	// During the regular dock node update we write to all nodes.
 	// 'only_write_to_single_node' is only set when turning a node visible mid-frame and we need its size right-away.
 	g : ^ImGuiContext = GImGui
-	write_to_node : bool = only_write_to_single_node == nil || only_write_to_single_node != nil == node
+	write_to_node : bool = only_write_to_single_node == nil || only_write_to_single_node == node
 	if write_to_node {
 		node.Pos = pos
 		node.Size = size
@@ -24249,8 +24249,8 @@ DockNodeTreeUpdateSplitterFindTouchingNode :: proc(node : ^ImGuiDockNode, axis :
 		push_back(touching_nodes, node)
 		return
 	}
-	if node.ChildNodes[0].IsVisible { if node.SplitAxis != axis || side != 0 == 0 || !node.ChildNodes[1].IsVisible { DockNodeTreeUpdateSplitterFindTouchingNode(node.ChildNodes[0], axis, side, touching_nodes) } }
-	if node.ChildNodes[1].IsVisible { if node.SplitAxis != axis || side != 0 == 1 || !node.ChildNodes[0].IsVisible { DockNodeTreeUpdateSplitterFindTouchingNode(node.ChildNodes[1], axis, side, touching_nodes) } }
+	if node.ChildNodes[0].IsVisible { if node.SplitAxis != axis || side == 0 || !node.ChildNodes[1].IsVisible { DockNodeTreeUpdateSplitterFindTouchingNode(node.ChildNodes[0], axis, side, touching_nodes) } }
+	if node.ChildNodes[1].IsVisible { if node.SplitAxis != axis || side == 1 || !node.ChildNodes[0].IsVisible { DockNodeTreeUpdateSplitterFindTouchingNode(node.ChildNodes[1], axis, side, touching_nodes) } }
 }
 
 // (Depth-First, Pre-Order)
@@ -24396,7 +24396,7 @@ DockNodeTreeFindVisibleNodeByPos :: proc(node : ^ImGuiDockNode, pos : ImVec2) ->
 SetWindowDock :: proc(window : ^ImGuiWindow, dock_id : ImGuiID, cond : ImGuiCond)
 {
 	// Test condition (NB: bit 0 is always true) and clear flags for next time
-	if cond != {} && (window.SetWindowDockAllowFlags & cond) != {} == 0 { return }
+	if cond != {} && (window.SetWindowDockAllowFlags & cond) == {} { return }
 	window.SetWindowDockAllowFlags &= ~(ImGuiCond_.ImGuiCond_Once | ImGuiCond_.ImGuiCond_FirstUseEver | ImGuiCond_.ImGuiCond_Appearing)
 
 	if window.DockId == dock_id { return }
@@ -24456,7 +24456,7 @@ DockSpace :: proc(dockspace_id : ImGuiID, size_arg : ^ImVec2, flags : ImGuiDockN
 
 	// When a DockSpace transitioned form implicit to explicit this may be called a second time
 	// It is possible that the node has already been claimed by a docked window which appeared before the DockSpace() node, so we overwrite IsDockSpace again.
-	if node.LastFrameActive == g.FrameCount != 0 && (flags & ImGuiDockNodeFlags_.ImGuiDockNodeFlags_KeepAliveOnly) == {} {
+	if node.LastFrameActive == g.FrameCount && (flags & ImGuiDockNodeFlags_.ImGuiDockNodeFlags_KeepAliveOnly) == {} {
 		IM_ASSERT(IsDockSpace(node) == false && "Cannot call DockSpace() twice a frame with the same ID")
 		SetLocalFlags(node, node.LocalFlags | ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_DockSpace)
 		return dockspace_id
@@ -24687,7 +24687,7 @@ DockBuilderRemoveNodeChildNodes :: proc(root_id : ImGuiID)
 	dc : ^ImGuiDockContext = &g.DockContext
 
 	root_node : ^ImGuiDockNode = root_id != 0 ? DockContextFindNodeByID(&g, root_id) : nil
-	if root_id != 0 && root_node != nil == nil { return }
+	if root_id != 0 && root_node == nil { return }
 	has_central_node : bool = false
 
 	backup_root_node_authority_for_pos : ImGuiDataAuthority = root_node != nil ? root_node.AuthorityForPos : ImGuiDataAuthority_.ImGuiDataAuthority_Auto
@@ -24696,7 +24696,7 @@ DockBuilderRemoveNodeChildNodes :: proc(root_id : ImGuiID)
 	// Process active windows
 	nodes_to_remove : ImVector(^ImGuiDockNode)
 	for n : i32 = 0; n < dc.Nodes.Data.Size; post_incr(&n) { if node : ^ImGuiDockNode = cast(^ImGuiDockNode) dc.Nodes.Data[n].val_p; node {
-	want_removal : bool = (root_id == 0) || (node.ID != root_id && DockNodeGetRootNode(node).ID != 0 == root_id)
+	want_removal : bool = (root_id == 0) || (node.ID != root_id && DockNodeGetRootNode(node).ID == root_id)
 	if want_removal {
 		if IsCentralNode(node) { has_central_node = true }
 		if root_id != 0 { DockContextQueueNotifyRemovedNode(&g, node) }
@@ -24750,7 +24750,7 @@ DockBuilderRemoveNodeDockedWindows :: proc(root_id : ImGuiID, clear_settings_ref
 	// Clear references in windows
 	for n : i32 = 0; n < g.Windows.Size; post_incr(&n) {
 		window : ^ImGuiWindow = g.Windows[n]
-		want_removal : bool = (root_id == 0) || (window.DockNode != nil && DockNodeGetRootNode(window.DockNode).ID != 0 == root_id) || (window.DockNodeAsHost != nil && window.DockNodeAsHost.ID != 0 == root_id)
+		want_removal : bool = (root_id == 0) || (window.DockNode != nil && DockNodeGetRootNode(window.DockNode).ID == root_id) || (window.DockNodeAsHost != nil && window.DockNodeAsHost.ID == root_id)
 		if want_removal {
 			backup_dock_id : ImGuiID = window.DockId
 			IM_UNUSED(backup_dock_id)
@@ -24783,12 +24783,12 @@ DockBuilderSplitNode :: proc(id : ImGuiID, split_dir : ImGuiDir, size_ratio_for_
 	req.DockTargetNode = node
 	req.DockPayload = nil
 	req.DockSplitDir = split_dir
-	req.DockSplitRatio = ImSaturate((split_dir == ImGuiDir.ImGuiDir_Left != 0 || split_dir != {} == ImGuiDir.ImGuiDir_Up) ? size_ratio_for_node_at_dir : 1.0 - size_ratio_for_node_at_dir)
+	req.DockSplitRatio = ImSaturate((split_dir == ImGuiDir.ImGuiDir_Left || split_dir == ImGuiDir.ImGuiDir_Up) ? size_ratio_for_node_at_dir : 1.0 - size_ratio_for_node_at_dir)
 	req.DockSplitOuter = false
 	DockContextProcessDock(&g, &req)
 
-	id_at_dir : ImGuiID = node.ChildNodes[(split_dir == ImGuiDir.ImGuiDir_Left != 0 || split_dir != {} == ImGuiDir.ImGuiDir_Up) ? 0 : 1].ID
-	id_at_opposite_dir : ImGuiID = node.ChildNodes[(split_dir == ImGuiDir.ImGuiDir_Left != 0 || split_dir != {} == ImGuiDir.ImGuiDir_Up) ? 1 : 0].ID
+	id_at_dir : ImGuiID = node.ChildNodes[(split_dir == ImGuiDir.ImGuiDir_Left || split_dir == ImGuiDir.ImGuiDir_Up) ? 0 : 1].ID
+	id_at_opposite_dir : ImGuiID = node.ChildNodes[(split_dir == ImGuiDir.ImGuiDir_Left || split_dir == ImGuiDir.ImGuiDir_Up) ? 1 : 0].ID
 	if out_id_at_dir != nil { out_id_at_dir^ = id_at_dir }
 	if out_id_at_opposite_dir != nil { out_id_at_opposite_dir^ = id_at_opposite_dir }
 	return id_at_dir
@@ -25040,7 +25040,7 @@ BeginDocked :: proc(window : ^ImGuiWindow, p_open : ^bool)
 	// Bind to our dock node
 	node : ^ImGuiDockNode = window.DockNode
 	if node != nil { IM_ASSERT(window.DockId == node.ID) }
-	if window.DockId != 0 && node != nil == nil {
+	if window.DockId != 0 && node == nil {
 		node = DockContextBindNodeToWindow(&g, window)
 		if node == nil { return }
 	}
@@ -25109,7 +25109,7 @@ BeginDocked :: proc(window : ^ImGuiWindow, p_open : ^bool)
 	// This allows multiple windows to be created in the same frame and have their respective dock orders preserved.
 	if node.TabBar != nil && window.WasActive { window.DockOrder = cast(i16) DockNodeGetTabOrder(window) }
 
-	if (node.WantCloseAll || node.WantCloseTabId != 0 == window.TabId) && p_open != nil { p_open^ = false }
+	if (node.WantCloseAll || node.WantCloseTabId == window.TabId) && p_open != nil { p_open^ = false }
 
 	// Update ChildId to allow returning from Child to Parent with Escape
 	parent_window : ^ImGuiWindow = window.DockNode.HostWindow
@@ -25234,7 +25234,7 @@ DockSettingsRenameNodeReferences :: proc(old_node_id : ImGuiID, new_node_id : Im
 	IMGUI_DEBUG_LOG_DOCKING("[docking] DockSettingsRenameNodeReferences: from 0x%08X -> to 0x%08X\n", old_node_id, new_node_id)
 	for window_n : i32 = 0; window_n < g.Windows.Size; post_incr(&window_n) {
 		window : ^ImGuiWindow = g.Windows[window_n]
-		if window.DockId == old_node_id != 0 && window.DockNode != nil == nil { window.DockId = new_node_id }
+		if window.DockId == old_node_id && window.DockNode == nil { window.DockId = new_node_id }
 	}
 
 	//// FIXME-OPT: We could remove this loop by storing the index in the map
@@ -25673,7 +25673,7 @@ DebugRenderViewportThumbnail :: proc(draw_list : ^ImDrawList, viewport : ^ImGuiV
 		title_r = ImRect(ImTrunc(off + title_r.Min * scale), ImTrunc(off + ImVec2(title_r.Max.x, title_r.Min.y + GetHeight(&title_r) * 3.0) * scale)); // Exaggerate title bar height
 		ClipWithFull(&thumb_r, bb)
 		ClipWithFull(&title_r, bb)
-		window_is_focused : bool = (g.NavWindow != nil && thumb_window.RootWindowForTitleBarHighlight != nil == g.NavWindow.RootWindowForTitleBarHighlight)
+		window_is_focused : bool = (g.NavWindow != nil && thumb_window.RootWindowForTitleBarHighlight == g.NavWindow.RootWindowForTitleBarHighlight)
 		AddRectFilled(window.DrawList, thumb_r.Min, thumb_r.Max, GetColorU32(ImGuiCol_.ImGuiCol_WindowBg, alpha_mul))
 		AddRectFilled(window.DrawList, title_r.Min, title_r.Max, GetColorU32(window_is_focused ? ImGuiCol_.ImGuiCol_TitleBgActive : ImGuiCol_.ImGuiCol_TitleBg, alpha_mul))
 		AddRect(window.DrawList, thumb_r.Min, thumb_r.Max, GetColorU32(ImGuiCol_.ImGuiCol_Border, alpha_mul))
@@ -26512,7 +26512,7 @@ DebugBreakButton :: proc(label : ^u8, description_of_location : ^u8) -> bool
 
 	// WE DO NOT USE ButtonEx() or ButtonBehavior() in order to reduce our side-effects.
 	hovered : bool = ItemHoverable(bb, id, g.CurrentItemFlags)
-	pressed : bool = hovered && (IsKeyChordPressed(g.DebugBreakKeyChord) || IsMouseClicked(0) || g.NavActivateId != 0 == id)
+	pressed : bool = hovered && (IsKeyChordPressed(g.DebugBreakKeyChord) || IsMouseClicked(0) || g.NavActivateId == id)
 	DebugBreakButtonTooltip(false, description_of_location)
 
 	col4f : ImVec4 = GetStyleColorVec4(hovered ? ImGuiCol_.ImGuiCol_ButtonHovered : ImGuiCol_.ImGuiCol_Button)
@@ -26578,8 +26578,8 @@ DebugNodeDockNode :: proc(node : ^ImGuiDockNode, label : ^u8)
 	if !is_alive { PopStyleColor() }
 	if is_active && IsItemHovered() { if window : ^ImGuiWindow = node.HostWindow != nil ? node.HostWindow : node.VisibleWindow; window { AddRect(GetForegroundDrawList(window), node.Pos, node.Pos + node.Size, IM_COL32(255, 255, 0, 255)) } }
 	if open {
-		IM_ASSERT(node.ChildNodes[0] == nil || node.ChildNodes[0].ParentNode != nil == node)
-		IM_ASSERT(node.ChildNodes[1] == nil || node.ChildNodes[1].ParentNode != nil == node)
+		IM_ASSERT(node.ChildNodes[0] == nil || node.ChildNodes[0].ParentNode == node)
+		IM_ASSERT(node.ChildNodes[1] == nil || node.ChildNodes[1].ParentNode == node)
 		BulletText("Pos (%.0f,%.0f), Size (%.0f, %.0f) Ref (%.0f, %.0f)", node.Pos.x, node.Pos.y, node.Size.x, node.Size.y, node.SizeRef.x, node.SizeRef.y)
 		DebugNodeWindow(node.HostWindow, "HostWindow")
 		DebugNodeWindow(node.VisibleWindow, "VisibleWindow")
@@ -26612,7 +26612,7 @@ DebugNodeDrawList :: proc(window : ^ImGuiWindow, viewport : ^ImGuiViewportP, dra
 	g : ^ImGuiContext = GImGui
 	cfg : ^ImGuiMetricsConfig = &g.DebugMetricsConfig
 	cmd_count : i32 = draw_list.CmdBuffer.Size
-	if cmd_count > 0 && back(&draw_list.CmdBuffer).ElemCount != 0 == 0 && back(&draw_list.CmdBuffer).UserCallback != {} == nil { post_decr(&cmd_count) }
+	if cmd_count > 0 && back(&draw_list.CmdBuffer).ElemCount == 0 && back(&draw_list.CmdBuffer).UserCallback == nil { post_decr(&cmd_count) }
 	node_open : bool = TreeNode(draw_list, "%s: '%s' %d vtx, %d indices, %d cmds", label, draw_list._OwnerName != nil ? draw_list._OwnerName : "", draw_list.VtxBuffer.Size, draw_list.IdxBuffer.Size, cmd_count)
 	if draw_list == GetWindowDrawList() {
 		SameLine()
@@ -27274,7 +27274,7 @@ DebugHookIdInfo :: proc(id : ImGuiID, data_type : ImGuiDataType, data_id : rawpt
 	IM_ASSERT(tool.StackLevel >= 0)
 	if tool.StackLevel != window.IDStack.Size { return }
 	info : ^ImGuiStackLevelInfo = &tool.Results[tool.StackLevel]
-	IM_ASSERT(info.ID == id != 0 && info.QueryFrameCount > 0)
+	IM_ASSERT(info.ID == id && info.QueryFrameCount > 0)
 
 	switch data_type {
 		case ImGuiDataType_.ImGuiDataType_S32:
@@ -27306,12 +27306,12 @@ DebugHookIdInfo :: proc(id : ImGuiID, data_type : ImGuiDataType, data_id : rawpt
 StackToolFormatLevelInfo :: proc(tool : ^ImGuiIDStackTool, n : i32, format_for_ui : bool, buf : ^u8, buf_size : uint) -> i32
 {
 	info : ^ImGuiStackLevelInfo = &tool.Results[n]
-	window : ^ImGuiWindow = (info.Desc[0] == 0 && n != 0 == 0) ? FindWindowByID(info.ID) : nil
+	window : ^ImGuiWindow = (info.Desc[0] == 0 && n == 0) ? FindWindowByID(info.ID) : nil
 	if window != nil {
 		// Source: window name (because the root ID don't call GetID() and so doesn't get hooked)return ImFormatString(buf, buf_size, format_for_ui ? "\"%s\" [window]" : "%s", window.Name)
 	}
 	if info.QuerySuccess {
-		// Source: GetID() hooks (prioritize over ItemInfo() because we frequently use patterns like: PushID(str), Button("") where they both have same id)return ImFormatString(buf, buf_size, (format_for_ui && info.DataType != {} == ImGuiDataType_.ImGuiDataType_String) ? "\"%s\"" : "%s", info.Desc)
+		// Source: GetID() hooks (prioritize over ItemInfo() because we frequently use patterns like: PushID(str), Button("") where they both have same id)return ImFormatString(buf, buf_size, (format_for_ui && info.DataType == ImGuiDataType_.ImGuiDataType_String) ? "\"%s\"" : "%s", info.Desc)
 	}
 	if tool.StackLevel < tool.Results.Size {
 		// Only start using fallback below when all queries are done, so during queries we don't flickering ??? markers.return (buf^ = 0)
@@ -28021,7 +28021,7 @@ ImDrawList__TryMergeDrawCmds :: proc(this : ^ImDrawList)
 	IM_ASSERT_PARANOID(this.CmdBuffer.Size > 0)
 	curr_cmd : ^ImDrawCmd = &this.CmdBuffer.Data[this.CmdBuffer.Size - 1]
 	prev_cmd : ^ImDrawCmd = curr_cmd - 1
-	if ImDrawCmd_HeaderCompare(curr_cmd, prev_cmd) == 0 && ImDrawCmd_AreSequentialIdxOffset(prev_cmd, curr_cmd) && curr_cmd.UserCallback != {} == nil && prev_cmd.UserCallback != {} == nil {
+	if ImDrawCmd_HeaderCompare(curr_cmd, prev_cmd) == 0 && ImDrawCmd_AreSequentialIdxOffset(prev_cmd, curr_cmd) && curr_cmd.UserCallback == nil && prev_cmd.UserCallback == nil {
 		prev_cmd.ElemCount += curr_cmd.ElemCount
 		pop_back(&this.CmdBuffer)
 	}
@@ -28042,7 +28042,7 @@ ImDrawList__OnChangedClipRect :: proc(this : ^ImDrawList)
 
 	// Try to merge with previous command if it matches, else use current command
 	prev_cmd : ^ImDrawCmd = curr_cmd - 1
-	if curr_cmd.ElemCount == 0 && this.CmdBuffer.Size > 1 && ImDrawCmd_HeaderCompare(&this._CmdHeader, prev_cmd) == 0 && ImDrawCmd_AreSequentialIdxOffset(prev_cmd, curr_cmd) && prev_cmd.UserCallback != {} == nil {
+	if curr_cmd.ElemCount == 0 && this.CmdBuffer.Size > 1 && ImDrawCmd_HeaderCompare(&this._CmdHeader, prev_cmd) == 0 && ImDrawCmd_AreSequentialIdxOffset(prev_cmd, curr_cmd) && prev_cmd.UserCallback == nil {
 		pop_back(&this.CmdBuffer)
 		return
 	}
@@ -28062,7 +28062,7 @@ ImDrawList__OnChangedTextureID :: proc(this : ^ImDrawList)
 
 	// Try to merge with previous command if it matches, else use current command
 	prev_cmd : ^ImDrawCmd = curr_cmd - 1
-	if curr_cmd.ElemCount == 0 && this.CmdBuffer.Size > 1 && ImDrawCmd_HeaderCompare(&this._CmdHeader, prev_cmd) == 0 && ImDrawCmd_AreSequentialIdxOffset(prev_cmd, curr_cmd) && prev_cmd.UserCallback != {} == nil {
+	if curr_cmd.ElemCount == 0 && this.CmdBuffer.Size > 1 && ImDrawCmd_HeaderCompare(&this._CmdHeader, prev_cmd) == 0 && ImDrawCmd_AreSequentialIdxOffset(prev_cmd, curr_cmd) && prev_cmd.UserCallback == nil {
 		pop_back(&this.CmdBuffer)
 		return
 	}
@@ -28267,7 +28267,7 @@ IM_FIXNORMAL2F :: #force_inline proc "contextless" (VX : $T0, VY : $T1) //TODO @
 // We avoid using the ImVec2 math operators here to reduce cost to a minimum for debug/non-inlined builds.
 ImDrawList_AddPolyline :: proc(this : ^ImDrawList, points : ^ImVec2, points_count : i32, col : ImU32, flags : ImDrawFlags, thickness : f32)
 {
-	if points_count < 2 || (col & IM_COL32_A_MASK) != 0 == 0 { return }
+	if points_count < 2 || (col & IM_COL32_A_MASK) == 0 { return }
 
 	closed : bool = (flags & ImDrawFlags_.ImDrawFlags_Closed) != {}
 	opaque_uv : ImVec2 = this._Data.TexUvWhitePixel
@@ -28304,7 +28304,7 @@ ImDrawList_AddPolyline :: proc(this : ^ImDrawList, points : ^ImVec2, points_coun
 
 		// Calculate normals (tangents) for each line segment
 		for i1 : i32 = 0; i1 < count; post_incr(&i1) {
-			i2 : i32 = (i1 + 1) == points_count != 0 ? 0 : i1 + 1
+			i2 : i32 = (i1 + 1) == points_count ? 0 : i1 + 1
 			dx : f32 = points[i2].x - points[i1].x
 			dy : f32 = points[i2].y - points[i1].y
 			IM_NORMALIZE2F_OVER_ZERO(dx, dy)
@@ -28339,7 +28339,7 @@ ImDrawList_AddPolyline :: proc(this : ^ImDrawList, points : ^ImVec2, points_coun
 			// FIXME-OPT: Merge the different loops, possibly remove the temporary buffer.
 			idx1 : u32 = this._VtxCurrentIdx; // Vertex index for start of line segment
 			for i1 : i32 = 0; i1 < count; post_incr(&i1) {
-				i2 : i32 = (i1 + 1) == points_count != 0 ? 0 : i1 + 1; // i2 is the second point of the line segment
+				i2 : i32 = (i1 + 1) == points_count ? 0 : i1 + 1; // i2 is the second point of the line segment
 				idx2 : u32 = ((i1 + 1) == points_count) ? this._VtxCurrentIdx : (idx1 + (use_texture ? 2 : 3)); // Vertex index for end of segment
 
 				// Average normals
@@ -28426,8 +28426,8 @@ ImDrawList_AddPolyline :: proc(this : ^ImDrawList, points : ^ImVec2, points_coun
 			// FIXME-OPT: Merge the different loops, possibly remove the temporary buffer.
 			idx1 : u32 = this._VtxCurrentIdx; // Vertex index for start of line segment
 			for i1 : i32 = 0; i1 < count; post_incr(&i1) {
-				i2 : i32 = (i1 + 1) == points_count != 0 ? 0 : (i1 + 1); // i2 is the second point of the line segment
-				idx2 : u32 = (i1 + 1) == points_count != 0 ? this._VtxCurrentIdx : (idx1 + 4); // Vertex index for end of segment
+				i2 : i32 = (i1 + 1) == points_count ? 0 : (i1 + 1); // i2 is the second point of the line segment
+				idx2 : u32 = (i1 + 1) == points_count ? this._VtxCurrentIdx : (idx1 + 4); // Vertex index for end of segment
 
 				// Average normals
 				dm_x : f32 = (temp_normals[i1].x + temp_normals[i2].x) * 0.5
@@ -28479,7 +28479,7 @@ ImDrawList_AddPolyline :: proc(this : ^ImDrawList, points : ^ImVec2, points_coun
 		ImDrawList_PrimReserve(this, idx_count, vtx_count)
 
 		for i1 : i32 = 0; i1 < count; post_incr(&i1) {
-			i2 : i32 = (i1 + 1) == points_count != 0 ? 0 : i1 + 1
+			i2 : i32 = (i1 + 1) == points_count ? 0 : i1 + 1
 			p1 : ^ImVec2 = points[i1]
 			p2 : ^ImVec2 = points[i2]
 
@@ -28507,7 +28507,7 @@ ImDrawList_AddPolyline :: proc(this : ^ImDrawList, points : ^ImVec2, points_coun
 // - Filled shapes must always use clockwise winding order. The anti-aliasing fringe depends on it. Counter-clockwise shapes will have "inward" anti-aliasing.
 ImDrawList_AddConvexPolyFilled :: proc(this : ^ImDrawList, points : ^ImVec2, points_count : i32, col : ImU32)
 {
-	if points_count < 3 || (col & IM_COL32_A_MASK) != 0 == 0 { return }
+	if points_count < 3 || (col & IM_COL32_A_MASK) == 0 { return }
 
 	uv : ImVec2 = this._Data.TexUvWhitePixel
 
@@ -28855,7 +28855,7 @@ FixRectCornerFlags :: #force_inline proc(flags : ImDrawFlags) -> ImDrawFlags
 	// If this assert triggers, please update your code replacing hardcoded values with new ImDrawFlags_RoundCorners* values.
 	// Note that ImDrawFlags_Closed (== 0x01) is an invalid flag for AddRect(), AddRectFilled(), PathRect() etc. anyway.
 	// See details in 1.82 Changelog as well as 2021/03/12 and 2023/09/08 entries in "API BREAKING CHANGES" section.
-	IM_ASSERT((flags & 0x0F) == 0 && "Misuse of legacy hardcoded ImDrawCornerFlags values!")
+	IM_ASSERT((flags & 0x0F) == {} && "Misuse of legacy hardcoded ImDrawCornerFlags values!")
 
 	if (flags & ImDrawFlags_.ImDrawFlags_RoundCornersMask_) == {} { flags |= ImDrawFlags_.ImDrawFlags_RoundCornersAll }
 
@@ -28869,7 +28869,7 @@ ImDrawList_PathRect :: proc(this : ^ImDrawList, a : ^ImVec2, b : ^ImVec2, roundi
 		rounding = ImMin(rounding, ImFabs(b.x - a.x) * (((flags & ImDrawFlags_.ImDrawFlags_RoundCornersTop) == ImDrawFlags_.ImDrawFlags_RoundCornersTop) || ((flags & ImDrawFlags_.ImDrawFlags_RoundCornersBottom) == ImDrawFlags_.ImDrawFlags_RoundCornersBottom) ? 0.5 : 1.0) - 1.0)
 		rounding = ImMin(rounding, ImFabs(b.y - a.y) * (((flags & ImDrawFlags_.ImDrawFlags_RoundCornersLeft) == ImDrawFlags_.ImDrawFlags_RoundCornersLeft) || ((flags & ImDrawFlags_.ImDrawFlags_RoundCornersRight) == ImDrawFlags_.ImDrawFlags_RoundCornersRight) ? 0.5 : 1.0) - 1.0)
 	}
-	if rounding < 0.5 || (flags & ImDrawFlags_.ImDrawFlags_RoundCornersMask_) != {} == ImDrawFlags_.ImDrawFlags_RoundCornersNone {
+	if rounding < 0.5 || (flags & ImDrawFlags_.ImDrawFlags_RoundCornersMask_) == ImDrawFlags_.ImDrawFlags_RoundCornersNone {
 		ImDrawList_PathLineTo(this, a)
 		ImDrawList_PathLineTo(this, ImVec2(b.x, a.y))
 		ImDrawList_PathLineTo(this, b)
@@ -28920,7 +28920,7 @@ ImDrawList_AddRect :: proc(this : ^ImDrawList, p_min : ^ImVec2, p_max : ^ImVec2,
 ImDrawList_AddRectFilled :: proc(this : ^ImDrawList, p_min : ^ImVec2, p_max : ^ImVec2, col : ImU32, rounding : f32 = 0.0, flags : ImDrawFlags = 0)
 {
 	if (col & IM_COL32_A_MASK) == 0 { return }
-	if rounding < 0.5 || (flags & ImDrawFlags_.ImDrawFlags_RoundCornersMask_) != {} == ImDrawFlags_.ImDrawFlags_RoundCornersNone {
+	if rounding < 0.5 || (flags & ImDrawFlags_.ImDrawFlags_RoundCornersMask_) == ImDrawFlags_.ImDrawFlags_RoundCornersNone {
 		ImDrawList_PrimReserve(this, 6, 4)
 		ImDrawList_PrimRect(this, p_min, p_max, col)
 	}
@@ -29109,7 +29109,7 @@ ImDrawList_AddText_1 :: proc(this : ^ImDrawList, font : ^ImFont, font_size : f32
 	if (col & IM_COL32_A_MASK) == 0 { return }
 
 	// Accept null ranges
-	if text_begin == text_end != nil || text_begin[0] != 0 == 0 { return }
+	if text_begin == text_end || text_begin[0] == 0 { return }
 	if text_end == nil { text_end = text_begin + strlen(text_begin) }
 
 	// Pull default font/size from the shared ImDrawListSharedData instance
@@ -29168,7 +29168,7 @@ ImDrawList_AddImageRounded :: proc(this : ^ImDrawList, user_texture_id : ImTextu
 	if (col & IM_COL32_A_MASK) == 0 { return }
 
 	flags = FixRectCornerFlags(flags)
-	if rounding < 0.5 || (flags & ImDrawFlags_.ImDrawFlags_RoundCornersMask_) != {} == ImDrawFlags_.ImDrawFlags_RoundCornersNone {
+	if rounding < 0.5 || (flags & ImDrawFlags_.ImDrawFlags_RoundCornersMask_) == ImDrawFlags_.ImDrawFlags_RoundCornersNone {
 		ImDrawList_AddImage(this, user_texture_id, p_min, p_max, uv_min, uv_max, col)
 		return
 	}
@@ -29397,7 +29397,7 @@ ImTriangulator_ReclassifyNode :: proc(this : ^ImTriangulator, n1 : ^ImTriangulat
 // Caller can build AABB of points, and avoid filling if 'draw_list->_CmdHeader.ClipRect.Overlays(points_bb) == false')
 ImDrawList_AddConcavePolyFilled :: proc(this : ^ImDrawList, points : ^ImVec2, points_count : i32, col : ImU32)
 {
-	if points_count < 3 || (col & IM_COL32_A_MASK) != 0 == 0 { return }
+	if points_count < 3 || (col & IM_COL32_A_MASK) == 0 { return }
 
 	uv : ImVec2 = this._Data.TexUvWhitePixel
 	triangulator : ImTriangulator
@@ -29543,7 +29543,7 @@ ImDrawListSplitter_Merge :: proc(this : ^ImDrawListSplitter, draw_list : ^ImDraw
 	idx_offset : i32 = last_cmd != nil ? last_cmd.IdxOffset + last_cmd.ElemCount : 0
 	for i : i32 = 1; i < this._Count; post_incr(&i) {
 		ch : ^ImDrawChannel = this._Channels[i]
-		if ch._CmdBuffer.Size > 0 && back(&ch._CmdBuffer).ElemCount != 0 == 0 && back(&ch._CmdBuffer).UserCallback != {} == nil {
+		if ch._CmdBuffer.Size > 0 && back(&ch._CmdBuffer).ElemCount == 0 && back(&ch._CmdBuffer).UserCallback == nil {
 			// Equivalent of PopUnusedDrawCmd()pop_back(&ch._CmdBuffer)
 		}
 
@@ -29551,7 +29551,7 @@ ImDrawListSplitter_Merge :: proc(this : ^ImDrawListSplitter, draw_list : ^ImDraw
 			// Do not include ImDrawCmd_AreSequentialIdxOffset() in the compare as we rebuild IdxOffset values ourselves.
 			// Manipulating IdxOffset (e.g. by reordering draw commands like done by RenderDimmedBackgroundBehindWindow()) is not supported within a splitter.
 			next_cmd : ^ImDrawCmd = &ch._CmdBuffer[0]
-			if ImDrawCmd_HeaderCompare(last_cmd, next_cmd) == 0 && last_cmd.UserCallback != {} == nil && next_cmd.UserCallback != {} == nil {
+			if ImDrawCmd_HeaderCompare(last_cmd, next_cmd) == 0 && last_cmd.UserCallback == nil && next_cmd.UserCallback == nil {
 				// Merge previous channel last draw command with current channel first draw command if matching.
 				last_cmd.ElemCount += next_cmd.ElemCount
 				idx_offset += next_cmd.ElemCount
@@ -29638,12 +29638,12 @@ ImDrawData_Clear :: proc(this : ^ImDrawData)
 AddDrawListToDrawDataEx :: proc(draw_data : ^ImDrawData, out_list : ^ImVector(^ImDrawList), draw_list : ^ImDrawList)
 {
 	if draw_list.CmdBuffer.Size == 0 { return }
-	if draw_list.CmdBuffer.Size == 1 && draw_list.CmdBuffer[0].ElemCount != 0 == 0 && draw_list.CmdBuffer[0].UserCallback != {} == nil { return }
+	if draw_list.CmdBuffer.Size == 1 && draw_list.CmdBuffer[0].ElemCount == 0 && draw_list.CmdBuffer[0].UserCallback == nil { return }
 
 	// Draw list sanity check. Detect mismatch between PrimReserve() calls and incrementing _VtxCurrentIdx, _VtxWritePtr etc.
 	// May trigger for you if you are using PrimXXX functions incorrectly.
-	IM_ASSERT(draw_list.VtxBuffer.Size == 0 || draw_list._VtxWritePtr != nil == draw_list.VtxBuffer.Data + draw_list.VtxBuffer.Size)
-	IM_ASSERT(draw_list.IdxBuffer.Size == 0 || draw_list._IdxWritePtr != nil == draw_list.IdxBuffer.Data + draw_list.IdxBuffer.Size)
+	IM_ASSERT(draw_list.VtxBuffer.Size == 0 || draw_list._VtxWritePtr == draw_list.VtxBuffer.Data + draw_list.VtxBuffer.Size)
+	IM_ASSERT(draw_list.IdxBuffer.Size == 0 || draw_list._IdxWritePtr == draw_list.IdxBuffer.Data + draw_list.IdxBuffer.Size)
 	if (draw_list.Flags & ImDrawListFlags_.ImDrawListFlags_AllowVtxOffset) == {} { IM_ASSERT(cast(i32) draw_list._VtxCurrentIdx == draw_list.VtxBuffer.Size) }
 
 	// Check that draw_list doesn't use more vertices than indexable (default ImDrawIdx = unsigned short = 2 bytes = 64K vertices per ImDrawList = per window)
@@ -30243,11 +30243,11 @@ ImFontAtlasBuildWithStbTruetype :: proc(atlas : ^ImFontAtlas) -> bool
 	for src_i : i32 = 0; src_i < atlas.ConfigData.Size; post_incr(&src_i) {
 		src_tmp : ^ImFontBuildSrcData = src_tmp_array[src_i]
 		cfg : ^ImFontConfig = atlas.ConfigData[src_i]
-		IM_ASSERT(cfg.DstFont != nil && (!IsLoaded(cfg.DstFont) || cfg.DstFont.ContainerAtlas != nil == atlas))
+		IM_ASSERT(cfg.DstFont != nil && (!IsLoaded(cfg.DstFont) || cfg.DstFont.ContainerAtlas == atlas))
 
 		// Find index from cfg.DstFont (we allow the user to set cfg.DstFont. Also it makes casual debugging nicer than when storing indices)
 		src_tmp.DstIndex = -1
-		for output_i : i32 = 0; output_i < atlas.Fonts.Size && src_tmp.DstIndex != 0 == -1; post_incr(&output_i) { if cfg.DstFont == atlas.Fonts[output_i] { src_tmp.DstIndex = output_i } }
+		for output_i : i32 = 0; output_i < atlas.Fonts.Size && src_tmp.DstIndex == -1; post_incr(&output_i) { if cfg.DstFont == atlas.Fonts[output_i] { src_tmp.DstIndex = output_i } }
 
 		if src_tmp.DstIndex == -1 {
 			IM_ASSERT(src_tmp.DstIndex != -1); // cfg.DstFont not pointing within atlas->Fonts[] array?
@@ -30523,7 +30523,7 @@ ImFontAtlasBuildPackCustomRects :: proc(atlas : ^ImFontAtlas, stbrp_context_opaq
 	for i : i32 = 0; i < pack_rects.Size; post_incr(&i) { if pack_rects[i].was_packed != 0 {
 	user_rects[i].X = cast(u16) pack_rects[i].x
 	user_rects[i].Y = cast(u16) pack_rects[i].y
-	IM_ASSERT(pack_rects[i].w == (user_rects[i].Width + pack_padding) != 0 && pack_rects[i].h != {} == user_rects[i].Height + pack_padding)
+	IM_ASSERT(pack_rects[i].w == user_rects[i].Width + pack_padding && pack_rects[i].h == user_rects[i].Height + pack_padding)
 	atlas.TexHeight = ImMax(atlas.TexHeight, pack_rects[i].y + pack_rects[i].h)
 } }
 }
@@ -30552,7 +30552,7 @@ ImFontAtlasBuildRenderDefaultTexData :: proc(atlas : ^ImFontAtlas)
 	w : i32 = atlas.TexWidth
 	if (atlas.Flags & ImFontAtlasFlags_.ImFontAtlasFlags_NoMouseCursors) != {} {
 		// White pixels only
-		IM_ASSERT(r.Width == 2 && r.Height != 0 == 2)
+		IM_ASSERT(r.Width == 2 && r.Height == 2)
 		offset : i32 = cast(i32) r.X + cast(i32) r.Y * w
 		if atlas.TexPixelsAlpha8 != nil {
 			atlas.TexPixelsAlpha8[offset + w + 1] = 0xFF; atlas.TexPixelsAlpha8[offset + w] = atlas.TexPixelsAlpha8[offset + w + 1]; atlas.TexPixelsAlpha8[offset + 1] = atlas.TexPixelsAlpha8[offset + w]; atlas.TexPixelsAlpha8[offset] = atlas.TexPixelsAlpha8[offset + 1]
@@ -30563,7 +30563,7 @@ ImFontAtlasBuildRenderDefaultTexData :: proc(atlas : ^ImFontAtlas)
 	}
 	else {
 		// White pixels and mouse cursor
-		IM_ASSERT(r.Width == (FONT_ATLAS_DEFAULT_TEX_DATA_W * 2 + 1) != 0 && r.Height != 0 == FONT_ATLAS_DEFAULT_TEX_DATA_H)
+		IM_ASSERT(r.Width == FONT_ATLAS_DEFAULT_TEX_DATA_W * 2 + 1 && r.Height == FONT_ATLAS_DEFAULT_TEX_DATA_H)
 		x_for_white : i32 = r.X
 		x_for_black : i32 = r.X + FONT_ATLAS_DEFAULT_TEX_DATA_W + 1
 		if atlas.TexPixelsAlpha8 != nil {
@@ -30593,7 +30593,7 @@ ImFontAtlasBuildRenderLinesTexData :: proc(atlas : ^ImFontAtlas)
 		pad_right : i32 = r.Width - (pad_left + line_width)
 
 		// Write each slice
-		IM_ASSERT(pad_left + line_width + pad_right == r.Width != 0 && y < r.Height); // Make sure we're inside the texture bounds before we start writing pixels
+		IM_ASSERT(pad_left + line_width + pad_right == r.Width && y < r.Height); // Make sure we're inside the texture bounds before we start writing pixels
 		if atlas.TexPixelsAlpha8 != nil {
 			write_ptr : ^u8 = &atlas.TexPixelsAlpha8[r.X + ((r.Y + y) * atlas.TexWidth)]
 			for i : i32 = 0; i < pad_left; post_incr(&i) { write_ptr[i] = 0x00 }
@@ -30646,7 +30646,7 @@ ImFontAtlasBuildFinish :: proc(atlas : ^ImFontAtlas)
 	// Register custom rectangle glyphs
 	for i : i32 = 0; i < atlas.CustomRects.Size; post_incr(&i) {
 		r : ^ImFontAtlasCustomRect = &atlas.CustomRects[i]
-		if r.Font == nil || r.GlyphID != 0 == 0 { continue }
+		if r.Font == nil || r.GlyphID == 0 { continue }
 
 		// Will ignore ImFontConfig settings: GlyphMinAdvanceX, GlyphMinAdvanceY, GlyphExtraSpacing, PixelSnapH
 		IM_ASSERT(r.Font.ContainerAtlas == atlas)
@@ -31184,7 +31184,7 @@ ImFont_AddRemapChar :: proc(this : ^ImFont, dst : ImWchar, src : ImWchar, overwr
 	IM_ASSERT(this.IndexLookup.Size > 0); // Currently this can only be called AFTER the font has been built, aka after calling ImFontAtlas::GetTexDataAs*() function.
 	index_size : u32 = cast(u32) this.IndexLookup.Size
 
-	if dst < index_size && this.IndexLookup.Data[dst] != {} == (cast(ImWchar) -1) != {} && !overwrite_dst {
+	if dst < index_size && this.IndexLookup.Data[dst] == cast(ImWchar) -1 && !overwrite_dst {
 		// 'dst' already existsreturn
 	}
 	if src >= index_size && dst >= index_size {
@@ -31311,7 +31311,7 @@ ImFont_CalcWordWrapPositionA :: proc(this : ^ImFont, scale : f32, text : ^u8, te
 
 	// Wrap_width is too small to fit anything. Force displaying 1 character to minimize the height discontinuity.
 	// +1 may not be a character start point in UTF-8 but it's ok because caller loops use (text >= word_wrap_eol).
-	if s == text != nil && text < text_end { return s + 1 }
+	if s == text && text < text_end { return s + 1 }
 	return s
 }
 
@@ -31377,7 +31377,7 @@ ImFont_CalcTextSizeA :: proc(this : ^ImFont, size : f32, max_width : f32, wrap_w
 
 	if text_size.x < line_width { text_size.x = line_width }
 
-	if line_width > 0 || text_size.y != 0 == 0.0 { text_size.y += line_height }
+	if line_width > 0 || text_size.y == 0.0 { text_size.y += line_height }
 
 	if remaining != nil { remaining^ = s }
 
@@ -31694,7 +31694,7 @@ RenderRectFilledRangeH :: proc(draw_list : ^ImDrawList, rect : ^ImRect, col : Im
 		PathLineTo(draw_list, ImVec2(x0, p1.y))
 		PathLineTo(draw_list, ImVec2(x0, p0.y))
 	}
-	else if arc0_b == 0.0 && arc0_e != 0 == half_pi {
+	else if arc0_b == 0.0 && arc0_e == half_pi {
 		PathArcToFast(draw_list, ImVec2(x0, p1.y - rounding), rounding, 3, 6); // BL
 		PathArcToFast(draw_list, ImVec2(x0, p0.y + rounding), rounding, 6, 9); // TR
 	}
@@ -31710,7 +31710,7 @@ RenderRectFilledRangeH :: proc(draw_list : ^ImDrawList, rect : ^ImRect, col : Im
 			PathLineTo(draw_list, ImVec2(x1, p0.y))
 			PathLineTo(draw_list, ImVec2(x1, p1.y))
 		}
-		else if arc1_b == 0.0 && arc1_e != 0 == half_pi {
+		else if arc1_b == 0.0 && arc1_e == half_pi {
 			PathArcToFast(draw_list, ImVec2(x1, p0.y + rounding), rounding, 9, 12); // TR
 			PathArcToFast(draw_list, ImVec2(x1, p1.y - rounding), rounding, 0, 3); // BR
 		}
@@ -31773,7 +31773,7 @@ RenderColorRectWithAlphaCheckerboard :: proc(draw_list : ^ImDrawList, p_min : Im
 				}
 
 				// Combine flags
-				cell_flags = (flags == ImDrawFlags_.ImDrawFlags_RoundCornersNone || cell_flags != {} == ImDrawFlags_.ImDrawFlags_RoundCornersNone) ? ImDrawFlags_.ImDrawFlags_RoundCornersNone : (cell_flags & flags)
+				cell_flags = (flags == ImDrawFlags_.ImDrawFlags_RoundCornersNone || cell_flags == ImDrawFlags_.ImDrawFlags_RoundCornersNone) ? ImDrawFlags_.ImDrawFlags_RoundCornersNone : (cell_flags & flags)
 				AddRectFilled(draw_list, ImVec2(x1, y1), ImVec2(x2, y2), col_bg2, rounding, cell_flags)
 			}
 		}
@@ -31912,7 +31912,7 @@ stb_decompress :: proc(output : ^u8, i : ^u8, _ : u32) -> u32
 		old_i : ^u8 = i
 		i = stb_decompress_token(i)
 		if i == old_i {
-			if i^ == 0x05 && i[1] != 0 == 0xfa {
+			if i^ == 0x05 && i[1] == 0xfa {
 				IM_ASSERT(stb__dout == output + olen)
 				if stb__dout != output + olen { return 0 }
 				if stb_adler32(1, output, olen) != cast(u32) stb__in4(2) { return 0 }
@@ -32566,7 +32566,7 @@ ButtonBehavior :: proc(bb : ^ImRect, id : ImGuiID, out_hovered : ^bool, out_held
 
 	// Default behavior inherited from item flags
 	// Note that _both_ ButtonFlags and ItemFlags are valid sources, so copy one into the item_flags and only check that.
-	item_flags : ImGuiItemFlags = (g.LastItemData.ID == id != 0 ? g.LastItemData.ItemFlags : g.CurrentItemFlags)
+	item_flags : ImGuiItemFlags = (g.LastItemData.ID == id ? g.LastItemData.ItemFlags : g.CurrentItemFlags)
 	if (flags & ImGuiButtonFlagsPrivate_.ImGuiButtonFlags_AllowOverlap) != {} { item_flags |= ImGuiItemFlagsPrivate_.ImGuiItemFlags_AllowOverlap }
 
 	// Default only reacts to left mouse button
@@ -32576,7 +32576,7 @@ ButtonBehavior :: proc(bb : ^ImRect, id : ImGuiID, out_hovered : ^bool, out_held
 	if (flags & ImGuiButtonFlagsPrivate_.ImGuiButtonFlags_PressedOnMask_) == {} { flags |= (item_flags & ImGuiItemFlags_.ImGuiItemFlags_ButtonRepeat) != {} ? ImGuiButtonFlagsPrivate_.ImGuiButtonFlags_PressedOnClick : ImGuiButtonFlagsPrivate_.ImGuiButtonFlags_PressedOnDefault_ }
 
 	backup_hovered_window : ^ImGuiWindow = g.HoveredWindow
-	flatten_hovered_children : bool = (flags & ImGuiButtonFlagsPrivate_.ImGuiButtonFlags_FlattenChildren) != {} && g.HoveredWindow != nil && g.HoveredWindow.RootWindowDockTree != nil == window.RootWindowDockTree
+	flatten_hovered_children : bool = (flags & ImGuiButtonFlagsPrivate_.ImGuiButtonFlags_FlattenChildren) != {} && g.HoveredWindow != nil && g.HoveredWindow.RootWindowDockTree == window.RootWindowDockTree
 	if flatten_hovered_children { g.HoveredWindow = window }
 
 	when IMGUI_ENABLE_TEST_ENGINE { /* @gen ifdef */
@@ -32612,8 +32612,8 @@ ButtonBehavior :: proc(bb : ^ImRect, id : ImGuiID, out_hovered : ^bool, out_held
 		mouse_button_released : i32 = -1
 		for button : i32 = 0; button < 3; post_incr(&button) { if (flags & (ImGuiButtonFlags_.ImGuiButtonFlags_MouseButtonLeft << button)) != {} {
 	// Handle ImGuiButtonFlags_MouseButtonRight and ImGuiButtonFlags_MouseButtonMiddle here.
-	if IsMouseClicked(button, ImGuiInputFlags_.ImGuiInputFlags_None, test_owner_id) && mouse_button_clicked != 0 == -1 { mouse_button_clicked = button }
-	if IsMouseReleased(button, test_owner_id) && mouse_button_released != 0 == -1 { mouse_button_released = button }
+	if IsMouseClicked(button, ImGuiInputFlags_.ImGuiInputFlags_None, test_owner_id) && mouse_button_clicked == -1 { mouse_button_clicked = button }
+	if IsMouseReleased(button, test_owner_id) && mouse_button_released == -1 { mouse_button_released = button }
 } }
 
 		// Process initial action
@@ -32632,7 +32632,7 @@ ButtonBehavior :: proc(bb : ^ImRect, id : ImGuiID, out_hovered : ^bool, out_held
 						FocusWindow(window, ImGuiFocusRequestFlags_.ImGuiFocusRequestFlags_RestoreFocusedChild); // Still need to focus and bring to front, but try to avoid losing NavId when navigating a child
 					}
 				}
-				if (flags & ImGuiButtonFlagsPrivate_.ImGuiButtonFlags_PressedOnClick) != {} || ((flags & ImGuiButtonFlagsPrivate_.ImGuiButtonFlags_PressedOnDoubleClick) != {} && g.IO.MouseClickedCount[mouse_button_clicked] != 0 == 2) {
+				if (flags & ImGuiButtonFlagsPrivate_.ImGuiButtonFlags_PressedOnClick) != {} || ((flags & ImGuiButtonFlagsPrivate_.ImGuiButtonFlags_PressedOnDoubleClick) != {} && g.IO.MouseClickedCount[mouse_button_clicked] == 2) {
 					pressed = true
 					if (flags & ImGuiButtonFlagsPrivate_.ImGuiButtonFlags_NoHoldingActiveId) != {} { ClearActiveID() }
 					else {
@@ -32663,7 +32663,7 @@ ButtonBehavior :: proc(bb : ^ImRect, id : ImGuiID, out_hovered : ^bool, out_held
 
 			// 'Repeat' mode acts when held regardless of _PressedOn flags (see table above).
 			// Relies on repeat logic of IsMouseClicked() but we may as well do it ourselves if we end up exposing finer RepeatDelay/RepeatRate settings.
-			if g.ActiveId == id != 0 && (item_flags & ImGuiItemFlags_.ImGuiItemFlags_ButtonRepeat) != {} { if g.IO.MouseDownDuration[g.ActiveIdMouseButton] > 0.0 && IsMouseClicked(g.ActiveIdMouseButton, ImGuiInputFlags_.ImGuiInputFlags_Repeat, test_owner_id) { pressed = true } }
+			if g.ActiveId == id && (item_flags & ImGuiItemFlags_.ImGuiItemFlags_ButtonRepeat) != {} { if g.IO.MouseDownDuration[g.ActiveIdMouseButton] > 0.0 && IsMouseClicked(g.ActiveIdMouseButton, ImGuiInputFlags_.ImGuiInputFlags_Repeat, test_owner_id) { pressed = true } }
 		}
 
 		if pressed && g.IO.ConfigNavCursorVisibleAuto { g.NavCursorVisible = false }
@@ -32671,7 +32671,7 @@ ButtonBehavior :: proc(bb : ^ImRect, id : ImGuiID, out_hovered : ^bool, out_held
 
 	// Keyboard/Gamepad navigation handling
 	// We report navigated and navigation-activated items as hovered but we don't set g.HoveredId to not interfere with mouse.
-	if g.NavId == id != 0 && g.NavCursorVisible && g.NavHighlightItemUnderNav { if (flags & ImGuiButtonFlagsPrivate_.ImGuiButtonFlags_NoHoveredOnFocus) == {} { hovered = true } }
+	if g.NavId == id && g.NavCursorVisible && g.NavHighlightItemUnderNav { if (flags & ImGuiButtonFlagsPrivate_.ImGuiButtonFlags_NoHoveredOnFocus) == {} { hovered = true } }
 	if g.NavActivateDownId == id {
 		nav_activated_by_code : bool = (g.NavActivateId == id)
 		nav_activated_by_inputs : bool = (g.NavActivatePressedId == id)
@@ -32712,7 +32712,7 @@ ButtonBehavior :: proc(bb : ^ImRect, id : ImGuiID, out_hovered : ^bool, out_held
 				release_anywhere : bool = (flags & ImGuiButtonFlagsPrivate_.ImGuiButtonFlags_PressedOnClickReleaseAnywhere) != {}
 				if (release_in || release_anywhere) && !g.DragDropActive {
 					// Report as pressed when releasing the mouse (this is the most common path)
-					is_double_click_release : bool = (flags & ImGuiButtonFlagsPrivate_.ImGuiButtonFlags_PressedOnDoubleClick) != {} && g.IO.MouseReleased[mouse_button] && g.IO.MouseClickedLastCount[mouse_button] != 0 == 2
+					is_double_click_release : bool = (flags & ImGuiButtonFlagsPrivate_.ImGuiButtonFlags_PressedOnDoubleClick) != {} && g.IO.MouseReleased[mouse_button] && g.IO.MouseClickedLastCount[mouse_button] == 2
 					is_repeating_already : bool = (item_flags & ImGuiItemFlags_.ImGuiItemFlags_ButtonRepeat) != {} && g.IO.MouseDownDurationPrev[mouse_button] >= g.IO.KeyRepeatDelay; // Repeat mode trumps <on release>
 					is_button_avail_or_owned : bool = TestKeyOwner(MouseButtonToKey(mouse_button), test_owner_id)
 					if !is_double_click_release && !is_repeating_already && is_button_avail_or_owned { pressed = true }
@@ -32721,7 +32721,7 @@ ButtonBehavior :: proc(bb : ^ImRect, id : ImGuiID, out_hovered : ^bool, out_held
 			}
 			if (flags & ImGuiButtonFlagsPrivate_.ImGuiButtonFlags_NoNavFocus) == {} && g.IO.ConfigNavCursorVisibleAuto { g.NavCursorVisible = false }
 		}
-		else if g.ActiveIdSource == ImGuiInputSource.ImGuiInputSource_Keyboard || g.ActiveIdSource != {} == ImGuiInputSource.ImGuiInputSource_Gamepad {
+		else if g.ActiveIdSource == ImGuiInputSource.ImGuiInputSource_Keyboard || g.ActiveIdSource == ImGuiInputSource.ImGuiInputSource_Gamepad {
 			// When activated using Nav, we hold on the ActiveID until activation button is released
 			if g.NavActivateDownId == id {
 				// hovered == true not true as we are already likely hovered on direct activation.
@@ -33015,7 +33015,7 @@ ScrollbarEx :: proc(bb_frame : ^ImRect, id : ImGuiID, axis : ImGuiAxis, p_scroll
 		held_dir : i32 = (clicked_v_norm < grab_v_norm) ? -1 : (clicked_v_norm > grab_v_norm + grab_h_norm) ? +1 : 0
 		if g.ActiveIdIsJustActivated {
 			// On initial click when held_dir == 0 (clicked over grab): calculate the distance between mouse and the center of the grab
-			scroll_to_clicked_location : bool = (g.IO.ConfigScrollbarScrollByPage == false || g.IO.KeyShift || held_dir != 0 == 0)
+			scroll_to_clicked_location : bool = (g.IO.ConfigScrollbarScrollByPage == false || g.IO.KeyShift || held_dir == 0)
 			g.ScrollbarSeekMode = scroll_to_clicked_location ? 0 : cast(i16) held_dir
 			g.ScrollbarClickDeltaToGrabCenter = (held_dir == 0 && !g.IO.KeyShift) ? clicked_v_norm - grab_v_norm - grab_h_norm * 0.5 : 0.0
 		}
@@ -33029,7 +33029,7 @@ ScrollbarEx :: proc(bb_frame : ^ImRect, id : ImGuiID, axis : ImGuiAxis, p_scroll
 		}
 		else {
 			// Page by page
-			if IsMouseClicked(ImGuiMouseButton_.ImGuiMouseButton_Left, ImGuiInputFlags_.ImGuiInputFlags_Repeat) && held_dir != 0 == g.ScrollbarSeekMode {
+			if IsMouseClicked(ImGuiMouseButton_.ImGuiMouseButton_Left, ImGuiInputFlags_.ImGuiInputFlags_Repeat) && held_dir == g.ScrollbarSeekMode {
 				page_dir : f32 = (g.ScrollbarSeekMode > 0.0) ? +1.0 : -1.0
 				p_scroll_v^ = ImClamp(p_scroll_v^ + cast(ImS64) (page_dir * size_visible_v), cast(ImS64) 0, scroll_max)
 			}
@@ -33618,7 +33618,7 @@ SplitterBehavior :: proc(bb : ^ImRect, id : ImGuiID, axis : ImGuiAxis, size1 : ^
 		g.LastItemData.StatusFlags |= ImGuiItemStatusFlags_.ImGuiItemStatusFlags_HoveredRect
 	}
 
-	if held || (hovered && g.HoveredIdPreviousFrame != 0 == id != 0 && g.HoveredIdTimer >= hover_visibility_delay) { SetMouseCursor(axis == ImGuiAxis.ImGuiAxis_Y ? ImGuiMouseCursor_.ImGuiMouseCursor_ResizeNS : ImGuiMouseCursor_.ImGuiMouseCursor_ResizeEW) }
+	if held || (hovered && g.HoveredIdPreviousFrame == id && g.HoveredIdTimer >= hover_visibility_delay) { SetMouseCursor(axis == ImGuiAxis.ImGuiAxis_Y ? ImGuiMouseCursor_.ImGuiMouseCursor_ResizeNS : ImGuiMouseCursor_.ImGuiMouseCursor_ResizeEW) }
 
 	bb_render : ImRect = bb
 	if held {
@@ -33760,7 +33760,7 @@ BeginCombo :: proc(label : ^u8, preview_value : ^u8, flags : ImGuiComboFlags) ->
 	// Custom preview
 	if (flags & ImGuiComboFlagsPrivate_.ImGuiComboFlags_CustomPreview) != {} {
 		g.ComboPreviewData.PreviewRect = ImRect(bb.Min.x, bb.Min.y, value_x2, bb.Max.y)
-		IM_ASSERT(preview_value == nil || preview_value[0] != 0 == 0)
+		IM_ASSERT(preview_value == nil || preview_value[0] == 0)
 		preview_value = nil
 	}
 
@@ -33798,10 +33798,10 @@ BeginComboPopup :: proc(popup_id : ImGuiID, bb : ^ImRect, flags : ImGuiComboFlag
 		else if (flags & ImGuiComboFlags_.ImGuiComboFlags_HeightSmall) != {} { popup_max_height_in_items = 4 }
 		else if (flags & ImGuiComboFlags_.ImGuiComboFlags_HeightLarge) != {} { popup_max_height_in_items = 20 }
 		constraint_min : ImVec2; init(&constraint_min, 0.0, 0.0); constraint_max : ImVec2; init(&constraint_max, FLT_MAX, FLT_MAX)
-		if (g.NextWindowData.Flags & ImGuiNextWindowDataFlags_.ImGuiNextWindowDataFlags_HasSize) == 0 || g.NextWindowData.SizeVal.x <= 0.0 {
+		if (g.NextWindowData.Flags & ImGuiNextWindowDataFlags_.ImGuiNextWindowDataFlags_HasSize) == {} || g.NextWindowData.SizeVal.x <= 0.0 {
 			// Don't apply constraints if user specified a sizeconstraint_min.x = w
 		}
-		if (g.NextWindowData.Flags & ImGuiNextWindowDataFlags_.ImGuiNextWindowDataFlags_HasSize) == 0 || g.NextWindowData.SizeVal.y <= 0.0 { constraint_max.y = CalcMaxPopupHeightFromItemCount(popup_max_height_in_items) }
+		if (g.NextWindowData.Flags & ImGuiNextWindowDataFlags_.ImGuiNextWindowDataFlags_HasSize) == {} || g.NextWindowData.SizeVal.y <= 0.0 { constraint_max.y = CalcMaxPopupHeightFromItemCount(popup_max_height_in_items) }
 		SetNextWindowSizeConstraints(constraint_min, constraint_max)
 	}
 
@@ -33851,7 +33851,7 @@ BeginComboPreview :: proc() -> bool
 	preview_data : ^ImGuiComboPreviewData = &g.ComboPreviewData
 
 	if window.SkipItems || (g.LastItemData.StatusFlags & ImGuiItemStatusFlags_.ImGuiItemStatusFlags_Visible) == {} { return false }
-	IM_ASSERT(g.LastItemData.Rect.Min.x == preview_data.PreviewRect.Min.x != 0 && g.LastItemData.Rect.Min.y != 0 == preview_data.PreviewRect.Min.y); // Didn't call after BeginCombo/EndCombo block or forgot to pass ImGuiComboFlags_CustomPreview flag?
+	IM_ASSERT(g.LastItemData.Rect.Min.x == preview_data.PreviewRect.Min.x && g.LastItemData.Rect.Min.y == preview_data.PreviewRect.Min.y); // Didn't call after BeginCombo/EndCombo block or forgot to pass ImGuiComboFlags_CustomPreview flag?
 	if !Overlaps(&window.ClipRect, preview_data.PreviewRect) {
 		// Narrower test (optional)return false
 	}
@@ -34021,8 +34021,8 @@ DataTypeGetInfo :: proc(data_type : ImGuiDataType) -> ^ImGuiDataTypeInfo
 DataTypeFormatString :: proc(buf : ^u8, buf_size : i32, data_type : ImGuiDataType, p_data : rawptr, format : ^u8) -> i32
 {
 	// Signedness doesn't matter when pushing integer arguments
-	if data_type == ImGuiDataType_.ImGuiDataType_S32 || data_type != {} == ImGuiDataType_.ImGuiDataType_U32 { return ImFormatString(buf, buf_size, format, cast(^ImU32) p_data^) }
-	if data_type == ImGuiDataType_.ImGuiDataType_S64 || data_type != {} == ImGuiDataType_.ImGuiDataType_U64 { return ImFormatString(buf, buf_size, format, cast(^ImU64) p_data^) }
+	if data_type == ImGuiDataType_.ImGuiDataType_S32 || data_type == ImGuiDataType_.ImGuiDataType_U32 { return ImFormatString(buf, buf_size, format, cast(^ImU32) p_data^) }
+	if data_type == ImGuiDataType_.ImGuiDataType_S64 || data_type == ImGuiDataType_.ImGuiDataType_U64 { return ImFormatString(buf, buf_size, format, cast(^ImU64) p_data^) }
 	if data_type == ImGuiDataType_.ImGuiDataType_Float { return ImFormatString(buf, buf_size, format, cast(^f32) p_data^) }
 	if data_type == ImGuiDataType_.ImGuiDataType_Double { return ImFormatString(buf, buf_size, format, cast(^f64) p_data^) }
 	if data_type == ImGuiDataType_.ImGuiDataType_S8 { return ImFormatString(buf, buf_size, format, cast(^ImS8) p_data^) }
@@ -34035,7 +34035,7 @@ DataTypeFormatString :: proc(buf : ^u8, buf_size : i32, data_type : ImGuiDataTyp
 
 DataTypeApplyOp :: proc(data_type : ImGuiDataType, op : i32, output : rawptr, arg1 : rawptr, arg2 : rawptr)
 {
-	IM_ASSERT(op == '+' || op != 0 == '-')
+	IM_ASSERT(op == '+' || op == '-')
 	switch data_type {
 		case ImGuiDataType_.ImGuiDataType_S8:
 			if op == '+' { cast(^ImS8) output^ = ImAddClampOverflow(cast(^ImS8) arg1^, cast(^ImS8) arg2^, IM_S8_MIN, IM_S8_MAX) }
@@ -34115,7 +34115,7 @@ DataTypeApplyFromText :: proc(buf : ^u8, data_type : ImGuiDataType, p_data : raw
 	// - For float/double we have to ignore format with precision (e.g. "%.2f") because sscanf doesn't take them in, so force them into %f and %lf
 	// - In theory could treat empty format as using default, but this would only cover rare/bizarre case of using InputScalar() + integer + format string without %.
 	format_sanitized : [32]u8
-	if data_type == ImGuiDataType_.ImGuiDataType_Float || data_type != {} == ImGuiDataType_.ImGuiDataType_Double { format = type_info.ScanFmt }
+	if data_type == ImGuiDataType_.ImGuiDataType_Float || data_type == ImGuiDataType_.ImGuiDataType_Double { format = type_info.ScanFmt }
 	else { format = ImParseFormatSanitizeForScanning(format, format_sanitized, IM_ARRAYSIZE(format_sanitized)) }
 
 	// Small types need a 32-bit buffer to receive the result from scanf()
@@ -34223,9 +34223,9 @@ GetMinimumStepAtDecimalPrecision :: proc(decimal_precision : i32) -> f32
 RoundScalarWithFormatT :: proc($TYPE : typeid, format : ^u8, data_type : ImGuiDataType, v : TYPE) -> TYPE
 {
 	IM_UNUSED(data_type)
-	IM_ASSERT(data_type == ImGuiDataType_.ImGuiDataType_Float || data_type != {} == ImGuiDataType_.ImGuiDataType_Double)
+	IM_ASSERT(data_type == ImGuiDataType_.ImGuiDataType_Float || data_type == ImGuiDataType_.ImGuiDataType_Double)
 	fmt_start : ^u8 = ImParseFormatFindStart(format)
-	if fmt_start[0] != '%' || fmt_start[1] != 0 == '%' {
+	if fmt_start[0] != '%' || fmt_start[1] == '%' {
 		// Don't apply if the value is not visible in the format stringreturn v
 	}
 
@@ -34284,7 +34284,7 @@ DragBehaviorT :: proc($TYPE : typeid, $SIGNEDTYPE : typeid, $FLOATTYPE : typeid,
 		if g.IO.KeyAlt && (flags & ImGuiSliderFlags_.ImGuiSliderFlags_NoSpeedTweaks) == {} { adjust_delta *= 1.0 / 100.0 }
 		if g.IO.KeyShift && (flags & ImGuiSliderFlags_.ImGuiSliderFlags_NoSpeedTweaks) == {} { adjust_delta *= 10.0 }
 	}
-	else if g.ActiveIdSource == ImGuiInputSource.ImGuiInputSource_Keyboard || g.ActiveIdSource != {} == ImGuiInputSource.ImGuiInputSource_Gamepad {
+	else if g.ActiveIdSource == ImGuiInputSource.ImGuiInputSource_Keyboard || g.ActiveIdSource == ImGuiInputSource.ImGuiInputSource_Gamepad {
 		decimal_precision : i32 = is_floating_point ? ImParseFormatPrecision(format, 3) : 0
 		tweak_slow : bool = IsKeyDown((g.NavInputSource == ImGuiInputSource.ImGuiInputSource_Gamepad) ? ImGuiKey_NavGamepadTweakSlow : ImGuiKey_NavKeyboardTweakSlow)
 		tweak_fast : bool = IsKeyDown((g.NavInputSource == ImGuiInputSource.ImGuiInputSource_Gamepad) ? ImGuiKey_NavGamepadTweakFast : ImGuiKey_NavKeyboardTweakFast)
@@ -34376,13 +34376,13 @@ DragBehaviorT :: proc($TYPE : typeid, $SIGNEDTYPE : typeid, $FLOATTYPE : typeid,
 DragBehavior :: proc(id : ImGuiID, data_type : ImGuiDataType, p_v : rawptr, v_speed : f32, p_min : rawptr, p_max : rawptr, format : ^u8, flags : ImGuiSliderFlags) -> bool
 {
 	// Read imgui.cpp "API BREAKING CHANGES" section for 1.78 if you hit this assert.
-	IM_ASSERT((flags == 1 || (flags & ImGuiSliderFlags_.ImGuiSliderFlags_InvalidMask_) != {} == 0) && "Invalid ImGuiSliderFlags flags! Has the legacy 'float power' argument been mistakenly cast to flags? Call function with ImGuiSliderFlags_Logarithmic flags instead.")
+	IM_ASSERT((flags == 1 || (flags & ImGuiSliderFlags_.ImGuiSliderFlags_InvalidMask_) == {}) && "Invalid ImGuiSliderFlags flags! Has the legacy 'float power' argument been mistakenly cast to flags? Call function with ImGuiSliderFlags_Logarithmic flags instead.")
 
 	g : ^ImGuiContext = GImGui
 	if g.ActiveId == id {
 		// Those are the things we can do easily outside the DragBehaviorT<> template, saves code generation.
 		if g.ActiveIdSource == ImGuiInputSource.ImGuiInputEventType_Mouse && !g.IO.MouseDown[0] { ClearActiveID() }
-		else if (g.ActiveIdSource == ImGuiInputSource.ImGuiInputSource_Keyboard || g.ActiveIdSource != {} == ImGuiInputSource.ImGuiInputSource_Gamepad) && g.NavActivatePressedId != 0 == id != 0 && !g.ActiveIdIsJustActivated { ClearActiveID() }
+		else if (g.ActiveIdSource == ImGuiInputSource.ImGuiInputSource_Keyboard || g.ActiveIdSource == ImGuiInputSource.ImGuiInputSource_Gamepad) && g.NavActivatePressedId == id && !g.ActiveIdIsJustActivated { ClearActiveID() }
 	}
 	if g.ActiveId != id { return false }
 	if (g.LastItemData.ItemFlags & ImGuiItemFlagsPrivate_.ImGuiItemFlags_ReadOnly) != {} || (flags & ImGuiSliderFlagsPrivate_.ImGuiSliderFlags_ReadOnly) != {} { return false }
@@ -34442,13 +34442,13 @@ DragScalar :: proc(label : ^u8, data_type : ImGuiDataType, p_data : rawptr, v_sp
 	if !temp_input_is_active {
 		// Tabbing or CTRL-clicking on Drag turns it into an InputText
 		clicked : bool = hovered && IsMouseClicked(0, ImGuiInputFlags_.ImGuiInputFlags_None, id)
-		double_clicked : bool = (hovered && g.IO.MouseClickedCount[0] != 0 == 2 && TestKeyOwner(ImGuiKey.ImGuiKey_MouseLeft, id))
-		make_active : bool = (clicked || double_clicked || g.NavActivateId != 0 == id)
+		double_clicked : bool = (hovered && g.IO.MouseClickedCount[0] == 2 && TestKeyOwner(ImGuiKey.ImGuiKey_MouseLeft, id))
+		make_active : bool = (clicked || double_clicked || g.NavActivateId == id)
 		if make_active && (clicked || double_clicked) { SetKeyOwner(ImGuiKey.ImGuiKey_MouseLeft, id) }
-		if make_active && temp_input_allowed { if (clicked && g.IO.KeyCtrl) || double_clicked || (g.NavActivateId == id != 0 && (g.NavActivateFlags & ImGuiActivateFlags_.ImGuiActivateFlags_PreferInput) != {}) { temp_input_is_active = true } }
+		if make_active && temp_input_allowed { if (clicked && g.IO.KeyCtrl) || double_clicked || (g.NavActivateId == id && (g.NavActivateFlags & ImGuiActivateFlags_.ImGuiActivateFlags_PreferInput) != {}) { temp_input_is_active = true } }
 
 		// (Optional) simple click (without moving) turns Drag into an InputText
-		if g.IO.ConfigDragClickToInputText && temp_input_allowed && !temp_input_is_active { if g.ActiveId == id != 0 && hovered && g.IO.MouseReleased[0] && !IsMouseDragPastThreshold(0, g.IO.MouseDragThreshold * DRAG_MOUSE_THRESHOLD_FACTOR) {
+		if g.IO.ConfigDragClickToInputText && temp_input_allowed && !temp_input_is_active { if g.ActiveId == id && hovered && g.IO.MouseReleased[0] && !IsMouseDragPastThreshold(0, g.IO.MouseDragThreshold * DRAG_MOUSE_THRESHOLD_FACTOR) {
 	g.NavActivateId = id
 	g.NavActivateFlags = ImGuiActivateFlags_.ImGuiActivateFlags_PreferInput
 	temp_input_is_active = true
@@ -34470,14 +34470,14 @@ DragScalar :: proc(label : ^u8, data_type : ImGuiDataType, p_data : rawptr, v_sp
 		clamp_enabled : bool = false
 		if (flags & ImGuiSliderFlags_.ImGuiSliderFlags_ClampOnInput) != {} && (p_min != nil || p_max != nil) {
 			clamp_range_dir : i32 = (p_min != nil && p_max != nil) ? DataTypeCompare(data_type, p_min, p_max) : 0; // -1 when *p_min < *p_max, == 0 when *p_min == *p_max
-			if p_min == nil || p_max != nil == nil || clamp_range_dir < 0 { clamp_enabled = true }
+			if p_min == nil || p_max == nil || clamp_range_dir < 0 { clamp_enabled = true }
 			else if clamp_range_dir == 0 { clamp_enabled = DataTypeIsZero(data_type, p_min) ? ((flags & ImGuiSliderFlags_.ImGuiSliderFlags_ClampZeroRange) != {}) : true }
 		}
 		return TempInputScalar(frame_bb, id, label, data_type, p_data, format, clamp_enabled ? p_min : nil, clamp_enabled ? p_max : nil)
 	}
 
 	// Draw frame
-	frame_col : ImU32 = GetColorU32(g.ActiveId == id != 0 ? ImGuiCol_.ImGuiCol_FrameBgActive : hovered ? ImGuiCol_.ImGuiCol_FrameBgHovered : ImGuiCol_.ImGuiCol_FrameBg)
+	frame_col : ImU32 = GetColorU32(g.ActiveId == id ? ImGuiCol_.ImGuiCol_FrameBgActive : hovered ? ImGuiCol_.ImGuiCol_FrameBgHovered : ImGuiCol_.ImGuiCol_FrameBg)
 	RenderNavCursor(frame_bb, id)
 	RenderFrame(frame_bb.Min, frame_bb.Max, frame_col, true, style.FrameRounding)
 
@@ -34718,7 +34718,7 @@ ScaleValueFromRatioT :: proc($TYPE : typeid, $SIGNEDTYPE : typeid, $FLOATTYPE : 
 {
 	// We special-case the extents because otherwise our logarithmic fudging can lead to "mathematically correct"
 	// but non-intuitive behaviors like a fully-left slider not actually reaching the minimum value. Also generally simpler.
-	if t <= 0.0 || v_min != {} == v_max { return v_min }
+	if t <= 0.0 || v_min == v_max { return v_min }
 	if t >= 1.0 { return v_max }
 
 	result : TYPE = cast(TYPE) 0
@@ -34828,7 +34828,7 @@ SliderBehaviorT :: proc($TYPE : typeid, $SIGNEDTYPE : typeid, $FLOATTYPE : typei
 				set_new_value = true
 			}
 		}
-		else if g.ActiveIdSource == ImGuiInputSource.ImGuiInputSource_Keyboard || g.ActiveIdSource != {} == ImGuiInputSource.ImGuiInputSource_Gamepad {
+		else if g.ActiveIdSource == ImGuiInputSource.ImGuiInputSource_Keyboard || g.ActiveIdSource == ImGuiInputSource.ImGuiInputSource_Gamepad {
 			if g.ActiveIdIsJustActivated {
 				g.SliderCurrentAccum = 0.0; // Reset any stored nav delta upon activation
 				g.SliderCurrentAccumDirty = false
@@ -34857,7 +34857,7 @@ SliderBehaviorT :: proc($TYPE : typeid, $SIGNEDTYPE : typeid, $FLOATTYPE : typei
 			}
 
 			delta : f32 = g.SliderCurrentAccum
-			if g.NavActivatePressedId == id != 0 && !g.ActiveIdIsJustActivated {
+			if g.NavActivatePressedId == id && !g.ActiveIdIsJustActivated {
 				ClearActiveID()
 			}
 			else if g.SliderCurrentAccumDirty {
@@ -34923,7 +34923,7 @@ SliderBehaviorT :: proc($TYPE : typeid, $SIGNEDTYPE : typeid, $FLOATTYPE : typei
 SliderBehavior :: proc(bb : ^ImRect, id : ImGuiID, data_type : ImGuiDataType, p_v : rawptr, p_min : rawptr, p_max : rawptr, format : ^u8, flags : ImGuiSliderFlags, out_grab_bb : ^ImRect) -> bool
 {
 	// Read imgui.cpp "API BREAKING CHANGES" section for 1.78 if you hit this assert.
-	IM_ASSERT((flags == 1 || (flags & ImGuiSliderFlags_.ImGuiSliderFlags_InvalidMask_) != {} == 0) && "Invalid ImGuiSliderFlags flags! Has the legacy 'float power' argument been mistakenly cast to flags? Call function with ImGuiSliderFlags_Logarithmic flags instead.")
+	IM_ASSERT((flags == 1 || (flags & ImGuiSliderFlags_.ImGuiSliderFlags_InvalidMask_) == {}) && "Invalid ImGuiSliderFlags flags! Has the legacy 'float power' argument been mistakenly cast to flags? Call function with ImGuiSliderFlags_Logarithmic flags instead.")
 	IM_ASSERT((flags & ImGuiSliderFlags_.ImGuiSliderFlags_WrapAround) == {}); // Not supported by SliderXXX(), only by DragXXX()
 
 	switch data_type {
@@ -34993,9 +34993,9 @@ SliderScalar :: proc(label : ^u8, data_type : ImGuiDataType, p_data : rawptr, p_
 	if !temp_input_is_active {
 		// Tabbing or CTRL-clicking on Slider turns it into an input box
 		clicked : bool = hovered && IsMouseClicked(0, ImGuiInputFlags_.ImGuiInputFlags_None, id)
-		make_active : bool = (clicked || g.NavActivateId != 0 == id)
+		make_active : bool = (clicked || g.NavActivateId == id)
 		if make_active && clicked { SetKeyOwner(ImGuiKey.ImGuiKey_MouseLeft, id) }
-		if make_active && temp_input_allowed { if (clicked && g.IO.KeyCtrl) || (g.NavActivateId == id != 0 && (g.NavActivateFlags & ImGuiActivateFlags_.ImGuiActivateFlags_PreferInput) != {}) { temp_input_is_active = true } }
+		if make_active && temp_input_allowed { if (clicked && g.IO.KeyCtrl) || (g.NavActivateId == id && (g.NavActivateFlags & ImGuiActivateFlags_.ImGuiActivateFlags_PreferInput) != {}) { temp_input_is_active = true } }
 
 		// Store initial value (not used by main lib but available as a convenience but some mods e.g. to revert)
 		if make_active { memcpy(&g.ActiveIdValueOnActivation, p_data, DataTypeGetInfo(data_type).Size) }
@@ -35015,7 +35015,7 @@ SliderScalar :: proc(label : ^u8, data_type : ImGuiDataType, p_data : rawptr, p_
 	}
 
 	// Draw frame
-	frame_col : ImU32 = GetColorU32(g.ActiveId == id != 0 ? ImGuiCol_.ImGuiCol_FrameBgActive : hovered ? ImGuiCol_.ImGuiCol_FrameBgHovered : ImGuiCol_.ImGuiCol_FrameBg)
+	frame_col : ImU32 = GetColorU32(g.ActiveId == id ? ImGuiCol_.ImGuiCol_FrameBgActive : hovered ? ImGuiCol_.ImGuiCol_FrameBgHovered : ImGuiCol_.ImGuiCol_FrameBg)
 	RenderNavCursor(frame_bb, id)
 	RenderFrame(frame_bb.Min, frame_bb.Max, frame_col, true, g.Style.FrameRounding)
 
@@ -35025,7 +35025,7 @@ SliderScalar :: proc(label : ^u8, data_type : ImGuiDataType, p_data : rawptr, p_
 	if value_changed { MarkItemEdited(id) }
 
 	// Render grab
-	if grab_bb.Max.x > grab_bb.Min.x { AddRectFilled(window.DrawList, grab_bb.Min, grab_bb.Max, GetColorU32(g.ActiveId == id != 0 ? ImGuiCol_.ImGuiCol_SliderGrabActive : ImGuiCol_.ImGuiCol_SliderGrab), style.GrabRounding) }
+	if grab_bb.Max.x > grab_bb.Min.x { AddRectFilled(window.DrawList, grab_bb.Min, grab_bb.Max, GetColorU32(g.ActiveId == id ? ImGuiCol_.ImGuiCol_SliderGrabActive : ImGuiCol_.ImGuiCol_SliderGrab), style.GrabRounding) }
 
 	// Display value using user-provided display format so user can add prefix/suffix/decorations to the value.
 	value_buf : [64]u8
@@ -35142,7 +35142,7 @@ VSliderScalar :: proc(label : ^u8, size : ^ImVec2, data_type : ImGuiDataType, p_
 
 	hovered : bool = ItemHoverable(frame_bb, id, g.LastItemData.ItemFlags)
 	clicked : bool = hovered && IsMouseClicked(0, ImGuiInputFlags_.ImGuiInputFlags_None, id)
-	if clicked || g.NavActivateId != 0 == id {
+	if clicked || g.NavActivateId == id {
 		if clicked { SetKeyOwner(ImGuiKey.ImGuiKey_MouseLeft, id) }
 		SetActiveID(id, window)
 		SetFocusID(id, window)
@@ -35151,7 +35151,7 @@ VSliderScalar :: proc(label : ^u8, size : ^ImVec2, data_type : ImGuiDataType, p_
 	}
 
 	// Draw frame
-	frame_col : ImU32 = GetColorU32(g.ActiveId == id != 0 ? ImGuiCol_.ImGuiCol_FrameBgActive : hovered ? ImGuiCol_.ImGuiCol_FrameBgHovered : ImGuiCol_.ImGuiCol_FrameBg)
+	frame_col : ImU32 = GetColorU32(g.ActiveId == id ? ImGuiCol_.ImGuiCol_FrameBgActive : hovered ? ImGuiCol_.ImGuiCol_FrameBgHovered : ImGuiCol_.ImGuiCol_FrameBg)
 	RenderNavCursor(frame_bb, id)
 	RenderFrame(frame_bb.Min, frame_bb.Max, frame_col, true, g.Style.FrameRounding)
 
@@ -35161,7 +35161,7 @@ VSliderScalar :: proc(label : ^u8, size : ^ImVec2, data_type : ImGuiDataType, p_
 	if value_changed { MarkItemEdited(id) }
 
 	// Render grab
-	if grab_bb.Max.y > grab_bb.Min.y { AddRectFilled(window.DrawList, grab_bb.Min, grab_bb.Max, GetColorU32(g.ActiveId == id != 0 ? ImGuiCol_.ImGuiCol_SliderGrabActive : ImGuiCol_.ImGuiCol_SliderGrab), style.GrabRounding) }
+	if grab_bb.Max.y > grab_bb.Min.y { AddRectFilled(window.DrawList, grab_bb.Min, grab_bb.Max, GetColorU32(g.ActiveId == id ? ImGuiCol_.ImGuiCol_SliderGrabActive : ImGuiCol_.ImGuiCol_SliderGrab), style.GrabRounding) }
 
 	// Display value using user-provided display format so user can add prefix/suffix/decorations to the value.
 	// For the vertical slider we allow centered text to overlap the frame padding
@@ -35228,8 +35228,8 @@ ImParseFormatFindEnd :: proc(fmt : ^u8) -> ^u8
 	ignored_uppercase_mask : u32 = (1 << ('I' - 'A')) | (1 << ('L' - 'A'))
 	ignored_lowercase_mask : u32 = (1 << ('h' - 'a')) | (1 << ('j' - 'a')) | (1 << ('l' - 'a')) | (1 << ('t' - 'a')) | (1 << ('w' - 'a')) | (1 << ('z' - 'a'))
 	for c : u8; (c = fmt^) != 0; post_incr(&fmt) {
-		if c >= 'A' && c <= 'Z' && ((1 << (c - 'A')) & ignored_uppercase_mask) != 0 == 0 { return fmt + 1 }
-		if c >= 'a' && c <= 'z' && ((1 << (c - 'a')) & ignored_lowercase_mask) != 0 == 0 { return fmt + 1 }
+		if c >= 'A' && c <= 'Z' && ((1 << (c - 'A')) & ignored_uppercase_mask) == 0 { return fmt + 1 }
+		if c >= 'a' && c <= 'z' && ((1 << (c - 'a')) & ignored_lowercase_mask) == 0 { return fmt + 1 }
 	}
 
 	return fmt
@@ -35280,7 +35280,7 @@ ImParseFormatSanitizeForScanning :: proc(fmt_in : ^u8, fmt_out : ^u8, fmt_out_si
 	has_type : bool = false
 	for fmt_in < fmt_end {
 		c : u8 = post_incr(&fmt_in)^
-		if !has_type && ((c >= '0' && c <= '9') || c != 0 == '.' || c != 0 == '+' || c != 0 == '#') { continue }
+		if !has_type && ((c >= '0' && c <= '9') || c == '.' || c == '+' || c == '#') { continue }
 		has_type |= ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')); // Stop skipping digits
 		if c != '\'' && c != '$' && c != '_' {
 			// Custom flags provided by stb_sprintf.h. POSIX 2008 also supports '.(post_incr(&fmt_out))^ = c
@@ -35318,10 +35318,10 @@ ImParseFormatPrecision :: proc(fmt : ^u8, default_precision : i32) -> i32
 		fmt = ImAtoi(i32, fmt + 1, &precision)
 		if precision < 0 || precision > 99 { precision = default_precision }
 	}
-	if fmt^ == 'e' || fmt^ != 0 == 'E' {
+	if fmt^ == 'e' || fmt^ == 'E' {
 		// Maximum precision with scientific notationprecision = -1
 	}
-	if (fmt^ == 'g' || fmt^ != 0 == 'G') && precision != 0 == INT_MAX { precision = -1 }
+	if (fmt^ == 'g' || fmt^ == 'G') && precision == INT_MAX { precision = -1 }
 	return (precision == INT_MAX) ? default_precision : precision
 }
 
@@ -35411,7 +35411,7 @@ InputScalar :: proc(label : ^u8, data_type : ImGuiDataType, p_data : rawptr, p_s
 	p_data_default : rawptr = (g.NextItemData.HasFlags & ImGuiNextItemDataFlags_.ImGuiNextItemDataFlags_HasRefVal) != {} ? &g.NextItemData.RefVal : &g.DataTypeZeroValue
 
 	buf : [64]u8
-	if (flags & ImGuiInputTextFlags_.ImGuiInputTextFlags_DisplayEmptyRefVal) != {} && DataTypeCompare(data_type, p_data, p_data_default) != 0 == 0 { buf[0] = 0 }
+	if (flags & ImGuiInputTextFlags_.ImGuiInputTextFlags_DisplayEmptyRefVal) != {} && DataTypeCompare(data_type, p_data, p_data_default) == 0 { buf[0] = 0 }
 	else { DataTypeFormatString(buf, IM_ARRAYSIZE(buf), data_type, p_data, format) }
 
 	// Disable the MarkItemEdited() call in InputText but keep ImGuiItemStatusFlags_Edited.
@@ -36069,7 +36069,7 @@ ImStb_stb_textedit_find_charpos :: proc(find : ^StbFindState, str : ^IMSTB_TEXTE
 	z : i32 = STB_TEXTEDIT_STRINGLEN(str)
 	i : i32 = 0; first : i32
 
-	if n == z != 0 && single_line != 0 {
+	if n == z && single_line != 0 {
 		// special case if it's at the end (may not be needed?)
 		STB_TEXTEDIT_LAYOUTROW(&r, str, 0)
 		find.y = 0
@@ -36086,7 +36086,7 @@ ImStb_stb_textedit_find_charpos :: proc(find : ^StbFindState, str : ^IMSTB_TEXTE
 	for {
 		STB_TEXTEDIT_LAYOUTROW(&r, str, i)
 		if n < i + r.num_chars { break }
-		if i + r.num_chars == z != 0 && z > 0 && STB_TEXTEDIT_GETCHAR(str, z - 1) != STB_TEXTEDIT_NEWLINE {
+		if i + r.num_chars == z && z > 0 && STB_TEXTEDIT_GETCHAR(str, z - 1) != STB_TEXTEDIT_NEWLINE {
 			// [DEAR IMGUI] special handling for last line
 			// [DEAR IMGUI]
 			break
@@ -37089,7 +37089,7 @@ InputTextCalcTextSize :: proc(ctx : ^ImGuiContext, text_begin : ^u8, text_end : 
 		out_offset^ = ImVec2(line_width, text_size.y + line_height)
 	}
 
-	if line_width > 0 || text_size.y != 0 == 0.0 {
+	if line_width > 0 || text_size.y == 0.0 {
 		// whereas size.y will ignore the trailing \ntext_size.y += line_height
 	}
 
@@ -37793,7 +37793,7 @@ ImStb_stb_textedit_find_charpos :: proc(find : ^StbFindState, str : ^IMSTB_TEXTE
 	z : i32 = ImStb_STB_TEXTEDIT_STRINGLEN(str)
 	i : i32 = 0; first : i32
 
-	if n == z != 0 && single_line != 0 {
+	if n == z && single_line != 0 {
 		// special case if it's at the end (may not be needed?)
 		ImStb_STB_TEXTEDIT_LAYOUTROW(&r, str, 0)
 		find.y = 0
@@ -37810,7 +37810,7 @@ ImStb_stb_textedit_find_charpos :: proc(find : ^StbFindState, str : ^IMSTB_TEXTE
 	for {
 		ImStb_STB_TEXTEDIT_LAYOUTROW(&r, str, i)
 		if n < i + r.num_chars { break }
-		if i + r.num_chars == z != 0 && z > 0 && ImStb_STB_TEXTEDIT_GETCHAR(str, z - 1) != STB_TEXTEDIT_NEWLINE {
+		if i + r.num_chars == z && z > 0 && ImStb_STB_TEXTEDIT_GETCHAR(str, z - 1) != STB_TEXTEDIT_NEWLINE {
 			// [DEAR IMGUI] special handling for last line
 			// [DEAR IMGUI]
 			break
@@ -38895,7 +38895,7 @@ ImGuiInputTextCallbackData_InsertChars :: proc(this : ^ImGuiInputTextCallbackDat
 
 		g : ^ImGuiContext = this.Ctx
 		edit_state : ^ImGuiInputTextState = &g.InputTextState
-		IM_ASSERT(edit_state.ID != 0 && g.ActiveId != 0 == edit_state.ID)
+		IM_ASSERT(edit_state.ID != 0 && g.ActiveId == edit_state.ID)
 		IM_ASSERT(this.Buf == edit_state.TextA.Data)
 		new_buf_size : i32 = this.BufTextLen + ImClamp(new_text_len * 4, 32, ImMax(256, new_text_len)) + 1
 		resize(&edit_state.TextA, new_buf_size + 1)
@@ -38955,7 +38955,7 @@ InputTextFilterCharacter :: proc(ctx : ^ImGuiContext, p_char : ^u32, flags : ImG
 		// Users of non-default decimal point (in particular ',') may be affected by word-selection logic (is_word_boundary_from_right/is_word_boundary_from_left) functions.
 		g : ^ImGuiContext = ctx
 		c_decimal_point : u32 = cast(u32) g.PlatformIO.Platform_LocaleDecimalPoint
-		if (flags & (ImGuiInputTextFlags_.ImGuiInputTextFlags_CharsDecimal | ImGuiInputTextFlags_.ImGuiInputTextFlags_CharsScientific | cast(ImGuiInputTextFlags) ImGuiInputTextFlagsPrivate_.ImGuiInputTextFlags_LocalizeDecimalPoint)) != {} { if c == '.' || c != 0 == ',' { c = c_decimal_point } }
+		if (flags & (ImGuiInputTextFlags_.ImGuiInputTextFlags_CharsDecimal | ImGuiInputTextFlags_.ImGuiInputTextFlags_CharsScientific | cast(ImGuiInputTextFlags) ImGuiInputTextFlagsPrivate_.ImGuiInputTextFlags_LocalizeDecimalPoint)) != {} { if c == '.' || c == ',' { c = c_decimal_point } }
 
 		// Full-width -> half-width conversion for numeric fields (https://en.wikipedia.org/wiki/Halfwidth_and_Fullwidth_Forms_(Unicode_block)
 		// While this is mostly convenient, this has the side-effect for uninformed users accidentally inputting full-width characters that they may
@@ -39005,7 +39005,7 @@ InputTextReconcileUndoState :: proc(state : ^ImGuiInputTextState, old_buf : ^u8,
 	first_diff : i32
 	for first_diff = 0; first_diff < shorter_length; post_incr(&first_diff) { if old_buf[first_diff] != new_buf[first_diff] { break } }
 
-	if first_diff == old_length != 0 && first_diff != 0 == new_length { return }
+	if first_diff == old_length && first_diff == new_length { return }
 
 	old_last_diff : i32 = old_length - 1
 	new_last_diff : i32 = new_length - 1
@@ -39087,7 +39087,7 @@ InputTextEx :: proc(label : ^u8, hint : ^u8, buf : ^u8, buf_size : i32, size_arg
 		window.DC.CursorPos = backup_pos
 
 		// Prevent NavActivation from Tabbing when our widget accepts Tab inputs: this allows cycling through widgets without stopping.
-		if g.NavActivateId == id != 0 && (g.NavActivateFlags & ImGuiActivateFlags_.ImGuiActivateFlags_FromTabbing) != {} && (flags & ImGuiInputTextFlags_.ImGuiInputTextFlags_AllowTabInput) != {} { g.NavActivateId = 0 }
+		if g.NavActivateId == id && (g.NavActivateFlags & ImGuiActivateFlags_.ImGuiActivateFlags_FromTabbing) != {} && (flags & ImGuiInputTextFlags_.ImGuiInputTextFlags_AllowTabInput) != {} { g.NavActivateId = 0 }
 
 		// Prevent NavActivate reactivating in BeginChild() when we are already active.
 		backup_activate_id : ImGuiID = g.NavActivateId
@@ -39141,8 +39141,8 @@ InputTextEx :: proc(label : ^u8, hint : ^u8, buf : ^u8, buf_size : i32, size_arg
 	input_requested_by_nav : bool = (g.ActiveId != id) && ((g.NavActivateId == id) && ((g.NavActivateFlags & ImGuiActivateFlags_.ImGuiActivateFlags_PreferInput) != {} || (g.NavInputSource == ImGuiInputSource.ImGuiInputSource_Keyboard)))
 
 	user_clicked : bool = hovered && io.MouseClicked[0]
-	user_scroll_finish : bool = is_multiline && state != nil && g.ActiveId != 0 == 0 && g.ActiveIdPreviousFrame != 0 == GetWindowScrollbarID(draw_window, ImGuiAxis.ImGuiAxis_Y)
-	user_scroll_active : bool = is_multiline && state != nil && g.ActiveId != 0 == GetWindowScrollbarID(draw_window, ImGuiAxis.ImGuiAxis_Y)
+	user_scroll_finish : bool = is_multiline && state != nil && g.ActiveId == 0 && g.ActiveIdPreviousFrame == GetWindowScrollbarID(draw_window, ImGuiAxis.ImGuiAxis_Y)
+	user_scroll_active : bool = is_multiline && state != nil && g.ActiveId == GetWindowScrollbarID(draw_window, ImGuiAxis.ImGuiAxis_Y)
 	clear_active_id : bool = false
 	select_all : bool = false
 
@@ -39181,7 +39181,7 @@ InputTextEx :: proc(label : ^u8, hint : ^u8, buf : ^u8, buf_size : i32, size_arg
 
 		// Preserve cursor position and undo/redo stack if we come back to same widget
 		// FIXME: Since we reworked this on 2022/06, may want to differentiate recycle_cursor vs recycle_undostate?
-		recycle_state : bool = (state.ID == id != 0 && !init_changed_specs)
+		recycle_state : bool = (state.ID == id && !init_changed_specs)
 		if recycle_state && (state.TextLen != buf_len || (state.TextA.Data == nil || strncmp(state.TextA.Data, buf, buf_len) != 0)) { recycle_state = false }
 
 		// Start edition
@@ -39215,7 +39215,7 @@ InputTextEx :: proc(label : ^u8, hint : ^u8, buf : ^u8, buf_size : i32, size_arg
 
 	is_osx : bool = io.ConfigMacOSXBehaviors
 	if g.ActiveId != id && init_make_active {
-		IM_ASSERT(state != nil && state.ID != 0 == id)
+		IM_ASSERT(state != nil && state.ID == id)
 		SetActiveID(id, window)
 		SetFocusID(id, window)
 		FocusWindow(window)
@@ -39251,10 +39251,10 @@ InputTextEx :: proc(label : ^u8, hint : ^u8, buf : ^u8, buf_size : i32, size_arg
 	if state != nil { state.TextSrc = is_readonly ? buf : state.TextA.Data }
 
 	// We have an edge case if ActiveId was set through another widget (e.g. widget being swapped), clear id immediately (don't wait until the end of the function)
-	if g.ActiveId == id != 0 && state != nil == nil { ClearActiveID() }
+	if g.ActiveId == id && state == nil { ClearActiveID() }
 
 	// Release focus when we click outside
-	if g.ActiveId == id != 0 && io.MouseClicked[0] && !init_state && !init_make_active {
+	if g.ActiveId == id && io.MouseClicked[0] && !init_state && !init_make_active {
 		//-V560clear_active_id = true
 	}
 
@@ -39265,8 +39265,8 @@ InputTextEx :: proc(label : ^u8, hint : ^u8, buf : ^u8, buf_size : i32, size_arg
 	validated : bool = false
 
 	// Select the buffer to render.
-	buf_display_from_state : bool = (render_cursor || render_selection || g.ActiveId != 0 == id) && !is_readonly && state != nil
-	is_displaying_hint : bool = (hint != nil && (buf_display_from_state ? state.TextA.Data : buf)[0] != 0 == 0)
+	buf_display_from_state : bool = (render_cursor || render_selection || g.ActiveId == id) && !is_readonly && state != nil
+	is_displaying_hint : bool = (hint != nil && (buf_display_from_state ? state.TextA.Data : buf)[0] == 0)
 
 	// Password pushes a temporary font with only a fallback glyph
 	if is_password && !is_displaying_hint {
@@ -39309,7 +39309,7 @@ InputTextEx :: proc(label : ^u8, hint : ^u8, buf : ^u8, buf_size : i32, size_arg
 				// Double-click: Select word
 				// We always use the "Mac" word advance for double-click select vs CTRL+Right which use the platform dependent variant:
 				// FIXME: There are likely many ways to improve this behavior, but there's no "right" behavior (depends on use-case, software, OS)
-				is_bol : bool = (state.Stb.cursor == 0) || ImStb_STB_TEXTEDIT_GETCHAR(state, state.Stb.cursor - 1) != 0 == '\n'
+				is_bol : bool = (state.Stb.cursor == 0) || ImStb_STB_TEXTEDIT_GETCHAR(state, state.Stb.cursor - 1) == '\n'
 				if STB_TEXT_HAS_SELECTION(state.Stb) || !is_bol { OnKeyPressed(state, STB_TEXTEDIT_K_WORDLEFT) }
 				//state->OnKeyPressed(STB_TEXTEDIT_K_WORDRIGHT | STB_TEXTEDIT_K_SHIFT);
 				if !STB_TEXT_HAS_SELECTION(state.Stb) { ImStb_stb_textedit_prep_selection_at_cursor(state.Stb) }
@@ -39380,7 +39380,7 @@ InputTextEx :: proc(label : ^u8, hint : ^u8, buf : ^u8, buf_size : i32, size_arg
 
 	// Process other shortcuts/key-presses
 	revert_edit : bool = false
-	if g.ActiveId == id != 0 && !g.ActiveIdIsJustActivated && !clear_active_id {
+	if g.ActiveId == id && !g.ActiveIdIsJustActivated && !clear_active_id {
 		IM_ASSERT(state != nil)
 
 		row_count_per_page : i32 = ImMax(cast(i32) ((inner_size.y - style.FramePadding.y) / g.FontSize), 1)
@@ -39681,7 +39681,7 @@ else { OnKeyPressed(state, (is_startend_key_down ? STB_TEXTEDIT_K_TEXTEND : STB_
 
 	// Release active ID at the end of the function (so e.g. pressing Return still does a final application of the value)
 	// Otherwise request text input ahead for next frame.
-	if g.ActiveId == id != 0 && clear_active_id { ClearActiveID() }
+	if g.ActiveId == id && clear_active_id { ClearActiveID() }
 	else if g.ActiveId == id { g.WantTextInputNextFrame = 1 }
 
 	// Render frame
@@ -39841,7 +39841,7 @@ else { OnKeyPressed(state, (is_startend_key_down ? STB_TEXTEDIT_K_TEXTEND : STB_
 			// We don't need width
 			text_size = ImVec2(inner_size.x, InputTextCalcTextLenAndLineCount(buf_display, &buf_display_end) * g.FontSize)
 		}
-		else if !is_displaying_hint && g.ActiveId != 0 == id { buf_display_end = buf_display + state.TextLen }
+		else if !is_displaying_hint && g.ActiveId == id { buf_display_end = buf_display + state.TextLen }
 		else if !is_displaying_hint { buf_display_end = buf_display + strlen(buf_display) }
 
 		if is_multiline || (buf_display_end - buf_display) < buf_display_max_length {
@@ -39961,7 +39961,7 @@ ColorEditRestoreHS :: proc(col : ^f32, H : ^f32, S : ^f32, V : ^f32)
 
 	// When S == 0, H is undefined.
 	// When H == 1 it wraps around to 0.
-	if S^ == 0.0 || (H^ == 0.0 && g.ColorEditSavedHue != 0 == 1) { H^ = g.ColorEditSavedHue }
+	if S^ == 0.0 || (H^ == 0.0 && g.ColorEditSavedHue == 1) { H^ = g.ColorEditSavedHue }
 
 	// When V == 0, S is undefined.
 	if V^ == 0.0 { S^ = g.ColorEditSavedSat }
@@ -40027,7 +40027,7 @@ ColorEdit4 :: proc(label : ^u8, col : [4]f32, flags : ImGuiColorEditFlags) -> bo
 	inputs_offset_x : f32 = (style.ColorButtonPosition == ImGuiDir.ImGuiDir_Left) ? w_button : 0.0
 	window.DC.CursorPos.x = pos.x + inputs_offset_x
 
-	if (flags & (ImGuiColorEditFlags_.ImGuiColorEditFlags_DisplayRGB | ImGuiColorEditFlags_.ImGuiColorEditFlags_DisplayHSV)) != {} && (flags & ImGuiColorEditFlags_.ImGuiColorEditFlags_NoInputs) != {} == 0 {
+	if (flags & (ImGuiColorEditFlags_.ImGuiColorEditFlags_DisplayRGB | ImGuiColorEditFlags_.ImGuiColorEditFlags_DisplayHSV)) != {} && (flags & ImGuiColorEditFlags_.ImGuiColorEditFlags_NoInputs) == {} {
 		// RGB/HSV 0..255 Sliders
 		w_items : f32 = w_inputs - style.ItemInnerSpacing.x * (components - 1)
 
@@ -40063,7 +40063,7 @@ ColorEdit4 :: proc(label : ^u8, col : [4]f32, flags : ImGuiColorEditFlags) -> bo
 			if (flags & ImGuiColorEditFlags_.ImGuiColorEditFlags_NoOptions) == {} { OpenPopupOnItemClick("context", ImGuiPopupFlags_.ImGuiPopupFlags_MouseButtonRight) }
 		}
 	}
-	else if (flags & ImGuiColorEditFlags_.ImGuiColorEditFlags_DisplayHex) != {} && (flags & ImGuiColorEditFlags_.ImGuiColorEditFlags_NoInputs) != {} == 0 {
+	else if (flags & ImGuiColorEditFlags_.ImGuiColorEditFlags_DisplayHex) != {} && (flags & ImGuiColorEditFlags_.ImGuiColorEditFlags_NoInputs) == {} {
 		// RGB Hexadecimal Input
 		buf : [64]u8
 		if alpha { ImFormatString(buf, IM_ARRAYSIZE(buf), "#%02X%02X%02X%02X", ImClamp(i[0], 0, 255), ImClamp(i[1], 0, 255), ImClamp(i[2], 0, 255), ImClamp(i[3], 0, 255)) }
@@ -40128,7 +40128,7 @@ ColorEdit4 :: proc(label : ^u8, col : [4]f32, flags : ImGuiColorEditFlags) -> bo
 	}
 
 	// Convert back
-	if value_changed && picker_active_window != nil == nil {
+	if value_changed && picker_active_window == nil {
 		if !value_changed_as_float { for n : i32 = 0; n < 4; post_incr(&n) { f[n] = i[n] / 255.0 } }
 		if (flags & ImGuiColorEditFlags_.ImGuiColorEditFlags_DisplayHSV) != {} && (flags & ImGuiColorEditFlags_.ImGuiColorEditFlags_InputRGB) != {} {
 			g.ColorEditSavedHue = f[0]
@@ -40168,7 +40168,7 @@ ColorEdit4 :: proc(label : ^u8, col : [4]f32, flags : ImGuiColorEditFlags) -> bo
 	}
 
 	// When picker is being actively used, use its active id so IsItemActive() will function on ColorEdit4().
-	if picker_active_window != nil && g.ActiveId != 0 && g.ActiveIdWindow != nil == picker_active_window { g.LastItemData.ID = g.ActiveId }
+	if picker_active_window != nil && g.ActiveId != 0 && g.ActiveIdWindow == picker_active_window { g.LastItemData.ID = g.ActiveId }
 
 	if value_changed && g.LastItemData.ID != 0 {
 		// In case of ID collision, the second EndGroup() won't catch g.ActiveIdMarkItemEdited(g.LastItemData.ID)
@@ -40382,14 +40382,14 @@ ColorPicker4 :: proc(label : ^u8, col : [4]f32, flags : ImGuiColorEditFlags, ref
 		PushItemWidth((alpha_bar ? bar1_pos_x : bar0_pos_x) + bars_width - picker_pos.x)
 		sub_flags_to_forward : ImGuiColorEditFlags = ImGuiColorEditFlags_.ImGuiColorEditFlags_DataTypeMask_ | ImGuiColorEditFlags_.ImGuiColorEditFlags_InputMask_ | ImGuiColorEditFlags_.ImGuiColorEditFlags_HDR | ImGuiColorEditFlags_.ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_.ImGuiColorEditFlags_NoOptions | ImGuiColorEditFlags_.ImGuiColorEditFlags_NoTooltip | ImGuiColorEditFlags_.ImGuiColorEditFlags_NoSmallPreview | ImGuiColorEditFlags_.ImGuiColorEditFlags_AlphaPreview | ImGuiColorEditFlags_.ImGuiColorEditFlags_AlphaPreviewHalf
 		sub_flags : ImGuiColorEditFlags = (flags & sub_flags_to_forward) | ImGuiColorEditFlags_.ImGuiColorEditFlags_NoPicker
-		if (flags & ImGuiColorEditFlags_.ImGuiColorEditFlags_DisplayRGB) != {} || (flags & ImGuiColorEditFlags_.ImGuiColorEditFlags_DisplayMask_) != {} == 0 { if ColorEdit4("##rgb", col, sub_flags | ImGuiColorEditFlags_.ImGuiColorEditFlags_DisplayRGB) {
+		if (flags & ImGuiColorEditFlags_.ImGuiColorEditFlags_DisplayRGB) != {} || (flags & ImGuiColorEditFlags_.ImGuiColorEditFlags_DisplayMask_) == {} { if ColorEdit4("##rgb", col, sub_flags | ImGuiColorEditFlags_.ImGuiColorEditFlags_DisplayRGB) {
 	// FIXME: Hackily differentiating using the DragInt (ActiveId != 0 && !ActiveIdAllowOverlap) vs. using the InputText or DropTarget.
 	// For the later we don't want to run the hue-wrap canceling code. If you are well versed in HSV picker please provide your input! (See #2050)
 	value_changed_fix_hue_wrap = (g.ActiveId != 0 && !g.ActiveIdAllowOverlap)
 	value_changed = true
 } }
-		if (flags & ImGuiColorEditFlags_.ImGuiColorEditFlags_DisplayHSV) != {} || (flags & ImGuiColorEditFlags_.ImGuiColorEditFlags_DisplayMask_) != {} == 0 { value_changed |= ColorEdit4("##hsv", col, sub_flags | ImGuiColorEditFlags_.ImGuiColorEditFlags_DisplayHSV) }
-		if (flags & ImGuiColorEditFlags_.ImGuiColorEditFlags_DisplayHex) != {} || (flags & ImGuiColorEditFlags_.ImGuiColorEditFlags_DisplayMask_) != {} == 0 { value_changed |= ColorEdit4("##hex", col, sub_flags | ImGuiColorEditFlags_.ImGuiColorEditFlags_DisplayHex) }
+		if (flags & ImGuiColorEditFlags_.ImGuiColorEditFlags_DisplayHSV) != {} || (flags & ImGuiColorEditFlags_.ImGuiColorEditFlags_DisplayMask_) == {} { value_changed |= ColorEdit4("##hsv", col, sub_flags | ImGuiColorEditFlags_.ImGuiColorEditFlags_DisplayHSV) }
+		if (flags & ImGuiColorEditFlags_.ImGuiColorEditFlags_DisplayHex) != {} || (flags & ImGuiColorEditFlags_.ImGuiColorEditFlags_DisplayMask_) == {} { value_changed |= ColorEdit4("##hex", col, sub_flags | ImGuiColorEditFlags_.ImGuiColorEditFlags_DisplayHex) }
 		PopItemWidth()
 	}
 
@@ -40507,7 +40507,7 @@ ColorPicker4 :: proc(label : ^u8, col : [4]f32, flags : ImGuiColorEditFlags, ref
 
 	EndGroup()
 
-	if value_changed && memcmp(backup_initial_col, col, components * size_of(f32)) != 0 == 0 { value_changed = false }
+	if value_changed && memcmp(backup_initial_col, col, components * size_of(f32)) == 0 { value_changed = false }
 	if value_changed && g.LastItemData.ID != 0 {
 		// In case of ID collision, the second EndGroup() won't catch g.ActiveIdMarkItemEdited(g.LastItemData.ID)
 	}
@@ -40574,7 +40574,7 @@ ColorButton :: proc(desc_id : ^u8, col : ^ImVec4, flags : ImGuiColorEditFlags, s
 
 	// Drag and Drop Source
 	// NB: The ActiveId test is merely an optional micro-optimization, BeginDragDropSource() does the same test.
-	if g.ActiveId == id != 0 && (flags & ImGuiColorEditFlags_.ImGuiColorEditFlags_NoDragDrop) == {} && BeginDragDropSource() {
+	if g.ActiveId == id && (flags & ImGuiColorEditFlags_.ImGuiColorEditFlags_NoDragDrop) == {} && BeginDragDropSource() {
 		if (flags & ImGuiColorEditFlags_.ImGuiColorEditFlags_NoAlpha) != {} { SetDragDropPayload(IMGUI_PAYLOAD_TYPE_COLOR_3F, &col_rgb, size_of(f32) * 3, ImGuiCond_.ImGuiCond_Once) }
 		else { SetDragDropPayload(IMGUI_PAYLOAD_TYPE_COLOR_4F, &col_rgb, size_of(f32) * 4, ImGuiCond_.ImGuiCond_Once) }
 		ColorButton(desc_id, col, flags)
@@ -40947,7 +40947,7 @@ TreeNodeBehavior :: proc(id : ImGuiID, flags : ImGuiTreeNodeFlags, label : ^u8, 
 	// It will become tempting to enable ImGuiTreeNodeFlags_NavLeftJumpsBackHere by default or move it to ImGuiStyle.
 	store_tree_node_stack_data : bool = false
 	if (flags & ImGuiTreeNodeFlags_.ImGuiTreeNodeFlags_NoTreePushOnOpen) == {} {
-		if (flags & ImGuiTreeNodeFlags_.ImGuiTreeNodeFlags_NavLeftJumpsBackHere) != {} && is_open && !g.NavIdIsAlive { if g.NavMoveDir == ImGuiDir.ImGuiDir_Left != 0 && g.NavWindow != nil == window != nil && NavMoveRequestButNoResultYet() { store_tree_node_stack_data = true } }
+		if (flags & ImGuiTreeNodeFlags_.ImGuiTreeNodeFlags_NavLeftJumpsBackHere) != {} && is_open && !g.NavIdIsAlive { if g.NavMoveDir == ImGuiDir.ImGuiDir_Left && g.NavWindow == window && NavMoveRequestButNoResultYet() { store_tree_node_stack_data = true } }
 	}
 
 	is_leaf : bool = (flags & ImGuiTreeNodeFlags_.ImGuiTreeNodeFlags_Leaf) != {}
@@ -40980,7 +40980,7 @@ TreeNodeBehavior :: proc(id : ImGuiID, flags : ImGuiTreeNodeFlags, label : ^u8, 
 
 	is_multi_select : bool = (g.LastItemData.ItemFlags & ImGuiItemFlagsPrivate_.ImGuiItemFlags_IsMultiSelect) != {}
 	if is_multi_select {
-		// We absolutely need to distinguish open vs select so _OpenOnArrow comes by defaultflags |= (flags & ImGuiTreeNodeFlagsPrivate_.ImGuiTreeNodeFlags_OpenOnMask_) == 0 ? ImGuiTreeNodeFlags_.ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_.ImGuiTreeNodeFlags_OpenOnDoubleClick : ImGuiTreeNodeFlags_.ImGuiTreeNodeFlags_OpenOnArrow
+		// We absolutely need to distinguish open vs select so _OpenOnArrow comes by defaultflags |= (flags & ImGuiTreeNodeFlagsPrivate_.ImGuiTreeNodeFlags_OpenOnMask_) == {} ? ImGuiTreeNodeFlags_.ImGuiTreeNodeFlags_OpenOnArrow | ImGuiTreeNodeFlags_.ImGuiTreeNodeFlags_OpenOnDoubleClick : ImGuiTreeNodeFlags_.ImGuiTreeNodeFlags_OpenOnArrow
 	}
 
 	// Open behaviors can be altered with the _OpenOnArrow and _OnOnDoubleClick flags.
@@ -41014,7 +41014,7 @@ TreeNodeBehavior :: proc(id : ImGuiID, flags : ImGuiTreeNodeFlags, label : ^u8, 
 	toggled : bool = false
 	if !is_leaf {
 		if pressed && g.DragDropHoldJustPressedId != id {
-			if (flags & ImGuiTreeNodeFlagsPrivate_.ImGuiTreeNodeFlags_OpenOnMask_) == 0 || (g.NavActivateId == id != 0 && !is_multi_select) {
+			if (flags & ImGuiTreeNodeFlagsPrivate_.ImGuiTreeNodeFlags_OpenOnMask_) == {} || (g.NavActivateId == id && !is_multi_select) {
 				// Single click
 				toggled = true
 			}
@@ -41022,12 +41022,12 @@ TreeNodeBehavior :: proc(id : ImGuiID, flags : ImGuiTreeNodeFlags, label : ^u8, 
 				// Lightweight equivalent of IsMouseHoveringRect() since ButtonBehavior() already did the job
 				toggled |= is_mouse_x_over_arrow && !g.NavHighlightItemUnderNav
 			}
-			if (flags & ImGuiTreeNodeFlags_.ImGuiTreeNodeFlags_OpenOnDoubleClick) != {} && g.IO.MouseClickedCount[0] != 0 == 2 {
+			if (flags & ImGuiTreeNodeFlags_.ImGuiTreeNodeFlags_OpenOnDoubleClick) != {} && g.IO.MouseClickedCount[0] == 2 {
 				// Double click
 				toggled = true
 			}
 		}
-		else if pressed && g.DragDropHoldJustPressedId != 0 == id {
+		else if pressed && g.DragDropHoldJustPressedId == id {
 			IM_ASSERT(button_flags & ImGuiButtonFlagsPrivate_.ImGuiButtonFlags_PressedOnDragDropHold)
 			if !is_open {
 				// When using Drag and Drop "hold to open" we keep the node highlighted after opening, but never close it again.toggled = true
@@ -41038,12 +41038,12 @@ TreeNodeBehavior :: proc(id : ImGuiID, flags : ImGuiTreeNodeFlags, label : ^u8, 
 			}
 		}
 
-		if g.NavId == id != 0 && g.NavMoveDir != {} == ImGuiDir.ImGuiDir_Left != 0 && is_open {
+		if g.NavId == id && g.NavMoveDir == ImGuiDir.ImGuiDir_Left && is_open {
 			toggled = true
 			NavClearPreferredPosForAxis(ImGuiAxis.ImGuiAxis_X)
 			NavMoveRequestCancel()
 		}
-		if g.NavId == id != 0 && g.NavMoveDir != {} == ImGuiDir.ImGuiDir_Right != 0 && !is_open {
+		if g.NavId == id && g.NavMoveDir == ImGuiDir.ImGuiDir_Right && !is_open {
 			// If there's something upcoming on the line we may want to give it the priority?
 			toggled = true
 			NavClearPreferredPosForAxis(ImGuiAxis.ImGuiAxis_X)
@@ -41157,7 +41157,7 @@ TreePop :: proc()
 		IM_ASSERT(data.ID == back(&window.IDStack))
 		if (data.TreeFlags & ImGuiTreeNodeFlags_.ImGuiTreeNodeFlags_NavLeftJumpsBackHere) != {} {
 			// Handle Left arrow to move to parent tree node (when ImGuiTreeNodeFlags_NavLeftJumpsBackHere is enabled)
-			if g.NavIdIsAlive && g.NavMoveDir != {} == ImGuiDir.ImGuiDir_Left != 0 && g.NavWindow != nil == window != nil && NavMoveRequestButNoResultYet() { NavMoveRequestResolveWithPastTreeNode(&g.NavMoveResultLocal, data) }
+			if g.NavIdIsAlive && g.NavMoveDir == ImGuiDir.ImGuiDir_Left && g.NavWindow == window && NavMoveRequestButNoResultYet() { NavMoveRequestResolveWithPastTreeNode(&g.NavMoveResultLocal, data) }
 		}
 		pop_back(&g.TreeNodeStack)
 		window.DC.TreeHasStackDataDepthMask &= ~tree_depth_mask
@@ -41354,12 +41354,12 @@ Selectable_0 :: proc(label : ^u8, selected : bool, flags : ImGuiSelectableFlags,
 		//   - (1) it would require focus scope to be set, need exposing PushFocusScope() or equivalent (e.g. BeginSelection() calling PushFocusScope())
 		//   - (2) usage will fail with clipped items
 		//   The multi-select API aim to fix those issues, e.g. may be replaced with a BeginSelection() API.
-		if (flags & ImGuiSelectableFlagsPrivate_.ImGuiSelectableFlags_SelectOnNav) != {} && g.NavJustMovedToId != 0 && g.NavJustMovedToFocusScopeId != 0 == g.CurrentFocusScopeId { if g.NavJustMovedToId == id { pressed = true; selected = pressed } }
+		if (flags & ImGuiSelectableFlagsPrivate_.ImGuiSelectableFlags_SelectOnNav) != {} && g.NavJustMovedToId != 0 && g.NavJustMovedToFocusScopeId == g.CurrentFocusScopeId { if g.NavJustMovedToId == id { pressed = true; selected = pressed } }
 	}
 
 	// Update NavId when clicking or when Hovering (this doesn't happen on most widgets), so navigation can be resumed with keyboard/gamepad
 	if pressed || (hovered && (flags & ImGuiSelectableFlagsPrivate_.ImGuiSelectableFlags_SetNavIdOnHover) != {}) {
-		if !g.NavHighlightItemUnderNav && g.NavWindow != nil == window != nil && g.NavLayer != {} == window.DC.NavLayerCurrent {
+		if !g.NavHighlightItemUnderNav && g.NavWindow == window && g.NavLayer == window.DC.NavLayerCurrent {
 			SetNavID(id, window.DC.NavLayerCurrent, g.CurrentFocusScopeId, WindowRectAbsToRel(window, bb)); // (bb == NavRect)
 			if g.IO.ConfigNavCursorVisibleAuto { g.NavCursorVisible = false }
 		}
@@ -41440,9 +41440,9 @@ GetTypingSelectRequest :: proc(flags : ImGuiTypingSelectFlags) -> ^ImGuiTypingSe
 		clear_buffer |= (g.NavFocusScopeId != data.FocusScope)
 		clear_buffer |= (data.LastRequestTime + TYPING_SELECT_RESET_TIMER < g.Time)
 		clear_buffer |= g.NavAnyRequest
-		clear_buffer |= g.ActiveId != 0 && g.NavActivateId != 0 == 0; // Allow temporary SPACE activation to not interfere
+		clear_buffer |= g.ActiveId != 0 && g.NavActivateId == 0; // Allow temporary SPACE activation to not interfere
 		clear_buffer |= IsKeyPressed(ImGuiKey.ImGuiKey_Escape) || IsKeyPressed(ImGuiKey.ImGuiKey_Enter)
-		clear_buffer |= IsKeyPressed(ImGuiKey.ImGuiKey_Backspace) && (flags & ImGuiTypingSelectFlags_.ImGuiTypingSelectFlags_AllowBackspace) != {} == 0
+		clear_buffer |= IsKeyPressed(ImGuiKey.ImGuiKey_Backspace) && (flags & ImGuiTypingSelectFlags_.ImGuiTypingSelectFlags_AllowBackspace) == {}
 		//if (clear_buffer) { IMGUI_DEBUG_LOG("GetTypingSelectRequest(): Clear SearchBuffer.\n"); }
 		if clear_buffer { Clear(data) }
 	}
@@ -41458,7 +41458,7 @@ GetTypingSelectRequest :: proc(flags : ImGuiTypingSelectFlags) -> ^ImGuiTypingSe
 		}
 		w_buf : [5]u8
 		ImTextCharToUtf8(w_buf, cast(u32) w)
-		if data.SingleCharModeLock && w_len != 0 == out_request.SingleCharSize != 0 && memcmp(w_buf, data.SearchBuffer, w_len) != 0 == 0 {
+		if data.SingleCharModeLock && w_len == out_request.SingleCharSize && memcmp(w_buf, data.SearchBuffer, w_len) == 0 {
 			select_request = true; // Same character: don't need to append to buffer.
 			continue
 		}
@@ -41517,7 +41517,7 @@ GetTypingSelectRequest :: proc(flags : ImGuiTypingSelectFlags) -> ^ImGuiTypingSe
 ImStrimatchlen :: proc(s1 : ^u8, s1_end : ^u8, s2 : ^u8) -> i32
 {
 	match_len : i32 = 0
-	for s1 < s1_end && ImToUpper(post_incr(&s1)^) != 0 == ImToUpper(post_incr(&s2)^) { post_incr(&match_len) }
+	for s1 < s1_end && ImToUpper(post_incr(&s1)^) == ImToUpper(post_incr(&s2)^) { post_incr(&match_len) }
 
 	return match_len
 }
@@ -41555,7 +41555,7 @@ TypingSelectFindNextSingleCharMatch :: proc(req : ^ImGuiTypingSelectRequest, ite
 		if return_next_match {
 			// Return next matching item after current item.return idx
 		}
-		if first_match_idx == -1 && nav_item_idx != 0 == -1 {
+		if first_match_idx == -1 && nav_item_idx == -1 {
 			// Return first match immediately if we don't have a nav_item_idx value.return idx
 		}
 		if first_match_idx == -1 {
@@ -41633,7 +41633,7 @@ BoxSelectActivateDrag :: proc(bs : ^ImGuiBoxSelectState, window : ^ImGuiWindow)
 	bs.IsStarting = false
 	SetActiveID(bs.ID, window)
 	SetActiveIdUsingAllKeyboardKeys()
-	if bs.IsStartedFromVoid && (bs.KeyMods & (ImGuiKey.ImGuiMod_Ctrl | ImGuiKey.ImGuiMod_Shift)) != {} == 0 { bs.RequestClear = true }
+	if bs.IsStartedFromVoid && (bs.KeyMods & (ImGuiKey.ImGuiMod_Ctrl | ImGuiKey.ImGuiMod_Shift)) == {} { bs.RequestClear = true }
 }
 
 BoxSelectDeactivateDrag :: proc(bs : ^ImGuiBoxSelectState)
@@ -41727,7 +41727,7 @@ EndBoxSelect :: proc(scope_rect : ^ImRect, ms_flags : ImGuiMultiSelectFlags)
 	AddRect(window.DrawList, box_select_r.Min, box_select_r.Max, GetColorU32(ImGuiCol_.ImGuiCol_NavCursor)); // FIXME-MULTISELECT: Styling
 
 	// Scroll
-	enable_scroll : bool = (ms_flags & ImGuiMultiSelectFlags_.ImGuiMultiSelectFlags_ScopeWindow) != {} && (ms_flags & ImGuiMultiSelectFlags_.ImGuiMultiSelectFlags_BoxSelectNoScroll) != {} == 0
+	enable_scroll : bool = (ms_flags & ImGuiMultiSelectFlags_.ImGuiMultiSelectFlags_ScopeWindow) != {} && (ms_flags & ImGuiMultiSelectFlags_.ImGuiMultiSelectFlags_BoxSelectNoScroll) == {}
 	if enable_scroll {
 		scroll_r : ImRect = scope_rect
 		Expand(&scroll_r, -g.FontSize)
@@ -41841,17 +41841,17 @@ BeginMultiSelect :: proc(flags : ImGuiMultiSelectFlags, selection_size : i32, it
 	// (we compare FocusScopeId so it possible to use multiple selections inside a same window)
 	request_clear : bool = false
 	request_select_all : bool = false
-	if g.NavJustMovedToId != 0 && g.NavJustMovedToFocusScopeId != 0 == ms.FocusScopeId != 0 && g.NavJustMovedToHasSelectionData {
+	if g.NavJustMovedToId != 0 && g.NavJustMovedToFocusScopeId == ms.FocusScopeId && g.NavJustMovedToHasSelectionData {
 		if (ms.KeyMods & ImGuiKey.ImGuiMod_Shift) != {} { ms.IsKeyboardSetRange = true }
 		if ms.IsKeyboardSetRange {
 			// Not ready -> could clear?
 			IM_ASSERT(storage.RangeSrcItem != ImGuiSelectionUserData_Invalid)
 		}
-		if (ms.KeyMods & (ImGuiKey.ImGuiMod_Ctrl | ImGuiKey.ImGuiMod_Shift)) == 0 && (flags & (ImGuiMultiSelectFlags_.ImGuiMultiSelectFlags_NoAutoClear | ImGuiMultiSelectFlags_.ImGuiMultiSelectFlags_NoAutoSelect)) != {} == 0 { request_clear = true }
+		if (ms.KeyMods & (ImGuiKey.ImGuiMod_Ctrl | ImGuiKey.ImGuiMod_Shift)) == {} && (flags & (ImGuiMultiSelectFlags_.ImGuiMultiSelectFlags_NoAutoClear | ImGuiMultiSelectFlags_.ImGuiMultiSelectFlags_NoAutoSelect)) == {} { request_clear = true }
 	}
 	else if g.NavJustMovedFromFocusScopeId == ms.FocusScopeId {
 		// Also clear on leaving scope (may be optional?)
-		if (ms.KeyMods & (ImGuiKey.ImGuiMod_Ctrl | ImGuiKey.ImGuiMod_Shift)) == 0 && (flags & (ImGuiMultiSelectFlags_.ImGuiMultiSelectFlags_NoAutoClear | ImGuiMultiSelectFlags_.ImGuiMultiSelectFlags_NoAutoSelect)) != {} == 0 { request_clear = true }
+		if (ms.KeyMods & (ImGuiKey.ImGuiMod_Ctrl | ImGuiKey.ImGuiMod_Shift)) == {} && (flags & (ImGuiMultiSelectFlags_.ImGuiMultiSelectFlags_NoAutoClear | ImGuiMultiSelectFlags_.ImGuiMultiSelectFlags_NoAutoSelect)) == {} { request_clear = true }
 	}
 
 	// Box-select handling: update active state.
@@ -41897,8 +41897,8 @@ EndMultiSelect :: proc() -> ^ImGuiMultiSelectIO
 	storage : ^ImGuiMultiSelectState = ms.Storage
 	window : ^ImGuiWindow = g.CurrentWindow
 	IM_ASSERT_USER_ERROR(ms.FocusScopeId == g.CurrentFocusScopeId, "EndMultiSelect() FocusScope mismatch!")
-	IM_ASSERT(g.CurrentMultiSelect != nil && storage.Window != nil == g.CurrentWindow)
-	IM_ASSERT(g.MultiSelectTempDataStacked > 0 && &g.MultiSelectTempData[g.MultiSelectTempDataStacked - 1] != nil == g.CurrentMultiSelect)
+	IM_ASSERT(g.CurrentMultiSelect != nil && storage.Window == g.CurrentWindow)
+	IM_ASSERT(g.MultiSelectTempDataStacked > 0 && &g.MultiSelectTempData[g.MultiSelectTempDataStacked - 1] == g.CurrentMultiSelect)
 
 	scope_rect : ImRect = CalcScopeRect(ms, window)
 	if ms.IsFocused {
@@ -41924,9 +41924,9 @@ EndMultiSelect :: proc() -> ^ImGuiMultiSelectIO
 	// The InnerRect test is necessary for non-child/decorated windows.
 	scope_hovered : bool = IsWindowHovered() && Contains(&window.InnerRect, g.IO.MousePos)
 	if scope_hovered && (ms.Flags & ImGuiMultiSelectFlags_.ImGuiMultiSelectFlags_ScopeRect) != {} { scope_hovered &= Contains(&scope_rect, g.IO.MousePos) }
-	if scope_hovered && g.HoveredId != 0 == 0 && g.ActiveId != 0 == 0 {
+	if scope_hovered && g.HoveredId == 0 && g.ActiveId == 0 {
 		if (ms.Flags & (ImGuiMultiSelectFlags_.ImGuiMultiSelectFlags_BoxSelect1d | ImGuiMultiSelectFlags_.ImGuiMultiSelectFlags_BoxSelect2d)) != {} {
-			if !g.BoxSelectState.IsActive && !g.BoxSelectState.IsStarting && g.IO.MouseClickedCount[0] != 0 == 1 {
+			if !g.BoxSelectState.IsActive && !g.BoxSelectState.IsStarting && g.IO.MouseClickedCount[0] == 1 {
 				BoxSelectPreStartDrag(ms.BoxSelectId, ImGuiSelectionUserData_Invalid)
 				FocusWindow(window, ImGuiFocusRequestFlags_.ImGuiFocusRequestFlags_UnlessBelowModal)
 				SetHoveredID(ms.BoxSelectId)
@@ -41937,7 +41937,7 @@ EndMultiSelect :: proc() -> ^ImGuiMultiSelectIO
 			}
 		}
 
-		if (ms.Flags & ImGuiMultiSelectFlags_.ImGuiMultiSelectFlags_ClearOnClickVoid) != {} { if IsMouseReleased(0) && IsMouseDragPastThreshold(0) == false && g.IO.KeyMods != {} == ImGuiKey.ImGuiMod_None { MultiSelectAddSetAll(ms, false) } }
+		if (ms.Flags & ImGuiMultiSelectFlags_.ImGuiMultiSelectFlags_ClearOnClickVoid) != {} { if IsMouseReleased(0) && IsMouseDragPastThreshold(0) == false && g.IO.KeyMods == ImGuiKey.ImGuiMod_None { MultiSelectAddSetAll(ms, false) } }
 	}
 
 	// Courtesy nav wrapping helper flag
@@ -41990,7 +41990,7 @@ MultiSelectItemHeader :: proc(id : ImGuiID, p_selected : ^bool, p_button_flags :
 	if ms.IsFocused {
 		storage : ^ImGuiMultiSelectState = ms.Storage
 		item_data : ImGuiSelectionUserData = g.NextItemData.SelectionUserData
-		IM_ASSERT(g.NextItemData.FocusScopeId == g.CurrentFocusScopeId != 0 && "Forgot to call SetNextItemSelectionUserData() prior to item, required in BeginMultiSelect()/EndMultiSelect() scope")
+		IM_ASSERT(g.NextItemData.FocusScopeId == g.CurrentFocusScopeId && "Forgot to call SetNextItemSelectionUserData() prior to item, required in BeginMultiSelect()/EndMultiSelect() scope")
 
 		// Apply SetAll (Clear/SelectAll) requests requested by BeginMultiSelect().
 		// This is only useful if the user hasn't processed them already, and this only works if the user isn't using the clipper.
@@ -42001,9 +42001,9 @@ MultiSelectItemHeader :: proc(id : ImGuiID, p_selected : ^bool, p_button_flags :
 		// For this to work, we need someone to set 'RangeSrcPassedBy = true' at some point (either clipper either SetNextItemSelectionUserData() function)
 		if ms.IsKeyboardSetRange {
 			IM_ASSERT(id != 0 && (ms.KeyMods & ImGuiKey.ImGuiMod_Shift) != {})
-			is_range_dst : bool = (ms.RangeDstPassedBy == false) && g.NavJustMovedToId != 0 == id; // Assume that g.NavJustMovedToId is not clipped.
+			is_range_dst : bool = (ms.RangeDstPassedBy == false) && g.NavJustMovedToId == id; // Assume that g.NavJustMovedToId is not clipped.
 			if is_range_dst { ms.RangeDstPassedBy = true }
-			if is_range_dst && storage.RangeSrcItem != {} == ImGuiSelectionUserData_Invalid {
+			if is_range_dst && storage.RangeSrcItem == ImGuiSelectionUserData_Invalid {
 				// If we don't have RangeSrc, assign RangeSrc = RangeDst
 				storage.RangeSrcItem = item_data
 				storage.RangeSelected = selected ? 1 : 0
@@ -42014,7 +42014,7 @@ MultiSelectItemHeader :: proc(id : ImGuiID, p_selected : ^bool, p_button_flags :
 				IM_ASSERT(storage.RangeSrcItem != ImGuiSelectionUserData_Invalid && storage.RangeSelected != -1)
 				selected = (storage.RangeSelected != 0)
 			}
-			else if (ms.KeyMods & ImGuiKey.ImGuiMod_Ctrl) == 0 && (ms.Flags & ImGuiMultiSelectFlags_.ImGuiMultiSelectFlags_NoAutoClear) != {} == 0 {
+			else if (ms.KeyMods & ImGuiKey.ImGuiMod_Ctrl) == {} && (ms.Flags & ImGuiMultiSelectFlags_.ImGuiMultiSelectFlags_NoAutoClear) == {} {
 				// Clear other items
 				selected = false
 			}
@@ -42028,7 +42028,7 @@ MultiSelectItemHeader :: proc(id : ImGuiID, p_selected : ^bool, p_button_flags :
 	if p_button_flags != nil {
 		button_flags : ImGuiButtonFlags = p_button_flags^
 		button_flags |= ImGuiButtonFlagsPrivate_.ImGuiButtonFlags_NoHoveredOnFocus
-		if (!selected || (g.ActiveId == id != 0 && g.ActiveIdHasBeenPressedBefore)) && (ms.Flags & ImGuiMultiSelectFlags_.ImGuiMultiSelectFlags_SelectOnClickRelease) == {} { button_flags = (button_flags | ImGuiButtonFlagsPrivate_.ImGuiButtonFlags_PressedOnClick) & ~ImGuiButtonFlagsPrivate_.ImGuiButtonFlags_PressedOnClickRelease }
+		if (!selected || (g.ActiveId == id && g.ActiveIdHasBeenPressedBefore)) && (ms.Flags & ImGuiMultiSelectFlags_.ImGuiMultiSelectFlags_SelectOnClickRelease) == {} { button_flags = (button_flags | ImGuiButtonFlagsPrivate_.ImGuiButtonFlags_PressedOnClick) & ~ImGuiButtonFlagsPrivate_.ImGuiButtonFlags_PressedOnClickRelease }
 		else { button_flags |= ImGuiButtonFlagsPrivate_.ImGuiButtonFlags_PressedOnClickRelease }
 		p_button_flags^ = button_flags
 	}
@@ -42065,7 +42065,7 @@ MultiSelectItemFooter :: proc(id : ImGuiID, p_selected : ^bool, p_pressed : ^boo
 
 	apply_to_range_src : bool = false
 
-	if g.NavId == id != 0 && storage.RangeSrcItem != {} == ImGuiSelectionUserData_Invalid { apply_to_range_src = true }
+	if g.NavId == id && storage.RangeSrcItem == ImGuiSelectionUserData_Invalid { apply_to_range_src = true }
 	if ms.IsEndIO == false {
 		resize(&ms.IO.Requests, 0)
 		ms.IsEndIO = true
@@ -42111,7 +42111,7 @@ MultiSelectItemFooter :: proc(id : ImGuiID, p_selected : ^bool, p_pressed : ^boo
 
 	// Right-click handling.
 	// FIXME-MULTISELECT: Currently filtered out by ImGuiMultiSelectFlags_NoAutoSelect but maybe should be moved to Selectable(). See https://github.com/ocornut/imgui/pull/5816
-	if hovered && IsMouseClicked(1) && (flags & ImGuiMultiSelectFlags_.ImGuiMultiSelectFlags_NoAutoSelect) != {} == 0 {
+	if hovered && IsMouseClicked(1) && (flags & ImGuiMultiSelectFlags_.ImGuiMultiSelectFlags_NoAutoSelect) == {} {
 		if g.ActiveId != 0 && g.ActiveId != id { ClearActiveID() }
 		SetFocusID(id, window)
 		if !pressed && !selected {
@@ -42128,8 +42128,8 @@ MultiSelectItemFooter :: proc(id : ImGuiID, p_selected : ^bool, p_pressed : ^boo
 	// Alter selection
 	if pressed && (!enter_pressed || !selected) {
 		// Box-select
-		input_source : ImGuiInputSource = (g.NavJustMovedToId == id != 0 || g.NavActivateId != 0 == id) ? g.NavInputSource : ImGuiInputSource.ImGuiInputEventType_Mouse
-		if (flags & (ImGuiMultiSelectFlags_.ImGuiMultiSelectFlags_BoxSelect1d | ImGuiMultiSelectFlags_.ImGuiMultiSelectFlags_BoxSelect2d)) != {} { if selected == false && !g.BoxSelectState.IsActive && !g.BoxSelectState.IsStarting && input_source != {} == ImGuiInputSource.ImGuiInputEventType_Mouse && g.IO.MouseClickedCount[0] != 0 == 1 { BoxSelectPreStartDrag(ms.BoxSelectId, item_data) } }
+		input_source : ImGuiInputSource = (g.NavJustMovedToId == id || g.NavActivateId == id) ? g.NavInputSource : ImGuiInputSource.ImGuiInputEventType_Mouse
+		if (flags & (ImGuiMultiSelectFlags_.ImGuiMultiSelectFlags_BoxSelect1d | ImGuiMultiSelectFlags_.ImGuiMultiSelectFlags_BoxSelect2d)) != {} { if selected == false && !g.BoxSelectState.IsActive && !g.BoxSelectState.IsStarting && input_source == ImGuiInputSource.ImGuiInputEventType_Mouse && g.IO.MouseClickedCount[0] == 1 { BoxSelectPreStartDrag(ms.BoxSelectId, item_data) } }
 
 		//----------------------------------------------------------------------------------------
 		// ACTION                      | Begin  | Pressed/Activated  | End
@@ -42151,8 +42151,8 @@ MultiSelectItemFooter :: proc(id : ImGuiID, p_selected : ^bool, p_pressed : ^boo
 		if (flags & ImGuiMultiSelectFlags_.ImGuiMultiSelectFlags_NoAutoClear) == {} {
 			request_clear : bool = false
 			if is_singleselect { request_clear = true }
-			else if (input_source == ImGuiInputSource.ImGuiInputEventType_Mouse || g.NavActivateId != 0 == id) && !is_ctrl { request_clear = (flags & ImGuiMultiSelectFlags_.ImGuiMultiSelectFlags_NoAutoClearOnReselect) != {} ? !selected : true }
-			else if (input_source == ImGuiInputSource.ImGuiInputSource_Keyboard || input_source != {} == ImGuiInputSource.ImGuiInputSource_Gamepad) && is_shift && !is_ctrl {
+			else if (input_source == ImGuiInputSource.ImGuiInputEventType_Mouse || g.NavActivateId == id) && !is_ctrl { request_clear = (flags & ImGuiMultiSelectFlags_.ImGuiMultiSelectFlags_NoAutoClearOnReselect) != {} ? !selected : true }
+			else if (input_source == ImGuiInputSource.ImGuiInputSource_Keyboard || input_source == ImGuiInputSource.ImGuiInputSource_Gamepad) && is_shift && !is_ctrl {
 				// With is_shift==false the RequestClear was done in BeginIO, not necessary to do again.
 				request_clear = true
 			}
@@ -42213,9 +42213,9 @@ MultiSelectAddSetAll :: proc(ms : ^ImGuiMultiSelectTempData, selected : bool)
 MultiSelectAddSetRange :: proc(ms : ^ImGuiMultiSelectTempData, selected : bool, range_dir : i32, first_item : ImGuiSelectionUserData, last_item : ImGuiSelectionUserData)
 {
 	// Merge contiguous spans into same request (unless NoRangeSelect is set which guarantees single-item ranges)
-	if ms.IO.Requests.Size > 0 && first_item != {} == last_item != {} && (ms.Flags & ImGuiMultiSelectFlags_.ImGuiMultiSelectFlags_NoRangeSelect) != {} == 0 {
+	if ms.IO.Requests.Size > 0 && first_item == last_item && (ms.Flags & ImGuiMultiSelectFlags_.ImGuiMultiSelectFlags_NoRangeSelect) == {} {
 		prev : ^ImGuiSelectionRequest = &ms.IO.Requests.Data[ms.IO.Requests.Size - 1]
-		if prev.Type == ImGuiSelectionRequestType.ImGuiSelectionRequestType_SetRange && prev.RangeLastItem != {} == ms.LastSubmittedItem != {} && prev.Selected == selected {
+		if prev.Type == ImGuiSelectionRequestType.ImGuiSelectionRequestType_SetRange && prev.RangeLastItem == ms.LastSubmittedItem && prev.Selected == selected {
 			prev.RangeLastItem = last_item
 			return
 		}
@@ -42295,7 +42295,7 @@ ImGuiSelectionBasicStorage_GetNextSelectedItem :: proc(this : ^ImGuiSelectionBas
 {
 	it : ^ImGuiStoragePair = cast(^ImGuiStoragePair) opaque_it^
 	it_end : ^ImGuiStoragePair = this._Storage.Data.Data + this._Storage.Data.Size
-	if this.PreserveOrder && it != nil == nil && it_end != nil {
+	if this.PreserveOrder && it == nil && it_end != nil {
 		// ~ImGuiStorage::BuildSortByValueInt()
 		ImQsort(this._Storage.Data.Data, cast(uint) this._Storage.Data.Size, size_of(ImGuiStoragePair), PairComparerByValueInt)
 	}
@@ -42313,7 +42313,7 @@ ImGuiSelectionBasicStorage_GetNextSelectedItem :: proc(this : ^ImGuiSelectionBas
 ImGuiSelectionBasicStorage_SetItemSelected :: proc(this : ^ImGuiSelectionBasicStorage, id : ImGuiID, selected : bool)
 {
 	p_int : ^i32 = GetIntRef(&this._Storage, id, 0)
-	if selected && p_int^ != 0 == 0 {p_int^ = post_incr(&this._SelectionOrder); post_incr(&this.Size)
+	if selected && p_int^ == 0 {p_int^ = post_incr(&this._SelectionOrder); post_incr(&this.Size)
 	}
 	else if !selected && p_int^ != 0 {p_int^ = 0; post_decr(&this.Size)
 	}
@@ -42577,7 +42577,7 @@ PlotEx :: proc(plot_type : ImGuiPlotType, label : ^u8, values_getter : proc(data
 	ButtonBehavior(frame_bb, id, &hovered, nil)
 
 	// Determine scale from values if not specified
-	if scale_min == FLT_MAX || scale_max != 0 == FLT_MAX {
+	if scale_min == FLT_MAX || scale_max == FLT_MAX {
 		v_min : f32 = FLT_MAX
 		v_max : f32 = -FLT_MAX
 		for i : i32 = 0; i < values_count; post_incr(&i) {
@@ -42636,11 +42636,11 @@ PlotEx :: proc(plot_type : ImGuiPlotType, label : ^u8, values_getter : proc(data
 			pos0 : ImVec2 = ImLerp(inner_bb.Min, inner_bb.Max, tp0)
 			pos1 : ImVec2 = ImLerp(inner_bb.Min, inner_bb.Max, (plot_type == ImGuiPlotType.ImGuiPlotType_Lines) ? tp1 : ImVec2(tp1.x, histogram_zero_line_t))
 			if plot_type == ImGuiPlotType.ImGuiPlotType_Lines {
-				AddLine(window.DrawList, pos0, pos1, idx_hovered == v1_idx != 0 ? col_hovered : col_base)
+				AddLine(window.DrawList, pos0, pos1, idx_hovered == v1_idx ? col_hovered : col_base)
 			}
 			else if plot_type == ImGuiPlotType.ImGuiPlotType_Histogram {
 				if pos1.x >= pos0.x + 2.0 { pos1.x -= 1.0 }
-				AddRectFilled(window.DrawList, pos0, pos1, idx_hovered == v1_idx != 0 ? col_hovered : col_base)
+				AddRectFilled(window.DrawList, pos0, pos1, idx_hovered == v1_idx ? col_hovered : col_base)
 			}
 
 			t0 = t1
@@ -42823,12 +42823,12 @@ EndMenuBar :: proc()
 	g : ^ImGuiContext = GImGui
 
 	// Nav: When a move request within one of our child menu failed, capture the request to navigate among our siblings.
-	if NavMoveRequestButNoResultYet() && (g.NavMoveDir == ImGuiDir.ImGuiDir_Left != 0 || g.NavMoveDir != {} == ImGuiDir.ImGuiDir_Right) && (g.NavWindow.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_ChildMenu) != {} {
+	if NavMoveRequestButNoResultYet() && (g.NavMoveDir == ImGuiDir.ImGuiDir_Left || g.NavMoveDir == ImGuiDir.ImGuiDir_Right) && (g.NavWindow.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_ChildMenu) != {} {
 		// Try to find out if the request is for one of our child menu
 		nav_earliest_child : ^ImGuiWindow = g.NavWindow
 		for nav_earliest_child.ParentWindow != nil && (nav_earliest_child.ParentWindow.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_ChildMenu) != {} { nav_earliest_child = nav_earliest_child.ParentWindow }
 
-		if nav_earliest_child.ParentWindow == window != nil && nav_earliest_child.DC.ParentLayoutType != {} == ImGuiLayoutType_.ImGuiLayoutType_Horizontal && (g.NavMoveFlags & ImGuiNavMoveFlags_.ImGuiNavMoveFlags_Forwarded) != {} == 0 {
+		if nav_earliest_child.ParentWindow == window && nav_earliest_child.DC.ParentLayoutType == ImGuiLayoutType_.ImGuiLayoutType_Horizontal && (g.NavMoveFlags & ImGuiNavMoveFlags_.ImGuiNavMoveFlags_Forwarded) == {} {
 			// To do so we claim focus back, restore NavId and then process the movement request for yet another frame.
 			// This involve a one-frame delay which isn't very problematic in this situation. We could remove it by scoring in advance for multiple window (probably not worth bothering)
 			layer : ImGuiNavLayer = ImGuiNavLayer.ImGuiNavLayer_Menu
@@ -42874,20 +42874,20 @@ BeginViewportSideBar :: proc(name : ^u8, viewport_p : ^ImGuiViewport, dir : ImGu
 
 	bar_window : ^ImGuiWindow = FindWindowByName(name)
 	viewport : ^ImGuiViewportP = cast(^ImGuiViewportP) cast(rawptr) (viewport_p != nil ? viewport_p : GetMainViewport())
-	if bar_window == nil || bar_window.BeginCount != 0 == 0 {
+	if bar_window == nil || bar_window.BeginCount == 0 {
 		// Calculate and set window size/position
 		avail_rect : ImRect = GetBuildWorkRect(viewport)
-		axis : ImGuiAxis = (dir == ImGuiDir.ImGuiDir_Up != 0 || dir != {} == ImGuiDir.ImGuiDir_Down) ? ImGuiAxis.ImGuiAxis_Y : ImGuiAxis.ImGuiAxis_X
+		axis : ImGuiAxis = (dir == ImGuiDir.ImGuiDir_Up || dir == ImGuiDir.ImGuiDir_Down) ? ImGuiAxis.ImGuiAxis_Y : ImGuiAxis.ImGuiAxis_X
 		pos : ImVec2 = avail_rect.Min
-		if dir == ImGuiDir.ImGuiDir_Right != 0 || dir != {} == ImGuiDir.ImGuiDir_Down { pos[axis] = avail_rect.Max[axis] - axis_size }
+		if dir == ImGuiDir.ImGuiDir_Right || dir == ImGuiDir.ImGuiDir_Down { pos[axis] = avail_rect.Max[axis] - axis_size }
 		size : ImVec2 = GetSize(&avail_rect)
 		size[axis] = axis_size
 		SetNextWindowPos(pos)
 		SetNextWindowSize(size)
 
 		// Report our size into work area (for next frame) using actual window size
-		if dir == ImGuiDir.ImGuiDir_Up != 0 || dir != {} == ImGuiDir.ImGuiDir_Left { viewport.BuildWorkInsetMin[axis] += axis_size }
-		else if dir == ImGuiDir.ImGuiDir_Down != 0 || dir != {} == ImGuiDir.ImGuiDir_Right { viewport.BuildWorkInsetMax[axis] += axis_size }
+		if dir == ImGuiDir.ImGuiDir_Up || dir == ImGuiDir.ImGuiDir_Left { viewport.BuildWorkInsetMin[axis] += axis_size }
+		else if dir == ImGuiDir.ImGuiDir_Down || dir == ImGuiDir.ImGuiDir_Right { viewport.BuildWorkInsetMax[axis] += axis_size }
 	}
 
 	window_flags |= ImGuiWindowFlags_.ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_.ImGuiWindowFlags_NoResize | ImGuiWindowFlags_.ImGuiWindowFlags_NoMove | ImGuiWindowFlags_.ImGuiWindowFlags_NoDocking
@@ -42929,7 +42929,7 @@ EndMainMenuBar :: proc()
 	// When the user has left the menu layer (typically: closed menus through activation of an item), we restore focus to the previous window
 	// FIXME: With this strategy we won't be able to restore a NULL focus.
 	g : ^ImGuiContext = GImGui
-	if g.CurrentWindow == g.NavWindow != nil && g.NavLayer != {} == ImGuiNavLayer.ImGuiNavLayer_Main && !g.NavAnyRequest { FocusTopMostWindowUnderOne(g.NavWindow, nil, nil, ImGuiFocusRequestFlags_.ImGuiFocusRequestFlags_UnlessBelowModal | ImGuiFocusRequestFlags_.ImGuiFocusRequestFlags_RestoreFocusedChild) }
+	if g.CurrentWindow == g.NavWindow && g.NavLayer == ImGuiNavLayer.ImGuiNavLayer_Main && !g.NavAnyRequest { FocusTopMostWindowUnderOne(g.NavWindow, nil, nil, ImGuiFocusRequestFlags_.ImGuiFocusRequestFlags_UnlessBelowModal | ImGuiFocusRequestFlags_.ImGuiFocusRequestFlags_RestoreFocusedChild) }
 
 	End()
 }
@@ -43052,8 +43052,8 @@ BeginMenuEx :: proc(label : ^u8, icon : ^u8, enabled : bool) -> bool
 		// Implement http://bjk5.com/post/44698559168/breaking-down-amazons-mega-dropdown to avoid using timers, so menus feels more reactive.
 		moving_toward_child_menu : bool = false
 		child_popup : ^ImGuiPopupData = (g.BeginPopupStack.Size < g.OpenPopupStack.Size) ? &g.OpenPopupStack[g.BeginPopupStack.Size] : nil; // Popup candidate (testing below)
-		child_menu_window : ^ImGuiWindow = (child_popup != nil && child_popup.Window != nil && child_popup.Window.ParentWindow != nil == window) ? child_popup.Window : nil
-		if g.HoveredWindow == window != nil && child_menu_window != nil {
+		child_menu_window : ^ImGuiWindow = (child_popup != nil && child_popup.Window != nil && child_popup.Window.ParentWindow == window) ? child_popup.Window : nil
+		if g.HoveredWindow == window && child_menu_window != nil {
 			ref_unit : f32 = g.FontSize; // FIXME-DPI
 			child_dir : f32 = (window.Pos.x < child_menu_window.Pos.x) ? 1.0 : -1.0
 			next_window_rect : ImRect = Rect(child_menu_window)
@@ -43073,7 +43073,7 @@ BeginMenuEx :: proc(label : ^u8, icon : ^u8, enabled : bool) -> bool
 		// The 'HovereWindow == window' check creates an inconsistency (e.g. moving away from menu slowly tends to hit same window, whereas moving away fast does not)
 		// But we also need to not close the top-menu menu when moving over void. Perhaps we should extend the triangle check to a larger polygon.
 		// (Remember to test this on BeginPopup("A")->BeginMenu("B") sequence which behaves slightly differently as B isn't a Child of A and hovering isn't shared.)
-		if menu_is_open && !hovered && g.HoveredWindow != nil == window != nil && !moving_toward_child_menu && !g.NavHighlightItemUnderNav && g.ActiveId != 0 == 0 { want_close = true }
+		if menu_is_open && !hovered && g.HoveredWindow == window && !moving_toward_child_menu && !g.NavHighlightItemUnderNav && g.ActiveId == 0 { want_close = true }
 
 		// Open
 		// (note: at this point 'hovered' actually includes the NavDisableMouseHover == false test)
@@ -43086,7 +43086,7 @@ BeginMenuEx :: proc(label : ^u8, icon : ^u8, enabled : bool) -> bool
 		else if !menu_is_open && hovered && g.HoveredIdTimer >= 0.30 && g.MouseStationaryTimer >= 0.30 {
 			// Hover to open (timer fallback)want_open = true
 		}
-		if g.NavId == id != 0 && g.NavMoveDir != {} == ImGuiDir.ImGuiDir_Right {
+		if g.NavId == id && g.NavMoveDir == ImGuiDir.ImGuiDir_Right {
 			// Nav-Right to open
 			want_open_nav_init = true; want_open = want_open_nav_init
 			NavMoveRequestCancel()
@@ -43104,7 +43104,7 @@ BeginMenuEx :: proc(label : ^u8, icon : ^u8, enabled : bool) -> bool
 			// First click to open, then hover to open others
 			want_open = true
 		}
-		else if g.NavId == id != 0 && g.NavMoveDir != {} == ImGuiDir.ImGuiDir_Down {
+		else if g.NavId == id && g.NavMoveDir == ImGuiDir.ImGuiDir_Down {
 			// Nav-Down to open
 			want_open = true
 			NavMoveRequestCancel()
@@ -43167,7 +43167,7 @@ EndMenu :: proc()
 	window : ^ImGuiWindow = g.CurrentWindow
 	IM_ASSERT(window.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_Popup); // Mismatched BeginMenu()/EndMenu() calls
 	parent_window : ^ImGuiWindow = window.ParentWindow; // Should always be != NULL is we passed assert.
-	if window.BeginCount == window.BeginCountPreviousFrame { if g.NavMoveDir == ImGuiDir.ImGuiDir_Left != 0 && NavMoveRequestButNoResultYet() { if g.NavWindow != nil && (g.NavWindow.RootWindowForNav == window) && parent_window.DC.LayoutType != {} == ImGuiLayoutType_.ImGuiLayoutType_Vertical {
+	if window.BeginCount == window.BeginCountPreviousFrame { if g.NavMoveDir == ImGuiDir.ImGuiDir_Left && NavMoveRequestButNoResultYet() { if g.NavWindow != nil && (g.NavWindow.RootWindowForNav == window) && parent_window.DC.LayoutType == ImGuiLayoutType_.ImGuiLayoutType_Vertical {
 	ClosePopupToLevel(g.BeginPopupStack.Size - 1, true)
 	NavMoveRequestCancel()
 } } }
@@ -43422,7 +43422,7 @@ EndTabBar :: proc()
 
 	// Restore the last visible height if no tab is visible, this reduce vertical flicker/movement when a tabs gets removed without calling SetTabItemClosed().
 	tab_bar_appearing : bool = (tab_bar.PrevFrameVisible + 1 < g.FrameCount)
-	if tab_bar.VisibleTabWasSubmitted || tab_bar.VisibleTabId != 0 == 0 || tab_bar_appearing {
+	if tab_bar.VisibleTabWasSubmitted || tab_bar.VisibleTabId == 0 || tab_bar_appearing {
 		tab_bar.CurrTabsContentsHeight = ImMax(window.DC.CursorPos.y - tab_bar.BarRect.Max.y, tab_bar.CurrTabsContentsHeight)
 		window.DC.CursorPos.y = tab_bar.BarRect.Max.y + tab_bar.CurrTabsContentsHeight
 	}
@@ -43526,18 +43526,18 @@ TabBarLayout :: proc(tab_bar : ^ImGuiTabBar)
 
 		if (most_recently_selected_tab == nil || most_recently_selected_tab.LastFrameSelected < tab.LastFrameSelected) && (tab.Flags & ImGuiTabItemFlagsPrivate_.ImGuiTabItemFlags_Button) == {} { most_recently_selected_tab = tab }
 		if tab.ID == tab_bar.SelectedTabId { found_selected_tab_id = true }
-		if scroll_to_tab_id == 0 && g.NavJustMovedToId != 0 == tab.ID { scroll_to_tab_id = tab.ID }
+		if scroll_to_tab_id == 0 && g.NavJustMovedToId == tab.ID { scroll_to_tab_id = tab.ID }
 
 		// Refresh tab width immediately, otherwise changes of style e.g. style.FramePadding.x would noticeably lag in the tab bar.
 		// Additionally, when using TabBarAddTab() to manipulate tab bar order we occasionally insert new tabs that don't have a width yet,
 		// and we cannot wait for the next BeginTabItem() call. We cannot compute this width within TabBarAddTab() because font size depends on the active window.
 		tab_name : ^u8 = TabBarGetTabName(tab_bar, tab)
-		has_close_button_or_unsaved_marker : bool = (tab.Flags & ImGuiTabItemFlagsPrivate_.ImGuiTabItemFlags_NoCloseButton) == 0 || (tab.Flags & ImGuiTabItemFlags_.ImGuiTabItemFlags_UnsavedDocument) != {}
+		has_close_button_or_unsaved_marker : bool = (tab.Flags & ImGuiTabItemFlagsPrivate_.ImGuiTabItemFlags_NoCloseButton) == {} || (tab.Flags & ImGuiTabItemFlags_.ImGuiTabItemFlags_UnsavedDocument) != {}
 		tab.ContentWidth = (tab.RequestedWidth >= 0.0) ? tab.RequestedWidth : TabItemCalcSize(tab_name, has_close_button_or_unsaved_marker).x
 
 		section_n : i32 = TabItemGetSectionIdx(tab)
 		section : ^ImGuiTabBarSection = &sections[section_n]
-		section.Width += tab.ContentWidth + (section_n == curr_section_n != 0 ? g.Style.ItemInnerSpacing.x : 0.0)
+		section.Width += tab.ContentWidth + (section_n == curr_section_n ? g.Style.ItemInnerSpacing.x : 0.0)
 		curr_section_n = section_n
 
 		// Store data so we can build an array sorted by width if we need to shrink tabs down
@@ -43618,14 +43618,14 @@ TabBarLayout :: proc(tab_bar : ^ImGuiTabBar)
 
 	// If we have lost the selected tab, select the next most recently active one
 	if found_selected_tab_id == false { tab_bar.SelectedTabId = 0 }
-	if tab_bar.SelectedTabId == 0 && tab_bar.NextSelectedTabId != 0 == 0 && most_recently_selected_tab != nil { tab_bar.SelectedTabId = most_recently_selected_tab.ID; scroll_to_tab_id = tab_bar.SelectedTabId }
+	if tab_bar.SelectedTabId == 0 && tab_bar.NextSelectedTabId == 0 && most_recently_selected_tab != nil { tab_bar.SelectedTabId = most_recently_selected_tab.ID; scroll_to_tab_id = tab_bar.SelectedTabId }
 
 	// Lock in visible tab
 	tab_bar.VisibleTabId = tab_bar.SelectedTabId
 	tab_bar.VisibleTabWasSubmitted = false
 
 	// CTRL+TAB can override visible tab temporarily
-	if g.NavWindowingTarget != nil && g.NavWindowingTarget.DockNode != nil && g.NavWindowingTarget.DockNode.TabBar != nil == tab_bar { scroll_to_tab_id = g.NavWindowingTarget.TabId; tab_bar.VisibleTabId = scroll_to_tab_id }
+	if g.NavWindowingTarget != nil && g.NavWindowingTarget.DockNode != nil && g.NavWindowingTarget.DockNode.TabBar == tab_bar { scroll_to_tab_id = g.NavWindowingTarget.TabId; tab_bar.VisibleTabId = scroll_to_tab_id }
 
 	// Apply request requests
 	if scroll_to_tab_id != 0 { TabBarScrollToTab(tab_bar, scroll_to_tab_id, sections) }
@@ -44118,7 +44118,7 @@ TabItemEx :: proc(tab_bar : ^ImGuiTabBar, label : ^u8, p_open : ^bool, flags : I
 
 	// Update selected tab
 	if !is_tab_button {
-		if tab_appearing && (tab_bar.Flags & ImGuiTabBarFlags_.ImGuiTabBarFlags_AutoSelectNewTabs) != {} && tab_bar.NextSelectedTabId != 0 == 0 { if !tab_bar_appearing || tab_bar.SelectedTabId != 0 == 0 {
+		if tab_appearing && (tab_bar.Flags & ImGuiTabBarFlags_.ImGuiTabBarFlags_AutoSelectNewTabs) != {} && tab_bar.NextSelectedTabId == 0 { if !tab_bar_appearing || tab_bar.SelectedTabId == 0 {
 	// New tabs gets activated
 	TabBarQueueFocus(tab_bar, tab)
 } }
@@ -44133,7 +44133,7 @@ TabItemEx :: proc(tab_bar : ^ImGuiTabBar, label : ^u8, p_open : ^bool, flags : I
 	if tab_contents_visible { tab_bar.VisibleTabWasSubmitted = true }
 
 	// On the very first frame of a tab bar we let first tab contents be visible to minimize appearing glitches
-	if !tab_contents_visible && tab_bar.SelectedTabId != 0 == 0 && tab_bar_appearing && docked_window != nil == nil { if tab_bar.Tabs.Size == 1 && (tab_bar.Flags & ImGuiTabBarFlags_.ImGuiTabBarFlags_AutoSelectNewTabs) == {} { tab_contents_visible = true } }
+	if !tab_contents_visible && tab_bar.SelectedTabId == 0 && tab_bar_appearing && docked_window == nil { if tab_bar.Tabs.Size == 1 && (tab_bar.Flags & ImGuiTabBarFlags_.ImGuiTabBarFlags_AutoSelectNewTabs) == {} { tab_contents_visible = true } }
 
 	// Note that tab_is_new is not necessarily the same as tab_appearing! When a tab bar stops being submitted
 	// and then gets submitted again, the tabs will have 'tab_appearing=true' but 'tab_is_new=false'.
@@ -44181,7 +44181,7 @@ TabItemEx :: proc(tab_bar : ^ImGuiTabBar, label : ^u8, p_open : ^bool, flags : I
 
 	// Transfer active id window so the active id is not owned by the dock host (as StartMouseMovingWindow()
 	// will only do it on the drag). This allows FocusWindow() to be more conservative in how it clears active id.
-	if held && docked_window != nil && g.ActiveId != 0 == id != 0 && g.ActiveIdIsJustActivated { g.ActiveIdWindow = docked_window }
+	if held && docked_window != nil && g.ActiveId == id && g.ActiveIdIsJustActivated { g.ActiveIdWindow = docked_window }
 
 	// Drag and drop a single floating window node moves it
 	node : ^ImGuiDockNode = docked_window != nil ? docked_window.DockNode : nil
@@ -44212,7 +44212,7 @@ TabItemEx :: proc(tab_bar : ^ImGuiTabBar, label : ^u8, p_open : ^bool, flags : I
 		can_undock : bool = docked_window != nil && (docked_window.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_NoMove) == {} && (node.MergedFlags & ImGuiDockNodeFlags_.ImGuiDockNodeFlags_NoUndocking) == {}
 		if can_undock {
 			// We use a variable threshold to distinguish dragging tabs within a tab bar and extracting them out of the tab bar
-			undocking_tab : bool = (g.DragDropActive && g.DragDropPayload.SourceId != 0 == id)
+			undocking_tab : bool = (g.DragDropActive && g.DragDropPayload.SourceId == id)
 			if !undocking_tab {
 				//&& (!g.IO.ConfigDockingWithShift || g.IO.KeyShift)
 				threshold_base : f32 = g.FontSize
@@ -44222,7 +44222,7 @@ TabItemEx :: proc(tab_bar : ^ImGuiTabBar, label : ^u8, p_open : ^bool, flags : I
 
 				distance_from_edge_y : f32 = ImMax(bb.Min.y - g.IO.MousePos.y, g.IO.MousePos.y - bb.Max.y)
 				if distance_from_edge_y >= threshold_y { undocking_tab = true }
-				if drag_distance_from_edge_x > threshold_x { if (drag_dir < 0 && TabBarGetTabOrder(tab_bar, tab) != 0 == 0) || (drag_dir > 0 && TabBarGetTabOrder(tab_bar, tab) != 0 == tab_bar.Tabs.Size - 1) { undocking_tab = true } }
+				if drag_distance_from_edge_x > threshold_x { if (drag_dir < 0 && TabBarGetTabOrder(tab_bar, tab) == 0) || (drag_dir > 0 && TabBarGetTabOrder(tab_bar, tab) == tab_bar.Tabs.Size - 1) { undocking_tab = true } }
 			}
 
 			if undocking_tab {
@@ -44270,7 +44270,7 @@ TabItemEx :: proc(tab_bar : ^ImGuiTabBar, label : ^u8, p_open : ^bool, flags : I
 
 	// Forward Hovered state so IsItemHovered() after Begin() can work (even though we are technically hovering our parent)
 	// That state is copied to window->DockTabItemStatusFlags by our caller.
-	if docked_window != nil && (hovered || g.HoveredId != 0 == close_button_id) { g.LastItemData.StatusFlags |= ImGuiItemStatusFlags_.ImGuiItemStatusFlags_HoveredWindow }
+	if docked_window != nil && (hovered || g.HoveredId == close_button_id) { g.LastItemData.StatusFlags |= ImGuiItemStatusFlags_.ImGuiItemStatusFlags_HoveredWindow }
 
 	// Restore main window position so user can draw there
 	if want_clip_rect { PopClipRect() }
@@ -44281,9 +44281,9 @@ TabItemEx :: proc(tab_bar : ^ImGuiTabBar, label : ^u8, p_open : ^bool, flags : I
 	// (We test IsItemHovered() to discard e.g. when another item is active or drag and drop over the tab bar, which g.HoveredId ignores)
 	// FIXME: This is a mess.
 	// FIXME: We may want disabled tab to still display the tooltip?
-	if text_clipped && g.HoveredId != 0 == id != 0 && !held { if (tab_bar.Flags & ImGuiTabBarFlags_.ImGuiTabBarFlags_NoTooltip) == {} && (tab.Flags & ImGuiTabItemFlags_.ImGuiTabItemFlags_NoTooltip) == {} { SetItemTooltip("%.*s", cast(i32) (FindRenderedTextEnd(label) - label), label) } }
+	if text_clipped && g.HoveredId == id && !held { if (tab_bar.Flags & ImGuiTabBarFlags_.ImGuiTabBarFlags_NoTooltip) == {} && (tab.Flags & ImGuiTabItemFlags_.ImGuiTabItemFlags_NoTooltip) == {} { SetItemTooltip("%.*s", cast(i32) (FindRenderedTextEnd(label) - label), label) } }
 
-	IM_ASSERT(!is_tab_button || !(tab_bar.SelectedTabId == tab.ID != 0 && is_tab_button)); // TabItemButton should not be selected
+	IM_ASSERT(!is_tab_button || !(tab_bar.SelectedTabId == tab.ID && is_tab_button)); // TabItemButton should not be selected
 	if is_tab_button { return pressed }
 	return tab_contents_visible
 }
@@ -44390,7 +44390,7 @@ TabItemLabelAndCloseButton :: proc(draw_list : ^ImDrawList, bb : ^ImRect, flags 
 	//  'g.ActiveId==close_button_id' will be true when we are holding on the close button, in which case both hovered booleans are false
 	close_button_pressed : bool = false
 	close_button_visible : bool = false
-	if close_button_id != 0 { if is_contents_visible || GetWidth(&bb) >= ImMax(button_sz, g.Style.TabMinWidthForCloseButton) { if g.HoveredId == tab_id != 0 || g.HoveredId != 0 == close_button_id != 0 || g.ActiveId != 0 == tab_id != 0 || g.ActiveId != 0 == close_button_id { close_button_visible = true } } }
+	if close_button_id != 0 { if is_contents_visible || GetWidth(&bb) >= ImMax(button_sz, g.Style.TabMinWidthForCloseButton) { if g.HoveredId == tab_id || g.HoveredId == close_button_id || g.ActiveId == tab_id || g.ActiveId == close_button_id { close_button_visible = true } } }
 	unsaved_marker_visible : bool = (flags & ImGuiTabItemFlags_.ImGuiTabItemFlags_UnsavedDocument) != {} && (button_pos.x + button_sz <= bb.Max.x)
 
 	if close_button_visible {
@@ -44772,7 +44772,7 @@ BeginTableEx :: proc(name : ^u8, id : ImGuiID, columns_count : i32, flags : ImGu
 	instance_id : ImGuiID
 	table.InstanceCurrent = cast(ImS16) instance_no
 	if instance_no > 0 {
-		IM_ASSERT(table.ColumnsCount == columns_count != 0 && "BeginTable(): Cannot change columns count mid-frame while preserving same ID")
+		IM_ASSERT(table.ColumnsCount == columns_count && "BeginTable(): Cannot change columns count mid-frame while preserving same ID")
 		if table.InstanceDataExtra.Size < instance_no { push_back(&table.InstanceDataExtra, ImGuiTableInstanceData()) }
 		instance_id = GetIDWithSeed(instance_no, GetIDWithSeed("##Instances", nil, id)); // Push "##Instances" followed by (int)instance_no in ID stack.
 	}
@@ -44807,7 +44807,7 @@ BeginTableEx :: proc(name : ^u8, id : ImGuiID, columns_count : i32, flags : ImGu
 		table.WorkRect = table.InnerWindow.WorkRect
 		table.OuterRect = Rect(table.InnerWindow)
 		table.InnerRect = table.InnerWindow.InnerRect
-		IM_ASSERT(table.InnerWindow.WindowPadding.x == 0.0 && table.InnerWindow.WindowPadding.y != 0 == 0.0 && table.InnerWindow.WindowBorderSize != 0 == 0.0)
+		IM_ASSERT(table.InnerWindow.WindowPadding.x == 0.0 && table.InnerWindow.WindowPadding.y == 0.0 && table.InnerWindow.WindowBorderSize == 0.0)
 
 		// Allow submitting when host is measuring
 		if table.InnerWindow.SkipItems && outer_window_is_measuring_size { table.InnerWindow.SkipItems = false }
@@ -44874,7 +44874,7 @@ BeginTableEx :: proc(name : ^u8, id : ImGuiID, columns_count : i32, flags : ImGu
 	pad_outer_x : bool = (flags & ImGuiTableFlags_.ImGuiTableFlags_NoPadOuterX) != {} ? false : (flags & ImGuiTableFlags_.ImGuiTableFlags_PadOuterX) != {} ? true : (flags & ImGuiTableFlags_.ImGuiTableFlags_BordersOuterV) != {}
 	pad_inner_x : bool = (flags & ImGuiTableFlags_.ImGuiTableFlags_NoPadInnerX) != {} ? false : true
 	inner_spacing_for_border : f32 = (flags & ImGuiTableFlags_.ImGuiTableFlags_BordersInnerV) != {} ? TABLE_BORDER_SIZE : 0.0
-	inner_spacing_explicit : f32 = (pad_inner_x && (flags & ImGuiTableFlags_.ImGuiTableFlags_BordersInnerV) != {} == 0) ? g.Style.CellPadding.x : 0.0
+	inner_spacing_explicit : f32 = (pad_inner_x && (flags & ImGuiTableFlags_.ImGuiTableFlags_BordersInnerV) == {}) ? g.Style.CellPadding.x : 0.0
 	inner_padding_explicit : f32 = (pad_inner_x && (flags & ImGuiTableFlags_.ImGuiTableFlags_BordersInnerV) != {}) ? g.Style.CellPadding.x : 0.0
 	table.CellSpacingX1 = inner_spacing_explicit + inner_spacing_for_border
 	table.CellSpacingX2 = inner_spacing_explicit
@@ -44916,7 +44916,7 @@ BeginTableEx :: proc(name : ^u8, id : ImGuiID, columns_count : i32, flags : ImGu
 		// So EndChild() within the inner window can restore the table properly.inner_window.DC.CurrentTableIdx = table_idx
 	}
 
-	if (previous_flags & ImGuiTableFlags_.ImGuiTableFlags_Reorderable) != {} && (flags & ImGuiTableFlags_.ImGuiTableFlags_Reorderable) != {} == 0 { table.IsResetDisplayOrderRequest = true }
+	if (previous_flags & ImGuiTableFlags_.ImGuiTableFlags_Reorderable) != {} && (flags & ImGuiTableFlags_.ImGuiTableFlags_Reorderable) == {} { table.IsResetDisplayOrderRequest = true }
 
 	// Mark as used to avoid GC
 	if table_idx >= g.TablesLastTimeActive.Size { resize(&g.TablesLastTimeActive, table_idx + 1, -1.0) }
@@ -45058,7 +45058,7 @@ TableBeginApplyRequests :: proc(table : ^ImGuiTable)
 			//    ... C [D] E  --->  ... [D] E  C   (Column name/index)
 			//    ... 2  3  4        ...  2  3  4   (Display order)
 			reorder_dir : i32 = table.ReorderColumnDir
-			IM_ASSERT(reorder_dir == -1 || reorder_dir != 0 == +1)
+			IM_ASSERT(reorder_dir == -1 || reorder_dir == +1)
 			IM_ASSERT(table.Flags & ImGuiTableFlags_.ImGuiTableFlags_Reorderable)
 			src_column : ^ImGuiTableColumn = &table.Columns[table.ReorderColumn]
 			dst_column : ^ImGuiTableColumn = &table.Columns[(reorder_dir == -1) ? src_column.PrevEnabledColumn : src_column.NextEnabledColumn]
@@ -45095,7 +45095,7 @@ TableSetupColumnFlags :: proc(table : ^ImGuiTable, column : ^ImGuiTableColumn, f
 	// Sizing Policy
 	if (flags & ImGuiTableColumnFlags_.ImGuiTableColumnFlags_WidthMask_) == {} {
 		table_sizing_policy : ImGuiTableFlags = (table.Flags & ImGuiTableFlags_.ImGuiTableFlags_SizingMask_)
-		if table_sizing_policy == ImGuiTableFlags_.ImGuiTableFlags_SizingFixedFit || table_sizing_policy != {} == ImGuiTableFlags_.ImGuiTableFlags_SizingFixedSame { flags |= ImGuiTableColumnFlags_.ImGuiTableColumnFlags_WidthFixed }
+		if table_sizing_policy == ImGuiTableFlags_.ImGuiTableFlags_SizingFixedFit || table_sizing_policy == ImGuiTableFlags_.ImGuiTableFlags_SizingFixedSame { flags |= ImGuiTableColumnFlags_.ImGuiTableColumnFlags_WidthFixed }
 		else { flags |= ImGuiTableColumnFlags_.ImGuiTableColumnFlags_WidthStretch }
 	}
 	else {
@@ -45123,15 +45123,15 @@ TableSetupColumnFlags :: proc(table : ^ImGuiTable, column : ^ImGuiTableColumn, f
 	column.SortDirectionsAvailList = 0; column.SortDirectionsAvailMask = column.SortDirectionsAvailList; column.SortDirectionsAvailCount = column.SortDirectionsAvailMask
 	if (table.Flags & ImGuiTableFlags_.ImGuiTableFlags_Sortable) != {} {
 		count : i32 = 0; mask : i32 = 0; list : i32 = 0
-		if (flags & ImGuiTableColumnFlags_.ImGuiTableColumnFlags_PreferSortAscending) != {} && (flags & ImGuiTableColumnFlags_.ImGuiTableColumnFlags_NoSortAscending) != {} == 0 {mask |= 1 << ImGuiSortDirection.ImGuiSortDirection_Ascending; list |= ImGuiSortDirection.ImGuiSortDirection_Ascending << (count << 1); post_incr(&count)
+		if (flags & ImGuiTableColumnFlags_.ImGuiTableColumnFlags_PreferSortAscending) != {} && (flags & ImGuiTableColumnFlags_.ImGuiTableColumnFlags_NoSortAscending) == {} {mask |= 1 << ImGuiSortDirection.ImGuiSortDirection_Ascending; list |= ImGuiSortDirection.ImGuiSortDirection_Ascending << (count << 1); post_incr(&count)
 		}
-		if (flags & ImGuiTableColumnFlags_.ImGuiTableColumnFlags_PreferSortDescending) != {} && (flags & ImGuiTableColumnFlags_.ImGuiTableColumnFlags_NoSortDescending) != {} == 0 {mask |= 1 << ImGuiSortDirection.ImGuiSortDirection_Descending; list |= ImGuiSortDirection.ImGuiSortDirection_Descending << (count << 1); post_incr(&count)
+		if (flags & ImGuiTableColumnFlags_.ImGuiTableColumnFlags_PreferSortDescending) != {} && (flags & ImGuiTableColumnFlags_.ImGuiTableColumnFlags_NoSortDescending) == {} {mask |= 1 << ImGuiSortDirection.ImGuiSortDirection_Descending; list |= ImGuiSortDirection.ImGuiSortDirection_Descending << (count << 1); post_incr(&count)
 		}
-		if (flags & ImGuiTableColumnFlags_.ImGuiTableColumnFlags_PreferSortAscending) == 0 && (flags & ImGuiTableColumnFlags_.ImGuiTableColumnFlags_NoSortAscending) != {} == 0 {mask |= 1 << ImGuiSortDirection.ImGuiSortDirection_Ascending; list |= ImGuiSortDirection.ImGuiSortDirection_Ascending << (count << 1); post_incr(&count)
+		if (flags & ImGuiTableColumnFlags_.ImGuiTableColumnFlags_PreferSortAscending) == {} && (flags & ImGuiTableColumnFlags_.ImGuiTableColumnFlags_NoSortAscending) == {} {mask |= 1 << ImGuiSortDirection.ImGuiSortDirection_Ascending; list |= ImGuiSortDirection.ImGuiSortDirection_Ascending << (count << 1); post_incr(&count)
 		}
-		if (flags & ImGuiTableColumnFlags_.ImGuiTableColumnFlags_PreferSortDescending) == 0 && (flags & ImGuiTableColumnFlags_.ImGuiTableColumnFlags_NoSortDescending) != {} == 0 {mask |= 1 << ImGuiSortDirection.ImGuiSortDirection_Descending; list |= ImGuiSortDirection.ImGuiSortDirection_Descending << (count << 1); post_incr(&count)
+		if (flags & ImGuiTableColumnFlags_.ImGuiTableColumnFlags_PreferSortDescending) == {} && (flags & ImGuiTableColumnFlags_.ImGuiTableColumnFlags_NoSortDescending) == {} {mask |= 1 << ImGuiSortDirection.ImGuiSortDirection_Descending; list |= ImGuiSortDirection.ImGuiSortDirection_Descending << (count << 1); post_incr(&count)
 		}
-		if (table.Flags & ImGuiTableFlags_.ImGuiTableFlags_SortTristate) != {} || count != 0 == 0 {mask |= 1 << ImGuiSortDirection.ImGuiSortDirection_None; post_incr(&count)
+		if (table.Flags & ImGuiTableFlags_.ImGuiTableFlags_SortTristate) != {} || count == 0 {mask |= 1 << ImGuiSortDirection.ImGuiSortDirection_None; post_incr(&count)
 		}
 		column.SortDirectionsAvailList = cast(ImU8) list
 		column.SortDirectionsAvailMask = cast(ImU8) mask
@@ -45187,7 +45187,7 @@ TableUpdateLayout :: proc(table : ^ImGuiTable)
 			column.IsUserEnabled = column.IsUserEnabledNextFrame
 			table.IsSettingsDirty = true
 		}
-		column.IsEnabled = column.IsUserEnabled && (column.Flags & ImGuiTableColumnFlags_.ImGuiTableColumnFlags_Disabled) != {} == 0
+		column.IsEnabled = column.IsUserEnabled && (column.Flags & ImGuiTableColumnFlags_.ImGuiTableColumnFlags_Disabled) == {}
 
 		if column.SortOrder != -1 && !column.IsEnabled { table.IsSortSpecsDirty = true }
 		if column.SortOrder > 0 && (table.Flags & ImGuiTableFlags_.ImGuiTableFlags_SortMulti) == {} { table.IsSortSpecsDirty = true }
@@ -45217,7 +45217,7 @@ TableUpdateLayout :: proc(table : ^ImGuiTable)
 
 		// Calculate ideal/auto column width (that's the width required for all contents to be visible without clipping)
 		// Combine width from regular rows + width from headers unless requested not to.
-		if !column.IsPreserveWidthAuto && table.InstanceCurrent != 0 == 0 { column.WidthAuto = TableGetColumnWidthAuto(table, column) }
+		if !column.IsPreserveWidthAuto && table.InstanceCurrent == 0 { column.WidthAuto = TableGetColumnWidthAuto(table, column) }
 
 		// Non-resizable columns keep their requested width (apply user value regardless of IsPreserveWidthAuto)
 		column_is_resizable : bool = (column.Flags & ImGuiTableColumnFlags_.ImGuiTableColumnFlags_NoResize) == {}
@@ -45235,7 +45235,7 @@ TableUpdateLayout :: proc(table : ^ImGuiTable)
 		}
 	}
 
-	if (table.Flags & ImGuiTableFlags_.ImGuiTableFlags_Sortable) != {} && table.SortSpecsCount != {} == 0 && (table.Flags & ImGuiTableFlags_.ImGuiTableFlags_SortTristate) == {} { table.IsSortSpecsDirty = true }
+	if (table.Flags & ImGuiTableFlags_.ImGuiTableFlags_Sortable) != {} && table.SortSpecsCount == {} && (table.Flags & ImGuiTableFlags_.ImGuiTableFlags_SortTristate) == {} { table.IsSortSpecsDirty = true }
 	table.RightMostEnabledColumn = cast(ImGuiTableColumnIdx) prev_visible_column_idx
 	IM_ASSERT(table.LeftMostEnabledColumn >= 0 && table.RightMostEnabledColumn >= 0)
 
@@ -45299,7 +45299,7 @@ TableUpdateLayout :: proc(table : ^ImGuiTable)
 	work_rect : ImRect = table.WorkRect
 	width_spacings : f32 = (table.OuterPaddingX * 2.0) + (table.CellSpacingX1 + table.CellSpacingX2) * (table.ColumnsEnabledCount - 1)
 	width_removed : f32 = (table.HasScrollbarYPrev && !table.InnerWindow.ScrollbarY) ? g.Style.ScrollbarSize : 0.0; // To synchronize decoration width of synched tables with mismatching scrollbar state (#5920)
-	width_avail : f32 = ImMax(1.0, (((table.Flags & ImGuiTableFlags_.ImGuiTableFlags_ScrollX) != {} && table.InnerWidth != 0 == 0.0) ? GetWidth(&table.InnerClipRect) : GetWidth(&work_rect)) - width_removed)
+	width_avail : f32 = ImMax(1.0, (((table.Flags & ImGuiTableFlags_.ImGuiTableFlags_ScrollX) != {} && table.InnerWidth == 0.0) ? GetWidth(&table.InnerClipRect) : GetWidth(&work_rect)) - width_removed)
 	width_avail_for_stretched_columns : f32 = width_avail - width_spacings - sum_width_requests
 	width_remaining_for_stretched_columns : f32 = width_avail_for_stretched_columns
 	table.ColumnsGivenWidth = width_spacings + (table.CellPaddingX * 2.0) * table.ColumnsEnabledCount
@@ -45368,7 +45368,7 @@ TableUpdateLayout :: proc(table : ^ImGuiTable)
 
 		column.NavLayerCurrent = cast(ImS8) (table.FreezeRowsCount > 0 ? ImGuiNavLayer.ImGuiNavLayer_Menu : ImGuiNavLayer.ImGuiNavLayer_Main); // Use Count NOT request so Header line changes layer when frozen
 
-		if offset_x_frozen && table.FreezeColumnsCount != {} == visible_n {
+		if offset_x_frozen && table.FreezeColumnsCount == visible_n {
 			offset_x += work_rect.Min.x - table.OuterRect.Min.x
 			offset_x_frozen = false
 		}
@@ -45472,7 +45472,7 @@ TableUpdateLayout :: proc(table : ^ImGuiTable)
 		}
 
 		// Don't decrement auto-fit counters until container window got a chance to submit its items
-		if table.HostSkipItems == false && table.InstanceCurrent != 0 == 0 {
+		if table.HostSkipItems == false && table.InstanceCurrent == 0 {
 			column.AutoFitQueue >>= 1
 			column.CannotSkipItemsQueue >>= 1
 		}
@@ -45494,7 +45494,7 @@ TableUpdateLayout :: proc(table : ^ImGuiTable)
 	// Clear Resizable flag if none of our column are actually resizable (either via an explicit _NoResize flag, either
 	// because of using _WidthAuto/_WidthStretch). This will hide the resizing option from the context menu.
 	unused_x1 : f32 = ImMax(table.WorkRect.Min.x, table.Columns[table.RightMostEnabledColumn].ClipRect.Max.x)
-	if is_hovering_table && table.HoveredColumnBody != {} == -1 { if mouse_skewed_x >= unused_x1 { table.HoveredColumnBody = cast(ImGuiTableColumnIdx) table.ColumnsCount } }
+	if is_hovering_table && table.HoveredColumnBody == -1 { if mouse_skewed_x >= unused_x1 { table.HoveredColumnBody = cast(ImGuiTableColumnIdx) table.ColumnsCount } }
 	if has_resizable == false && (table.Flags & ImGuiTableFlags_.ImGuiTableFlags_Resizable) != {} { table.Flags &= ~ImGuiTableFlags_.ImGuiTableFlags_Resizable }
 
 	table.IsActiveIdAliveBeforeTable = (g.ActiveIdIsAlive != 0)
@@ -45528,8 +45528,8 @@ TableUpdateLayout :: proc(table : ^ImGuiTable)
 
 	// Highlight header
 	table.HighlightColumnHeader = -1
-	if table.IsContextPopupOpen && table.ContextPopupColumn != -1 && table.InstanceInteracted != 0 == table.InstanceCurrent { table.HighlightColumnHeader = table.ContextPopupColumn }
-	else if (table.Flags & ImGuiTableFlags_.ImGuiTableFlags_HighlightHoveredColumn) != {} && table.HoveredColumnBody != -1 && table.HoveredColumnBody != table.ColumnsCount && table.HoveredColumnBorder != {} == -1 { if g.ActiveId == 0 || (table.IsActiveIdInTable || g.DragDropActive) { table.HighlightColumnHeader = table.HoveredColumnBody } }
+	if table.IsContextPopupOpen && table.ContextPopupColumn != -1 && table.InstanceInteracted == table.InstanceCurrent { table.HighlightColumnHeader = table.ContextPopupColumn }
+	else if (table.Flags & ImGuiTableFlags_.ImGuiTableFlags_HighlightHoveredColumn) != {} && table.HoveredColumnBody != -1 && table.HoveredColumnBody != table.ColumnsCount && table.HoveredColumnBorder == -1 { if g.ActiveId == 0 || (table.IsActiveIdInTable || g.DragDropActive) { table.HighlightColumnHeader = table.HoveredColumnBody } }
 
 	// [Part 11] Default context menu
 	// - To append to this menu: you can call TableBeginContextMenuPopup()/.../EndPopup().
@@ -45632,7 +45632,7 @@ EndTable :: proc()
 	outer_window : ^ImGuiWindow = table.OuterWindow
 	temp_data : ^ImGuiTableTempData = table.TempData
 	IM_ASSERT(inner_window == g.CurrentWindow)
-	IM_ASSERT(outer_window == inner_window != nil || outer_window != nil == inner_window.ParentWindow)
+	IM_ASSERT(outer_window == inner_window || outer_window == inner_window.ParentWindow)
 
 	if table.IsInsideRow { TableEndRow(table) }
 
@@ -45696,10 +45696,10 @@ EndTable :: proc()
 	table.ColumnsAutoFitWidth = width_spacings + (table.CellPaddingX * 2.0) * table.ColumnsEnabledCount + auto_fit_width_for_fixed + ImMax(auto_fit_width_for_stretched, auto_fit_width_for_stretched_min)
 
 	// Update scroll
-	if (table.Flags & ImGuiTableFlags_.ImGuiTableFlags_ScrollX) == 0 && inner_window != outer_window {
+	if (table.Flags & ImGuiTableFlags_.ImGuiTableFlags_ScrollX) == {} && inner_window != outer_window {
 		inner_window.Scroll.x = 0.0
 	}
-	else if table.LastResizedColumn != -1 && table.ResizedColumn != {} == -1 && inner_window.ScrollbarX && table.InstanceInteracted != 0 == table.InstanceCurrent {
+	else if table.LastResizedColumn != -1 && table.ResizedColumn == -1 && inner_window.ScrollbarX && table.InstanceInteracted == table.InstanceCurrent {
 		// When releasing a column being resized, scroll to keep the resulting column in sight
 		neighbor_width_to_keep_visible : f32 = table.MinColumnWidth + table.CellPaddingX * 2.0
 		column : ^ImGuiTableColumn = &table.Columns[table.LastResizedColumn]
@@ -45708,7 +45708,7 @@ EndTable :: proc()
 	}
 
 	// Apply resizing/dragging at the end of the frame
-	if table.ResizedColumn != -1 && table.InstanceCurrent != 0 == table.InstanceInteracted {
+	if table.ResizedColumn != -1 && table.InstanceCurrent == table.InstanceInteracted {
 		column : ^ImGuiTableColumn = &table.Columns[table.ResizedColumn]
 		new_x2 : f32 = (g.IO.MousePos.x - g.ActiveIdClickOffset.x + ImTrunc(TABLE_RESIZE_SEPARATOR_HALF_THICKNESS * g.CurrentDpiScale))
 		new_width : f32 = ImTrunc(new_x2 - column.MinX - table.CellSpacingX1 - table.CellPaddingX * 2.0)
@@ -45783,7 +45783,7 @@ EndTable :: proc()
 	table.IsInitializing = false
 
 	// Clear or restore current table, if any
-	IM_ASSERT(g.CurrentWindow == outer_window != nil && g.CurrentTable != nil == table)
+	IM_ASSERT(g.CurrentWindow == outer_window && g.CurrentTable == table)
 	IM_ASSERT(g.TablesTempDataStacked > 0)
 	temp_data = (pre_decr(&g.TablesTempDataStacked) > 0) ? &g.TablesTempData[g.TablesTempDataStacked - 1] : nil
 	g.CurrentTable = temp_data != nil ? GetByIndex(&g.Tables, temp_data.TableIndex) : nil
@@ -45803,7 +45803,7 @@ TableSetupColumn :: proc(label : ^u8, flags : ImGuiTableColumnFlags, init_width_
 	table : ^ImGuiTable = g.CurrentTable
 	IM_ASSERT(table != nil && "Need to call TableSetupColumn() after BeginTable()!")
 	IM_ASSERT(table.IsLayoutLocked == false && "Need to call call TableSetupColumn() before first row!")
-	IM_ASSERT((flags & ImGuiTableColumnFlags_.ImGuiTableColumnFlags_StatusMask_) == 0 && "Illegal to pass StatusMask values to TableSetupColumn()")
+	IM_ASSERT((flags & ImGuiTableColumnFlags_.ImGuiTableColumnFlags_StatusMask_) == {} && "Illegal to pass StatusMask values to TableSetupColumn()")
 	if table.DeclColumnsCount >= table.ColumnsCount {
 		IM_ASSERT_USER_ERROR(table.DeclColumnsCount < table.ColumnsCount, "Called TableSetupColumn() too many times!")
 		return
@@ -45814,11 +45814,11 @@ TableSetupColumn :: proc(label : ^u8, flags : ImGuiTableColumnFlags, init_width_
 
 	// Assert when passing a width or weight if policy is entirely left to default, to avoid storing width into weight and vice-versa.
 	// Give a grace to users of ImGuiTableFlags_ScrollX.
-	if table.IsDefaultSizingPolicy && (flags & ImGuiTableColumnFlags_.ImGuiTableColumnFlags_WidthMask_) != {} == 0 && (flags & ImGuiTableFlags_.ImGuiTableFlags_ScrollX) != {} == 0 { IM_ASSERT(init_width_or_weight <= 0.0 && "Can only specify width/weight if sizing policy is set explicitly in either Table or Column.") }
+	if table.IsDefaultSizingPolicy && (flags & ImGuiTableColumnFlags_.ImGuiTableColumnFlags_WidthMask_) == {} && (flags & ImGuiTableFlags_.ImGuiTableFlags_ScrollX) == {} { IM_ASSERT(init_width_or_weight <= 0.0 && "Can only specify width/weight if sizing policy is set explicitly in either Table or Column.") }
 
 	// When passing a width automatically enforce WidthFixed policy
 	// (whereas TableSetupColumnFlags would default to WidthAuto if table is not Resizable)
-	if (flags & ImGuiTableColumnFlags_.ImGuiTableColumnFlags_WidthMask_) == 0 && init_width_or_weight > 0.0 { if (table.Flags & ImGuiTableFlags_.ImGuiTableFlags_SizingMask_) == ImGuiTableFlags_.ImGuiTableFlags_SizingFixedFit || (table.Flags & ImGuiTableFlags_.ImGuiTableFlags_SizingMask_) != {} == ImGuiTableFlags_.ImGuiTableFlags_SizingFixedSame { flags |= ImGuiTableColumnFlags_.ImGuiTableColumnFlags_WidthFixed } }
+	if (flags & ImGuiTableColumnFlags_.ImGuiTableColumnFlags_WidthMask_) == {} && init_width_or_weight > 0.0 { if (table.Flags & ImGuiTableFlags_.ImGuiTableFlags_SizingMask_) == ImGuiTableFlags_.ImGuiTableFlags_SizingFixedFit || (table.Flags & ImGuiTableFlags_.ImGuiTableFlags_SizingMask_) == ImGuiTableFlags_.ImGuiTableFlags_SizingFixedSame { flags |= ImGuiTableColumnFlags_.ImGuiTableColumnFlags_WidthFixed } }
 	if (flags & ImGuiTableColumnFlags_.ImGuiTableColumnFlags_AngledHeader) != {} {
 		flags |= ImGuiTableColumnFlags_.ImGuiTableColumnFlags_NoHeaderLabel
 		post_incr(&table.AngledHeadersCount)
@@ -45841,8 +45841,8 @@ TableSetupColumn :: proc(label : ^u8, flags : ImGuiTableColumnFlags, init_width_
 		}
 
 		// Init default visibility/sort state
-		if (flags & ImGuiTableColumnFlags_.ImGuiTableColumnFlags_DefaultHide) != {} && (table.SettingsLoadedFlags & ImGuiTableFlags_.ImGuiTableFlags_Hideable) != {} == 0 { column.IsUserEnabledNextFrame = false; column.IsUserEnabled = column.IsUserEnabledNextFrame }
-		if (flags & ImGuiTableColumnFlags_.ImGuiTableColumnFlags_DefaultSort) != {} && (table.SettingsLoadedFlags & ImGuiTableFlags_.ImGuiTableFlags_Sortable) != {} == 0 {
+		if (flags & ImGuiTableColumnFlags_.ImGuiTableColumnFlags_DefaultHide) != {} && (table.SettingsLoadedFlags & ImGuiTableFlags_.ImGuiTableFlags_Hideable) == {} { column.IsUserEnabledNextFrame = false; column.IsUserEnabled = column.IsUserEnabledNextFrame }
+		if (flags & ImGuiTableColumnFlags_.ImGuiTableColumnFlags_DefaultSort) != {} && (table.SettingsLoadedFlags & ImGuiTableFlags_.ImGuiTableFlags_Sortable) == {} {
 			column.SortOrder = 0; // Multiple columns using _DefaultSort will be reassigned unique SortOrder values when building the sort specs.
 			column.SortDirection = (column.Flags & ImGuiTableColumnFlags_.ImGuiTableColumnFlags_PreferSortDescending) != {} ? cast(ImS8) ImGuiSortDirection.ImGuiSortDirection_Descending : cast(ImU8) (ImGuiSortDirection.ImGuiSortDirection_Ascending)
 		}
@@ -46452,7 +46452,7 @@ TableSetColumnWidth :: proc(column_n : i32, width : f32)
 	min_width : f32 = table.MinColumnWidth
 	max_width : f32 = ImMax(min_width, column_0.WidthMax); // Don't use TableCalcMaxColumnWidth() here as it would rely on MinX from last instance (#7933)
 	column_0_width = ImClamp(column_0_width, min_width, max_width)
-	if column_0.WidthGiven == column_0_width != 0 || column_0.WidthRequest != 0 == column_0_width { return }
+	if column_0.WidthGiven == column_0_width || column_0.WidthRequest == column_0_width { return }
 
 	//IMGUI_DEBUG_PRINT("TableSetColumnWidth(%d, %.1f->%.1f)\n", column_0_idx, column_0->WidthGiven, column_0_width);
 	column_1 : ^ImGuiTableColumn = (column_0.NextEnabledColumn != -1) ? &table.Columns[column_0.NextEnabledColumn] : nil
@@ -46491,7 +46491,7 @@ TableSetColumnWidth :: proc(column_n : i32, width : f32)
 
 	// If we have all Fixed columns OR resizing a Fixed column that doesn't come after a Stretch one, we can do an offsetting resize.
 	// This is the preferred resize path
-	if (column_0.Flags & ImGuiTableColumnFlags_.ImGuiTableColumnFlags_WidthFixed) != {} { if column_1 == nil || table.LeftMostStretchedColumn != {} == -1 || table.Columns[table.LeftMostStretchedColumn].DisplayOrder >= column_0.DisplayOrder {
+	if (column_0.Flags & ImGuiTableColumnFlags_.ImGuiTableColumnFlags_WidthFixed) != {} { if column_1 == nil || table.LeftMostStretchedColumn == -1 || table.Columns[table.LeftMostStretchedColumn].DisplayOrder >= column_0.DisplayOrder {
 	column_0.WidthRequest = column_0_width
 	table.IsSettingsDirty = true
 	return
@@ -46722,7 +46722,7 @@ this.ChannelsMask = nil
 
 			// Don't attempt to merge if there are multiple draw calls within the column
 			src_channel : ^ImDrawChannel = &splitter._Channels[channel_no]
-			if src_channel._CmdBuffer.Size > 0 && back(&src_channel._CmdBuffer).ElemCount != 0 == 0 && back(&src_channel._CmdBuffer).UserCallback != {} == nil {
+			if src_channel._CmdBuffer.Size > 0 && back(&src_channel._CmdBuffer).ElemCount == 0 && back(&src_channel._CmdBuffer).UserCallback == nil {
 				// Equivalent of PopUnusedDrawCmd()pop_back(&src_channel._CmdBuffer)
 			}
 			if src_channel._CmdBuffer.Size != 1 { continue }
@@ -46746,7 +46746,7 @@ this.ChannelsMask = nil
 				if content_max_x > column.ClipRect.Max.x { continue }
 			}
 
-			merge_group_n : i32 = (has_freeze_h && column_n < table.FreezeColumnsCount ? 0 : 1) + (has_freeze_v && merge_group_sub_n != 0 == 0 ? 0 : 2)
+			merge_group_n : i32 = (has_freeze_h && column_n < table.FreezeColumnsCount ? 0 : 1) + (has_freeze_v && merge_group_sub_n == 0 ? 0 : 2)
 			IM_ASSERT(channel_no < max_draw_channels)
 			merge_group : ^MergeGroup = &merge_groups[merge_group_n]
 			if merge_group.ChannelsCount == 0 { merge_group.ClipRect = ImRect(+FLT_MAX, +FLT_MAX, -FLT_MAX, -FLT_MAX) }
@@ -46791,7 +46791,7 @@ this.ChannelsMask = nil
 				if (merge_group_n & 1) == 0 || !has_freeze_h { merge_clip_rect.Min.x = ImMin(merge_clip_rect.Min.x, host_rect.Min.x) }
 				if (merge_group_n & 2) == 0 || !has_freeze_v { merge_clip_rect.Min.y = ImMin(merge_clip_rect.Min.y, host_rect.Min.y) }
 				if (merge_group_n & 1) != 0 { merge_clip_rect.Max.x = ImMax(merge_clip_rect.Max.x, host_rect.Max.x) }
-				if (merge_group_n & 2) != 0 && (table.Flags & ImGuiTableFlags_.ImGuiTableFlags_NoHostExtendY) != {} == 0 { merge_clip_rect.Max.y = ImMax(merge_clip_rect.Max.y, host_rect.Max.y) }
+				if (merge_group_n & 2) != 0 && (table.Flags & ImGuiTableFlags_.ImGuiTableFlags_NoHostExtendY) == {} { merge_clip_rect.Max.y = ImMax(merge_clip_rect.Max.y, host_rect.Max.y) }
 				//GetForegroundDrawList()->AddRect(merge_group->ClipRect.Min, merge_group->ClipRect.Max, IM_COL32(255, 0, 0, 200), 0.0f, 0, 1.0f); // [DEBUG]
 				//GetForegroundDrawList()->AddLine(merge_group->ClipRect.Min, merge_clip_rect.Min, IM_COL32(255, 100, 0, 200));
 				//GetForegroundDrawList()->AddLine(merge_group->ClipRect.Max, merge_clip_rect.Max, IM_COL32(255, 100, 0, 200));
@@ -46874,7 +46874,7 @@ TableDrawBorders :: proc(table : ^ImGuiTable)
 
 			// Draw in outer window so right-most column won't be clipped
 			// Always draw full height border when being resized/hovered, or on the delimitation of frozen column scrolling.
-			draw_y2 : f32 = (is_hovered || is_resized || is_frozen_separator || (table.Flags & (ImGuiTableFlags_.ImGuiTableFlags_NoBordersInBody | ImGuiTableFlags_.ImGuiTableFlags_NoBordersInBodyUntilResize)) != {} == 0) ? draw_y2_body : draw_y2_head
+			draw_y2 : f32 = (is_hovered || is_resized || is_frozen_separator || (table.Flags & (ImGuiTableFlags_.ImGuiTableFlags_NoBordersInBody | ImGuiTableFlags_.ImGuiTableFlags_NoBordersInBodyUntilResize)) == {}) ? draw_y2_body : draw_y2_head
 			if draw_y2 > draw_y1 { AddLine(inner_drawlist, ImVec2(column.MaxX, draw_y1), ImVec2(column.MaxX, draw_y2), TableGetColumnBorderCol(table, order_n, column_n), border_size) }
 		}
 	}
@@ -46958,7 +46958,7 @@ TableFixColumnSortDirection :: proc(table : ^ImGuiTable, column : ^ImGuiTableCol
 // Calculate next sort direction that would be set after clicking the column
 // - If the PreferSortDescending flag is set, we will default to a Descending direction on the first click.
 // - Note that the PreferSortAscending flag is never checked, it is essentially the default and therefore a no-op.
-IM_STATIC_ASSERT(ImGuiSortDirection.ImGuiSortDirection_None == 0 && ImGuiSortDirection.ImGuiSortDirection_Ascending != 0 == 1 && ImGuiSortDirection.ImGuiSortDirection_Descending != 0 == 2)
+IM_STATIC_ASSERT(ImGuiSortDirection.ImGuiSortDirection_None == 0 && ImGuiSortDirection.ImGuiSortDirection_Ascending == 1 && ImGuiSortDirection.ImGuiSortDirection_Descending == 2)
 TableGetColumnNextSortDirection :: proc(column : ^ImGuiTableColumn) -> ImGuiSortDirection
 {
 	IM_ASSERT(column.SortDirectionsAvailCount > 0)
@@ -47152,7 +47152,7 @@ TableHeadersRow :: proc()
 
 	// Allow opening popup from the right-most section after the last column.
 	mouse_pos : ImVec2 = GetMousePos()
-	if IsMouseReleased(1) && TableGetHoveredColumn() != 0 == columns_count { if mouse_pos.y >= row_y1 && mouse_pos.y < row_y1 + row_height {
+	if IsMouseReleased(1) && TableGetHoveredColumn() == columns_count { if mouse_pos.y >= row_y1 && mouse_pos.y < row_y1 + row_height {
 	// Will open a non-column-specific popup.
 	TableOpenContextMenu(columns_count)
 } }
@@ -47254,7 +47254,7 @@ TableHeader :: proc(label : ^u8)
 				PopStyleColor()
 				x += w_sort_text
 			}
-			RenderArrow(window.DrawList, ImVec2(x, y), GetColorU32(ImGuiCol_.ImGuiCol_Text), column.SortDirection == ImGuiSortDirection.ImGuiSortDirection_Ascending != 0 ? ImGuiDir.ImGuiDir_Up : ImGuiDir.ImGuiDir_Down, ARROW_SCALE)
+			RenderArrow(window.DrawList, ImVec2(x, y), GetColorU32(ImGuiCol_.ImGuiCol_Text), column.SortDirection == ImGuiSortDirection.ImGuiSortDirection_Ascending ? ImGuiDir.ImGuiDir_Up : ImGuiDir.ImGuiDir_Down, ARROW_SCALE)
 		}
 
 		// Handle clicking on column header to adjust Sort Order
@@ -47270,7 +47270,7 @@ TableHeader :: proc(label : ^u8)
 	RenderTextEllipsis(window.DrawList, label_pos, ImVec2(ellipsis_max, label_pos.y + label_height + g.Style.FramePadding.y), ellipsis_max, ellipsis_max, label, label_end, &label_size)
 
 	text_clipped : bool = label_size.x > (ellipsis_max - label_pos.x)
-	if text_clipped && hovered && g.ActiveId != 0 == 0 { SetItemTooltip("%.*s", cast(i32) (label_end - label), label) }
+	if text_clipped && hovered && g.ActiveId == 0 { SetItemTooltip("%.*s", cast(i32) (label_end - label), label) }
 
 	// We don't use BeginPopupContextItem() because we want the popup to stay up even after the column is hidden
 	if IsMouseReleased(1) && IsItemHovered() { TableOpenContextMenu(column_n) }
@@ -47290,7 +47290,7 @@ TableAngledHeadersRow :: proc()
 	row_id : ImGuiID = GetID("##AngledHeaders")
 	table_instance : ^ImGuiTableInstanceData = TableGetInstanceData(table, table.InstanceCurrent)
 	highlight_column_n : i32 = table.HighlightColumnHeader
-	if highlight_column_n == -1 && table.HoveredColumnBody != -1 { if table_instance.HoveredRowLast == 0 && table.HoveredColumnBorder != {} == -1 && (g.ActiveId == 0 || g.ActiveId != 0 == row_id != 0 || (table.IsActiveIdInTable || g.DragDropActive)) { highlight_column_n = table.HoveredColumnBody } }
+	if highlight_column_n == -1 && table.HoveredColumnBody != -1 { if table_instance.HoveredRowLast == 0 && table.HoveredColumnBorder == -1 && (g.ActiveId == 0 || g.ActiveId == row_id || (table.IsActiveIdInTable || g.DragDropActive)) { highlight_column_n = table.HoveredColumnBody } }
 
 	// Build up request
 	col_header_bg : ImU32 = GetColorU32(ImGuiCol_.ImGuiCol_TableHeaderBg)
@@ -47501,7 +47501,7 @@ TableDrawDefaultContextMenu :: proc(table : ^ImGuiTable, flags_for_section_to_di
 		}
 
 		size_all_desc : ^u8
-		if table.ColumnsEnabledFixedCount == table.ColumnsEnabledCount != {} && (table.Flags & ImGuiTableFlags_.ImGuiTableFlags_SizingMask_) != ImGuiTableFlags_.ImGuiTableFlags_SizingFixedSame {
+		if table.ColumnsEnabledFixedCount == table.ColumnsEnabledCount && (table.Flags & ImGuiTableFlags_.ImGuiTableFlags_SizingMask_) != ImGuiTableFlags_.ImGuiTableFlags_SizingFixedSame {
 			// "###SizeAll" All fixed
 			size_all_desc = LocalizeGetMsg(ImGuiLocKey.ImGuiLocKey_TableSizeAllFit)
 		}
@@ -47538,7 +47538,7 @@ TableDrawDefaultContextMenu :: proc(table : ^ImGuiTable, flags_for_section_to_di
 			if (other_column.Flags & ImGuiTableColumnFlags_.ImGuiTableColumnFlags_Disabled) != {} { continue }
 
 			name : ^u8 = TableGetColumnName(table, other_column_n)
-			if name == nil || name[0] != 0 == 0 { name = "<Unknown>" }
+			if name == nil || name[0] == 0 { name = "<Unknown>" }
 
 			// Make sure we can't hide the last active column
 			menu_item_active : bool = (other_column.Flags & ImGuiTableColumnFlags_.ImGuiTableColumnFlags_NoHide) != {} ? false : true
@@ -47653,7 +47653,7 @@ TableSaveSettings :: proc(table : ^ImGuiTable)
 
 	// Serialize ImGuiTable/ImGuiTableColumn into ImGuiTableSettings/ImGuiTableColumnSettings
 	IM_ASSERT(settings.ID == table.ID)
-	IM_ASSERT(settings.ColumnsCount == table.ColumnsCount != 0 && settings.ColumnsCountMax >= settings.ColumnsCount)
+	IM_ASSERT(settings.ColumnsCount == table.ColumnsCount && settings.ColumnsCountMax >= settings.ColumnsCount)
 	column : ^ImGuiTableColumn = table.Columns.Data
 	column_settings : ^ImGuiTableColumnSettings = GetColumnSettings(settings)
 
@@ -48275,7 +48275,7 @@ BeginColumns :: proc(str_id : ^u8, columns_count : i32, flags : ImGuiOldColumnFl
 NextColumn :: proc()
 {
 	window : ^ImGuiWindow = GetCurrentWindow()
-	if window.SkipItems || window.DC.CurrentColumns != nil == nil { return }
+	if window.SkipItems || window.DC.CurrentColumns == nil { return }
 
 	g : ^ImGuiContext = GImGui
 	columns : ^ImGuiOldColumns = window.DC.CurrentColumns
@@ -48399,7 +48399,7 @@ Columns :: proc(columns_count : i32, id : ^u8, borders : bool)
 	flags : ImGuiOldColumnFlags = (borders ? 0 : ImGuiOldColumnFlags_.ImGuiOldColumnFlags_NoBorder)
 	//flags |= ImGuiOldColumnFlags_NoPreserveWidths; // NB: Legacy behavior
 	columns : ^ImGuiOldColumns = window.DC.CurrentColumns
-	if columns != nil && columns.Count != 0 == columns_count != 0 && columns.Flags != {} == flags { return }
+	if columns != nil && columns.Count == columns_count && columns.Flags == flags { return }
 
 	if columns != nil { EndColumns() }
 

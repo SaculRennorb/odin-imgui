@@ -2421,7 +2421,7 @@ ast_parse_expression :: proc(ctx: ^AstContext, tokens : ^[]Token, max_presedence
 						case .BracketTriangleClose: presedence = .Comparison
 						case .DoubleAmpersand     : presedence = .LogicAnd
 						case .DoublePipe          : presedence = .LogicOr
-						case .Equals              : presedence = .Assign
+						case .Equals              : presedence = .Equality
 						case .NotEquals           : presedence = .Equality
 						case .LessEq              : presedence = .Comparison
 						case .GreaterEq           : presedence = .Comparison

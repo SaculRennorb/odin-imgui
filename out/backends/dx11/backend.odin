@@ -147,9 +147,29 @@ STB_TEXTEDIT_K_SHIFT :: 0x400000
 FILE :: rawptr
 HANDLE :: rawptr
 HWND :: HANDLE
+WORD :: u16
 DWORD :: u32
 LONG :: i32
+CHAR :: u8
 WCHAR :: u16
+SHORT :: i16
+BYTE :: u8
+INT :: i32
+UINT :: u32
+PUINT :: ^u32
+BOOL :: i32
+UINT8 :: u8
+FLOAT :: f32
+LCID :: DWORD
+LCTYPE :: DWORD
+LPSTR :: ^CHAR
+LPCWSTR :: ^WCHAR
+LONGLONG :: __int64
+LONG_PTR :: __int64
+UINT_PTR :: __int64
+WPARAM :: UINT_PTR
+LPARAM :: LONG_PTR
+LRESULT :: LONG_PTR
 
 POINT :: struct {
 	x : LONG, y : LONG,
@@ -172,18 +192,427 @@ CANDIDATEFORM :: struct {
 	rcArea : RECT,
 }
 
+SORT_DEFAULT :: 0x0
+LOCALE_RETURN_NUMBER :: 0x20000000
+LOCALE_IDEFAULTANSICODEPAGE :: 0x00001004
+
+CP_ACP :: 0
+CP_UTF8 :: 65001
+
+TRUE :: 1
+FALSE :: 0
+
+LARGE_INTEGER :: struct #raw_union {
+	using _0 : struct {
+		LowPart : DWORD,
+		HighPart : LONG,
+	},
+	u : struct {
+LowPart : DWORD,
+HighPart : LONG,
+},
+	QuadPart : LONGLONG,
+}
+
+IDC_ARROW :: MAKEINTRESOURCE(32512)
+IDC_IBEAM :: MAKEINTRESOURCE(32513)
+IDC_WAIT :: MAKEINTRESOURCE(32514)
+IDC_CROSS :: MAKEINTRESOURCE(32515)
+IDC_UPARROW :: MAKEINTRESOURCE(32516)
+IDC_SIZE :: MAKEINTRESOURCE(32640)
+IDC_ICON :: MAKEINTRESOURCE(32641)
+IDC_SIZENWSE :: MAKEINTRESOURCE(32642)
+IDC_SIZENESW :: MAKEINTRESOURCE(32643)
+IDC_SIZEWE :: MAKEINTRESOURCE(32644)
+IDC_SIZENS :: MAKEINTRESOURCE(32645)
+IDC_SIZEALL :: MAKEINTRESOURCE(32646)
+IDC_NO :: MAKEINTRESOURCE(32648)
+IDC_HAND :: MAKEINTRESOURCE(32649)
+
+VK_LSHIFT :: 0xA0
+VK_RSHIFT :: 0xA1
+VK_LCONTROL :: 0xA2
+VK_RCONTROL :: 0xA3
+VK_LMENU :: 0xA4
+VK_RMENU :: 0xA5
+
+VK_LWIN :: 0x5B
+VK_RWIN :: 0x5C
+VK_APPS :: 0x5D
+
+VK_SHIFT :: 0x10
+VK_CONTROL :: 0x11
+VK_MENU :: 0x12
+VK_PAUSE :: 0x13
+VK_CAPITAL :: 0x14
+
+VK_BACK :: 0x08
+VK_TAB :: 0x09
+
+VK_CLEAR :: 0x0C
+VK_RETURN :: 0x0D
+
+VK_SPACE :: 0x20
+VK_PRIOR :: 0x21
+VK_NEXT :: 0x22
+VK_END :: 0x23
+VK_HOME :: 0x24
+VK_LEFT :: 0x25
+VK_UP :: 0x26
+VK_RIGHT :: 0x27
+VK_DOWN :: 0x28
+VK_SELECT :: 0x29
+VK_PRINT :: 0x2A
+VK_EXECUTE :: 0x2B
+VK_SNAPSHOT :: 0x2C
+VK_INSERT :: 0x2D
+VK_DELETE :: 0x2E
+VK_HELP :: 0x2F
+
+VK_SHIFT :: 0x10
+VK_CONTROL :: 0x11
+VK_MENU :: 0x12
+VK_PAUSE :: 0x13
+VK_CAPITAL :: 0x14
+
+VK_KANA :: 0x15
+VK_HANGEUL :: 0x15
+VK_HANGUL :: 0x15
+VK_IME_ON :: 0x16
+VK_JUNJA :: 0x17
+VK_FINAL :: 0x18
+VK_HANJA :: 0x19
+VK_KANJI :: 0x19
+VK_IME_OFF :: 0x1A
+
+VK_ESCAPE :: 0x1B
+
+VK_CONVERT :: 0x1C
+VK_NONCONVERT :: 0x1D
+VK_ACCEPT :: 0x1E
+VK_MODECHANGE :: 0x1F
+
+VK_OEM_1 :: 0xBA// ';:' for US
+VK_OEM_PLUS :: 0xBB// '+' any country
+VK_OEM_COMMA :: 0xBC// ',' any country
+VK_OEM_MINUS :: 0xBD// '-' any country
+VK_OEM_PERIOD :: 0xBE// '.' any country
+VK_OEM_2 :: 0xBF// '/?' for US
+VK_OEM_3 :: 0xC0// '`~' for US
+VK_OEM_4 :: 0xDB//  '[{' for US
+VK_OEM_5 :: 0xDC//  '\|' for US
+VK_OEM_6 :: 0xDD//  ']}' for US
+VK_OEM_7 :: 0xDE//  ''"' for US
+VK_OEM_8 :: 0xDF
+
+VK_NUMLOCK :: 0x90
+VK_SCROLL :: 0x91
+
+VK_NUMPAD0 :: 0x60
+VK_NUMPAD1 :: 0x61
+VK_NUMPAD2 :: 0x62
+VK_NUMPAD3 :: 0x63
+VK_NUMPAD4 :: 0x64
+VK_NUMPAD5 :: 0x65
+VK_NUMPAD6 :: 0x66
+VK_NUMPAD7 :: 0x67
+VK_NUMPAD8 :: 0x68
+VK_NUMPAD9 :: 0x69
+VK_MULTIPLY :: 0x6A
+VK_ADD :: 0x6B
+VK_SEPARATOR :: 0x6C
+VK_SUBTRACT :: 0x6D
+VK_DECIMAL :: 0x6E
+VK_DIVIDE :: 0x6F
+VK_F1 :: 0x70
+VK_F2 :: 0x71
+VK_F3 :: 0x72
+VK_F4 :: 0x73
+VK_F5 :: 0x74
+VK_F6 :: 0x75
+VK_F7 :: 0x76
+VK_F8 :: 0x77
+VK_F9 :: 0x78
+VK_F10 :: 0x79
+VK_F11 :: 0x7A
+VK_F12 :: 0x7B
+VK_F13 :: 0x7C
+VK_F14 :: 0x7D
+VK_F15 :: 0x7E
+VK_F16 :: 0x7F
+VK_F17 :: 0x80
+VK_F18 :: 0x81
+VK_F19 :: 0x82
+VK_F20 :: 0x83
+VK_F21 :: 0x84
+VK_F22 :: 0x85
+VK_F23 :: 0x86
+VK_F24 :: 0x87
+
+VK_BROWSER_BACK :: 0xA6
+VK_BROWSER_FORWARD :: 0xA7
+VK_BROWSER_REFRESH :: 0xA8
+VK_BROWSER_STOP :: 0xA9
+VK_BROWSER_SEARCH :: 0xAA
+VK_BROWSER_FAVORITES :: 0xAB
+VK_BROWSER_HOME :: 0xAC
+
+
+XINPUT_FLAG_GAMEPAD :: 0x00000001
+ERROR_SUCCESS :: 0
+
+XINPUT_GAMEPAD :: struct {
+	wButtons : WORD,
+	bLeftTrigger : BYTE,
+	bRightTrigger : BYTE,
+	sThumbLX : SHORT,
+	sThumbLY : SHORT,
+	sThumbRX : SHORT,
+	sThumbRY : SHORT,
+}
+
+XINPUT_STATE :: struct {
+	dwPacketNumber : DWORD,
+	Gamepad : XINPUT_GAMEPAD,
+}
+
+XINPUT_GAMEPAD_DPAD_UP :: 0x0001
+XINPUT_GAMEPAD_DPAD_DOWN :: 0x0002
+XINPUT_GAMEPAD_DPAD_LEFT :: 0x0004
+XINPUT_GAMEPAD_DPAD_RIGHT :: 0x0008
+XINPUT_GAMEPAD_START :: 0x0010
+XINPUT_GAMEPAD_BACK :: 0x0020
+XINPUT_GAMEPAD_LEFT_THUMB :: 0x0040
+XINPUT_GAMEPAD_RIGHT_THUMB :: 0x0080
+XINPUT_GAMEPAD_LEFT_SHOULDER :: 0x0100
+XINPUT_GAMEPAD_RIGHT_SHOULDER :: 0x0200
+XINPUT_GAMEPAD_A :: 0x1000
+XINPUT_GAMEPAD_B :: 0x2000
+XINPUT_GAMEPAD_X :: 0x4000
+XINPUT_GAMEPAD_Y :: 0x8000
+
+XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE :: 7849
+XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE :: 8689
+XINPUT_GAMEPAD_TRIGGER_THRESHOLD :: 30
+
+MONITORINFO :: struct {
+	cbSize : DWORD,
+	rcMonitor : RECT,
+	rcWork : RECT,
+	dwFlags : DWORD,
+}
+
+HMONITOR :: rawptr
+
+MONITORINFOF_PRIMARY :: 0x00000001
+
+LOWORD :: #force_inline proc "contextless" (l : $T0) //TODO @gen: Validate the parameters were not passed by reference.
+{
+	((WORD)(((DWORD_PTR)(l))&0xffff))
+}
+
+HIWORD :: #force_inline proc "contextless" (l : $T0) //TODO @gen: Validate the parameters were not passed by reference.
+{
+	((WORD)((((DWORD_PTR)(l))>>16)&0xffff))
+}
+
+
+KF_EXTENDED :: 0x0100
+KF_DLGMODE :: 0x0800
+KF_MENUMODE :: 0x1000
+KF_ALTDOWN :: 0x2000
+KF_REPEAT :: 0x4000
+KF_UP :: 0x8000
+
+
+WM_MOUSEFIRST :: 0x0200
+WM_MOUSEMOVE :: 0x0200
+WM_LBUTTONDOWN :: 0x0201
+WM_LBUTTONUP :: 0x0202
+WM_LBUTTONDBLCLK :: 0x0203
+WM_RBUTTONDOWN :: 0x0204
+WM_RBUTTONUP :: 0x0205
+WM_RBUTTONDBLCLK :: 0x0206
+WM_MBUTTONDOWN :: 0x0207
+WM_MBUTTONUP :: 0x0208
+WM_MBUTTONDBLCLK :: 0x0209
+WM_MOUSEWHEEL :: 0x020A
+WM_NCMOUSEMOVE :: 0x00A0
+WM_MOUSELEAVE :: 0x02A3
+WM_NCMOUSELEAVE :: 0x02A2
+WM_DESTROY :: 0x0002
+WM_XBUTTONDOWN :: 0x020B
+WM_XBUTTONUP :: 0x020C
+WM_XBUTTONDBLCLK :: 0x020D
+WM_KEYDOWN :: 0x0100
+WM_KEYUP :: 0x0101
+WM_SYSKEYDOWN :: 0x0104
+WM_SYSKEYUP :: 0x0105
+WM_SETFOCUS :: 0x0007
+WM_KILLFOCUS :: 0x0008
+WM_INPUTLANGCHANGEREQUEST :: 0x0050
+WM_INPUTLANGCHANGE :: 0x0051
+WM_CHAR :: 0x0102
+WM_SETCURSOR :: 0x0020
+WM_DEVICECHANGE :: 0x0219
+WM_DISPLAYCHANGE :: 0x007E
+WM_MOUSEACTIVATE :: 0x0021
+WM_MOVE :: 0x0003
+WM_CLOSE :: 0x0010
+WM_SIZE :: 0x0005
+WM_NCHITTEST :: 0x0084
+
+HTTRANSPARENT :: (-1)
+
+XBUTTON1 :: 0x0001
+XBUTTON2 :: 0x0002
+
+WHEEL_DELTA :: 120
+GET_WHEEL_DELTA_WPARAM :: #force_inline proc "contextless" (wParam : $T0) //TODO @gen: Validate the parameters were not passed by reference.
+{
+	((short)HIWORD(wParam))
+}
+
+
+TME_CANCEL :: 0x80000000
+TME_LEAVE :: 0x00000002
+TME_NONCLIENT :: 0x00000010
+
+GET_X_LPARAM :: #force_inline proc "contextless" (lp : $T0) //TODO @gen: Validate the parameters were not passed by reference.
+{
+	((int)(short)LOWORD(lp))
+}
+
+GET_Y_LPARAM :: #force_inline proc "contextless" (lp : $T0) //TODO @gen: Validate the parameters were not passed by reference.
+{
+	((int)(short)HIWORD(lp))
+}
+
+
+MB_PRECOMPOSED :: 0x00000001
+
+HTCLIENT :: 1
+
+RTL_OSVERSIONINFOEXW :: struct {
+	dwOSVersionInfoSize : DWORD,
+	dwMajorVersion : DWORD,
+	dwMinorVersion : DWORD,
+	dwBuildNumber : DWORD,
+	dwPlatformId : DWORD,
+	szCSDVersion : [128]WCHAR,
+	wServicePackMajor : WORD,
+	wServicePackMinor : WORD,
+	wSuiteMask : WORD,
+	wProductType : BYTE,
+	wReserved : BYTE,
+}
+
+VER_MINORVERSION :: 0x0000001
+VER_MAJORVERSION :: 0x0000002
+VER_GREATER_EQUAL :: 3
+
+VER_SET_CONDITION :: #force_inline proc "contextless" (_m_ : $T0, _t_ : $T1, _c_ : $T2) //TODO @gen: Validate the parameters were not passed by reference.
+{
+	((_m_)=VerSetConditionMask((_m_),(_t_),(_c_)))
+}
+
+
+LOGPIXELSX :: 88
+LOGPIXELSY :: 90
+
+MONITOR_DEFAULTTONULL :: 0x00000000
+MONITOR_DEFAULTTOPRIMARY :: 0x00000001
+MONITOR_DEFAULTTONEAREST :: 0x00000002
+
+FAILED :: #force_inline proc "contextless" (hr : $T0) //TODO @gen: Validate the parameters were not passed by reference.
+{
+	(((HRESULT)(hr))<0)
+}
+
+SUCCEEDED :: #force_inline proc "contextless" (hr : $T0) //TODO @gen: Validate the parameters were not passed by reference.
+{
+	(((HRESULT)(hr))>=0)
+}
+
+
+DWM_BB_ENABLE :: 0x00000001
+DWM_BB_BLURREGION :: 0x00000002
+DWM_BB_TRANSITIONONMAXIMIZED :: 0x00000004
+
+HRGN :: struct { }
+
+DWM_BLURBEHIND :: struct {
+	dwFlags : DWORD,
+	fEnable : BOOL,
+	hRgnBlur : HRGN,
+	fTransitionOnMaximized : BOOL,
+}
+
+WS_POPUP :: 0x80000000
+WS_OVERLAPPED :: 0x00000000
+WS_EX_TOPMOST :: 0x00000008
+WS_EX_TOOLWINDOW :: 0x00000080
+WS_EX_APPWINDOW :: 0x00040000
+WS_EX_LAYERED :: 0x00080000
+
+WS_OVERLAPPEDWINDOW :: 0xfffff// w/e
+
+GWLP_HWNDPARENT :: (-8)
+
+SW_SHOWNA :: 8
+SW_SHOW :: 5
+
+HWND_TOPMOST :: ((HWND)-1)
+HWND_NOTOPMOST :: ((HWND)-2)
+
+GWL_STYLE :: (-16)
+GWL_EXSTYLE :: (-20)
+
+SWP_NOSIZE :: 0x0001
+SWP_NOMOVE :: 0x0002
+SWP_NOZORDER :: 0x0004
+SWP_NOACTIVATE :: 0x0010
+SWP_FRAMECHANGED :: 0x0020
+
+LWA_ALPHA :: 0x00000002
+
+MA_NOACTIVATE :: 3
+
+WNDPROC :: proc(_ : HWND, _ : UINT, _ : WPARAM, _ : LPARAM) -> LRESULT
+
+HINSTANCE :: HANDLE
+HICON :: HANDLE
+HCURSOR :: HANDLE
+HBRUSH :: HANDLE
+
+WNDCLASSEXW :: struct {
+	cbSize : UINT,
+	/* Win 3.x */
+	style : UINT,
+	lpfnWndProc : WNDPROC,
+	cbClsExtra : i32,
+	cbWndExtra : i32,
+	hInstance : HINSTANCE,
+	hIcon : HICON,
+	hCursor : HCURSOR,
+	hbrBackground : HBRUSH,
+	lpszMenuName : LPCWSTR,
+	lpszClassName : LPCWSTR,
+	/* Win 4.0 */
+	hIconSm : HICON,
+}
+
+CS_VREDRAW :: 0x0001
+CS_HREDRAW :: 0x0002
+CS_OWNDC :: 0x0020
+
+COLOR_BACKGROUND :: 1
+
 // END WIN32 STRUCT SHIM
 //
 // D3D11
 //
 // BEGIN DX11 SHIM
-
-INT :: i32
-UINT :: u32
-PUINT :: ^u32
-BOOL :: i32
-UINT8 :: u8
-FLOAT :: f32
 
 D3D11_VIEWPORT :: struct {
 	TopLeftX : f32,
@@ -375,12 +804,6 @@ D3D11_SHADER_RESOURCE_VIEW_DESC :: struct {
 		BufferEx : D3D11_BUFFEREX_SRV,
 	},
 }
-
-FAILED :: #force_inline proc "contextless" (hr : $T0) //TODO @gen: Validate the parameters were not passed by reference.
-{
-	(((HRESULT)(hr))<0)
-}
-
 
 D3D11_INPUT_CLASSIFICATION :: enum i32 {
 	D3D11_INPUT_PER_VERTEX_DATA = 0,
@@ -616,8 +1039,6 @@ DXGI_SWAP_CHAIN_DESC :: struct {
 }
 
 DXGI_USAGE_RENDER_TARGET_OUTPUT :: 0x00000020U
-
-TRUE :: 1
 
 // END DX11 SHIM
 //

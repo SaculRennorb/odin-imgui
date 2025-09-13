@@ -26,6 +26,8 @@ Expand :: proc { ImRect_Expand_0, ImRect_Expand_1 }
 
 GetColorU32 :: proc { GetColorU32_0, GetColorU32_1, GetColorU32_2 }
 
+GetCursorPos :: proc { GetCursorPos_0 }
+
 GetForegroundDrawList :: proc { GetForegroundDrawList_1, GetForegroundDrawList_0 }
 
 GetID :: proc { GetID_0, GetID_1, GetID_2, GetID_3, ImGuiWindow_GetID_0, ImGuiWindow_GetID_1, ImGuiWindow_GetID_2 }

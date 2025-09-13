@@ -122,7 +122,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 
 						did_clobber = write_type(ctx, scope_node, type.type, indent_str, indent_str)
 
-					case .Struct, .Union:
+					case .Struct, .Union, .Enum:
 						if typedef.name.source != get_simple_name_string(ctx, type.structure.name) {
 							// Only push this name if its not the same as they type itself, otherwise this will case lookup issues.
 							// Also a typedefed named struct is the same as a normal struct declaration, we don't care about that detail.
@@ -3006,12 +3006,18 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 								return TYPE_LIT_INT32, {}
 							case "stb__in2", "stb__in3", "stb__in4":
 								return TYPE_LIT_INT32, {}
+							case "LOWORD", "HIWORD", "GET_X_LPARAM", "GET_Y_LPARAM", "GET_WHEEL_DELTA_WPARAM":
+								return TYPE_LIT_INT32, {}
 							case "STB_TEXT_HAS_SELECTION":
 								return TYPE_LIT_BOOL, {}
-							case "IM_BITARRAY_TESTBIT", "ImDrawCmd_AreSequentialIdxOffset", "FAILED":
+							case "IM_BITARRAY_TESTBIT", "ImDrawCmd_AreSequentialIdxOffset":
+								return TYPE_LIT_BOOL, {}
+							case "FAILED", "SUCCEEDED":
 								return TYPE_LIT_BOOL, {}
 							case "IM_ARRAYSIZE":
 								return TYPE_LIT_INT32, {}
+							case "_IsWindowsVistaOrGreater", "_IsWindows8OrGreater", "_IsWindows8Point1OrGreater", "_IsWindows10OrGreater":
+								return TYPE_LIT_BOOL, {}
 						}
 						
 

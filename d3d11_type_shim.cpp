@@ -1,12 +1,5 @@
 // BEGIN DX11 SHIM
 
-typedef int                 INT;
-typedef unsigned int        UINT;
-typedef unsigned int        *PUINT;
-typedef int                 BOOL;
-typedef unsigned char       UINT8;
-typedef float               FLOAT;
-
 struct D3D11_VIEWPORT {
 	float TopLeftX;
 	float TopLeftY;
@@ -200,8 +193,6 @@ struct D3D11_SHADER_RESOURCE_VIEW_DESC
 		D3D11_BUFFEREX_SRV BufferEx;
 	};
 };
-
-#define FAILED(hr) (((HRESULT)(hr)) < 0)
 
 enum D3D11_INPUT_CLASSIFICATION {
 	D3D11_INPUT_PER_VERTEX_DATA = 0,
@@ -437,7 +428,5 @@ struct DXGI_SWAP_CHAIN_DESC {
 };
 
 #define DXGI_USAGE_RENDER_TARGET_OUTPUT     0x00000020UL
-
-#define TRUE 1
 
 // END DX11 SHIM

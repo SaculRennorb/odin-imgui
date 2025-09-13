@@ -1563,6 +1563,15 @@ ast_parse_statement :: proc(ctx: ^AstContext, tokens : ^[]Token, sequence : ^[dy
 				append(sequence, parsed_node)
 				return
 			}
+
+		case .Typedef:
+			tokens^ = nexts
+
+			node := ast_parse_typedef_no_keyword(ctx, tokens) or_return
+
+			parsed_node = ast_append_node(ctx, node)
+			append(sequence, parsed_node)
+			return
 	}
 
 

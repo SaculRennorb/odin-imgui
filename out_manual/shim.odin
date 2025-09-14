@@ -25,7 +25,7 @@ pre_incr_r :: #force_inline proc "contextless" (p : ^$T) -> (new : T) where !int
 
 post_decr :: proc { post_decr_m, post_decr_r }
 post_decr_m :: #force_inline proc "contextless" (p : ^[^]$T) -> (old : ^T) {
-	old = p^; p^ = p^[-1:]; return p^
+	old = p^; p^ = p^[-1:]; return
 }
 post_decr_r :: #force_inline proc "contextless" (p : ^$T) -> (old : T) where !intrinsics.type_is_multi_pointer(T) {
 	old = p^; when intrinsics.type_is_pointer(T) { p^ = mem.ptr_offset(p^, -1) } else { p^ -= 1 }; return
@@ -33,7 +33,7 @@ post_decr_r :: #force_inline proc "contextless" (p : ^$T) -> (old : T) where !in
 
 post_incr :: proc { post_incr_m, post_incr_r }
 post_incr_m :: #force_inline proc "contextless" (p : ^[^]$T) -> (old : ^T) {
-	old = p^; p^ = p^[1:]; return p^
+	old = p^; p^ = p^[1:]; return
 }
 post_incr_r :: #force_inline proc "contextless" (p : ^$T) -> (old : T) where !intrinsics.type_is_multi_pointer(T) {
 	old = p^; when intrinsics.type_is_pointer(T) { p^ = mem.ptr_offset(p^, 1) } else { p^ += 1 }; return

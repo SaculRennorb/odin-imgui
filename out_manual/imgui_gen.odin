@@ -1159,9 +1159,9 @@ Index of this file:
 //-----------------------------------------------------------------------------
 
 // Helper Macros
-IM_ASSERT :: #force_inline proc(_EXPR : bool, _e := #caller_expression(_EXPR))
+IM_ASSERT :: #force_inline proc(_EXPR : bool, _e := #caller_expression(_EXPR), loc := #caller_location)
 {
-	assert(_EXPR, _e)// You can override the default assert handler by editing imconfig.h
+	assert(_EXPR, _e, loc)// You can override the default assert handler by editing imconfig.h
 }
 
 IM_ARRAYSIZE :: #force_inline proc "contextless" (_ARR : $T0) -> int where intrinsics.type_is_sliceable(T0) & !intrinsics.type_is_multi_pointer(T0)
@@ -8380,7 +8380,8 @@ ImStrTrimBlanks :: proc(buf : [^]u8) -> int
 	for p > p_start && (p[-1] == ' ' || p[-1] == '\t') { post_decr(&p) }
 
 	if p_start != buf {
-		// Copy memory if we had leading blanksmemmove(buf, p_start, p - p_start)
+		// Copy memory if we had leading blanks
+		memmove(buf, p_start, mem.ptr_sub(p, p_start))
 	}
 	len := mem.ptr_sub(p, p_start)
 	buf[len] = 0; // Zero terminate
@@ -9494,7 +9495,8 @@ ImGuiListClipper_StepInternal :: proc(clipper : ^ImGuiListClipper) -> bool
 			clipper.ItemsHeight = window.DC.PrevLineSize.y + g.Style.ItemSpacing.y
 		}
 		if clipper.ItemsHeight == 0.0 && clipper.ItemsCount == INT_MAX {
-			// Accept that no item have been submitted if in indeterminate mode.return false
+			// Accept that no item have been submitted if in indeterminate mode.
+			return false
 		}
 		IM_ASSERT(clipper.ItemsHeight > 0.0, "Unable to calculate item height! First item hasn't moved the cursor vertically!")
 		calc_clipping = true; // If item height had to be calculated, calculate clipping afterwards.
@@ -9564,7 +9566,8 @@ ImGuiListClipper_StepInternal :: proc(clipper : ^ImGuiListClipper) -> bool
 		clipper.DisplayStart = ImMax(data.Ranges.Data[data.StepNo].Min, already_submitted)
 		clipper.DisplayEnd = ImMin(data.Ranges.Data[data.StepNo].Max, clipper.ItemsCount)
 		if clipper.DisplayStart > already_submitted {
-			//-V1051SeekCursorForItem(clipper, clipper.DisplayStart)
+			//-V1051
+			SeekCursorForItem(clipper, clipper.DisplayStart)
 		}
 		post_incr(&data.StepNo)
 		if clipper.DisplayStart == clipper.DisplayEnd && data.StepNo < data.Ranges.Size { continue }
@@ -9940,7 +9943,8 @@ RenderTextClippedEx :: proc(draw_list : ^ImDrawList, pos_min : ImVec2, pos_max :
 	clip_max : ImVec2 = clip_rect != nil ? clip_rect.Max : pos_max
 	need_clipping : bool = (pos.x + text_size.x >= clip_max.x) || (pos.y + text_size.y >= clip_max.y)
 	if clip_rect != nil {
-		// If we had no explicit clipping rectangle then pos==clip_minneed_clipping |= (pos.x < clip_min.x) || (pos.y < clip_min.y)
+		// If we had no explicit clipping rectangle then pos==clip_min
+		need_clipping |= (pos.x < clip_min.x) || (pos.y < clip_min.y)
 	}
 
 	// Align whole block. We should defer that to the better rendering function when we'll have support for individual line alignment.
@@ -10075,8 +10079,10 @@ RenderNavCursor :: proc(bb : ImRect, id : ImGuiID, flags : ImGuiNavRenderCursorF
 RenderMouseCursor :: proc(base_pos : ImVec2, base_scale : f32, mouse_cursor : ImGuiMouseCursor, col_fill : ImU32, col_border : ImU32, col_shadow : ImU32)
 {
 	g : ^ImGuiContext = GImGui
+	mouse_cursor := mouse_cursor
 	if mouse_cursor <= ImGuiMouseCursor_.ImGuiMouseCursor_None || mouse_cursor >= ImGuiMouseCursor_.ImGuiMouseCursor_COUNT {
-		// We intentionally accept out of bound values.mouse_cursor = ImGuiMouseCursor_.ImGuiMouseCursor_Arrow
+		// We intentionally accept out of bound values.
+		mouse_cursor = .ImGuiMouseCursor_Arrow
 	}
 	font_atlas : ^ImFontAtlas = g.DrawListSharedData.Font.ContainerAtlas
 	for viewport in g.Viewports.Data[:g.Viewports.Size] {
@@ -10150,11 +10156,13 @@ CreateContext :: proc(shared_font_atlas : ^ImFontAtlas = nil) -> ^ImGuiContext
 }
 
 // NULL = destroy current context
-DestroyContext :: proc(ctx : ^ImGuiContext)
+DestroyContext :: proc(ctx : ^ImGuiContext = nil)
 {
 	prev_ctx : ^ImGuiContext = GetCurrentContext()
+	ctx := ctx
 	if ctx == nil {
-		//-V1051ctx = prev_ctx
+		//-V1051
+		ctx = prev_ctx
 	}
 	SetCurrentContext(ctx)
 	Shutdown()
@@ -10164,7 +10172,7 @@ DestroyContext :: proc(ctx : ^ImGuiContext)
 
 // IMPORTANT: interactive elements requires a fixed ###xxx suffix, it must be same in ALL languages to allow for automation.
 GLocalizationEntriesEnUS := [?]ImGuiLocEntry{
-	{ImGuiLocKey.ImGuiLocKey_VersionStr, ")"},
+	{ImGuiLocKey.ImGuiLocKey_VersionStr, "Dear ImGui "+ IMGUI_VERSION /*+ " (" +IMGUI_VERSION_NUM+ ")"*/},
 	{ImGuiLocKey.ImGuiLocKey_TableSizeOne, "Size column to fit###SizeOne"},
 	{ImGuiLocKey.ImGuiLocKey_TableSizeAllFit, "Size all columns to fit###SizeAll"},
 	{ImGuiLocKey.ImGuiLocKey_TableSizeAllDefault, "Size all columns to default###SizeAll"},
@@ -11195,7 +11203,8 @@ StartMouseMovingWindowOrNode :: proc(window : ^ImGuiWindow, node : ^ImGuiDockNod
 		// - part of a dockspace node hierarchy: so we can undock the last single visible node too. Undocking from a fixed/central node will create a new node and copy windows.
 		root_node : ^ImGuiDockNode = DockNodeGetRootNode(node)
 		if root_node.OnlyNodeWithWindows != node || root_node.CentralNode != nil {
-			// -V1051 PVS-Studio thinks node should be root_node and is wrong about that.can_undock_node = true
+			// -V1051 PVS-Studio thinks node should be root_node and is wrong about that.
+			can_undock_node = true
 		}
 	}
 
@@ -11360,7 +11369,8 @@ UpdateHoveredWindowAndCaptureFlags :: proc()
 	// Modal windows prevents mouse from hovering behind them.
 	modal_window : ^ImGuiWindow = GetTopMostPopupModal()
 	if modal_window != nil && g.HoveredWindow != nil && !IsWindowWithinBeginStackOf(g.HoveredWindow.RootWindow, modal_window) {
-		// FIXME-MERGE: RootWindowDockTree ?clear_hovered_windows = true
+		// FIXME-MERGE: RootWindowDockTree ?
+		clear_hovered_windows = true
 	}
 
 	// Disabled mouse hovering (we don't currently clear MousePos, we could)
@@ -11495,7 +11505,8 @@ NewFrame :: proc()
 
 	// [DEBUG]
 	if !g.IO.ConfigDebugHighlightIdConflicts || !g.IO.KeyCtrl {
-		// Count is locked while holding CTRLg.DebugDrawIdConflicts = 0
+		// Count is locked while holding CTRL
+		g.DebugDrawIdConflicts = 0
 	}
 	if g.IO.ConfigDebugHighlightIdConflicts && g.HoveredIdPreviousFrameItemCount > 1 { g.DebugDrawIdConflicts = g.HoveredIdPreviousFrame }
 
@@ -11985,7 +11996,8 @@ EndFrame :: proc()
 	reserve(&g.WindowsTempSortBuffer, g.Windows.Size)
 	for window in g.Windows.Data[:g.Windows.Size] {
 		if window.Active && (window.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_ChildWindow) != {} {
-			// if a child is active its parent will add itcontinue
+			// if a child is active its parent will add it
+			continue
 		}
 		AddWindowToSortBuffer(&g.WindowsTempSortBuffer, window)
 	}
@@ -13268,10 +13280,12 @@ UpdateWindowSkipRefresh :: proc(window : ^ImGuiWindow)
 	if (g.NextWindowData.RefreshFlagsVal & ImGuiWindowRefreshFlags_.ImGuiWindowRefreshFlags_TryToAvoidRefresh) != {} {
 		// FIXME-IDLE: Tests for e.g. mouse clicks or keyboard while focused.
 		if window.Appearing {
-			// If currently appearingreturn
+			// If currently appearing
+			return
 		}
 		if window.Hidden {
-			// If was hidden (previous frame)return
+			// If was hidden (previous frame)
+			return
 		}
 		if (g.NextWindowData.RefreshFlagsVal & ImGuiWindowRefreshFlags_.ImGuiWindowRefreshFlags_RefreshOnHover) != {} && g.HoveredWindow != nil { if window.RootWindow == g.HoveredWindow.RootWindow || IsWindowWithinBeginStackOf(g.HoveredWindow.RootWindow, window) { return } }
 		if (g.NextWindowData.RefreshFlagsVal & ImGuiWindowRefreshFlags_.ImGuiWindowRefreshFlags_RefreshOnFocus) != {} && g.NavWindow != nil { if window.RootWindow == g.NavWindow.RootWindow || IsWindowWithinBeginStackOf(g.NavWindow.RootWindow, window) { return } }
@@ -13512,7 +13526,8 @@ Begin_ :: proc(name : string, p_open : ^bool = nil, flags : ImGuiWindowFlags = {
 		window_title_visible_elsewhere : bool = false
 		if (window.Viewport != nil && window.Viewport.Window == window) || (window.DockIsActive) { window_title_visible_elsewhere = true }
 		else if g.NavWindowingListWindow != nil && (window.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_NoNavFocus) == {} {
-			// Window titles visible when using CTRL+TABwindow_title_visible_elsewhere = true
+			// Window titles visible when using CTRL+TAB
+			window_title_visible_elsewhere = true
 		}
 		if window_title_visible_elsewhere && !window_just_created && name != window.Name {
 			buf_len : uint = cast(uint) window.NameBufLen
@@ -13575,7 +13590,8 @@ Begin_ :: proc(name : string, p_open : ^bool = nil, flags : ImGuiWindowFlags = {
 		use_current_size_for_scrollbar_y : bool = window_just_created
 		if window_size_x_set_by_api && window.ContentSizeExplicit.x != 0.0 { use_current_size_for_scrollbar_x = true }
 		if window_size_y_set_by_api && window.ContentSizeExplicit.y != 0.0 {
-			// #7252use_current_size_for_scrollbar_y = true
+			// #7252
+			use_current_size_for_scrollbar_y = true
 		}
 
 		// Collapse window by double-clicking on title bar
@@ -13644,7 +13660,8 @@ Begin_ :: proc(name : string, p_open : ^bool = nil, flags : ImGuiWindowFlags = {
 		if window_just_activated_by_user {
 			window.AutoPosLastDirection = ImGuiDir.ImGuiDir_None
 			if (flags & ImGuiWindowFlags_.ImGuiWindowFlags_Popup) != {} && (flags & ImGuiWindowFlags_.ImGuiWindowFlags_Modal) == {} && !window_pos_set_by_api {
-				// FIXME: BeginPopup() could use SetNextWindowPos()window.Pos = back(&g.BeginPopupStack).OpenPopupPos
+				// FIXME: BeginPopup() could use SetNextWindowPos()
+				window.Pos = back(&g.BeginPopupStack).OpenPopupPos
 			}
 		}
 
@@ -14146,7 +14163,8 @@ End :: proc()
 	// Close anything that is open
 	if window.DC.CurrentColumns != nil { EndColumns() }
 	if (window.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_DockNodeHost) == {} && !window.SkipRefresh {
-		// Pop inner window clip rectanglePopClipRect()
+		// Pop inner window clip rectangle
+		PopClipRect()
 	}
 	PopFocusScope()
 	if window_stack_data.DisabledOverrideReenable && window.RootWindow == window { EndDisabledOverrideReenable() }
@@ -14158,15 +14176,17 @@ End :: proc()
 
 	// Stop logging
 	if g.LogWindow == window {
-		// FIXME: add more options for scope of loggingLogFinish()
+		// FIXME: add more options for scope of logging
+		LogFinish()
 	}
 
 	if window.DC.IsSetPos { ErrorCheckUsingSetCursorPosToExtendParentBoundaries() }
 
 	// Docking: report contents sizes to parent to allow for auto-resize
 	if window.DockNode != nil && window.DockTabIsVisible { if host_window : ^ImGuiWindow = window.DockNode.HostWindow; host_window != nil {
-	// FIXME-DOCKhost_window.DC.CursorMaxPos = window.DC.CursorMaxPos + window.WindowPadding - host_window.WindowPadding
-} }
+		// FIXME-DOCK
+		host_window.DC.CursorMaxPos = window.DC.CursorMaxPos + window.WindowPadding - host_window.WindowPadding
+	} }
 
 	// Pop from window stack
 	g.LastItemData = window_stack_data.ParentLastItemDataBackup
@@ -14363,7 +14383,8 @@ IsWindowChildOf :: proc(window : ^ImGuiWindow, potential_parent : ^ImGuiWindow, 
 	for window := window; window != nil; {
 		if window == potential_parent { return true }
 		if window == window_root {
-			// end of chainreturn false
+			// end of chain
+			return false
 		}
 		window = window.ParentWindow
 	}
@@ -16240,7 +16261,8 @@ UpdateInputEvents :: proc(trickle_fast_inputs : bool)
 			IM_ASSERT(button >= ImGuiMouseButton(0) && button < ImGuiMouseButton_.ImGuiMouseButton_COUNT)
 			if trickle_fast_inputs && ((mouse_button_changed & (1 << u32(button))) != {} || mouse_wheeled) { break }
 			if trickle_fast_inputs && e.MouseButton.MouseSource == ImGuiMouseSource.ImGuiMouseSource_TouchScreen && mouse_moved {
-				// #2702: TouchScreen have no initial hover.break
+				// #2702: TouchScreen have no initial hover.
+				break
 			}
 			io.MouseDown[button] = e.MouseButton.Down
 			io.MouseSource = e.MouseButton.MouseSource
@@ -17899,13 +17921,16 @@ FindBlockingModal :: proc(window : ^ImGuiWindow) -> ^ImGuiWindow
 		popup_window : ^ImGuiWindow = popup_data.Window
 		if popup_window == nil || (popup_window.Flags & ImGuiWindowFlags_.ImGuiWindowFlags_Modal) == {} { continue }
 		if !popup_window.Active && !popup_window.WasActive {
-			// Check WasActive, because this code may run before popup renders on current frame, also check Active to handle newly created windows.continue
+			// Check WasActive, because this code may run before popup renders on current frame, also check Active to handle newly created windows.
+			continue
 		}
 		if window == nil {
-			// FindBlockingModal(NULL) test for if FocusWindow(NULL) is naturally possible via a mouse click.return popup_window
+			// FindBlockingModal(NULL) test for if FocusWindow(NULL) is naturally possible via a mouse click.
+			return popup_window
 		}
 		if IsWindowWithinBeginStackOf(window, popup_window) {
-			// Window may be over modalcontinue
+			// Window may be over modal
+			continue
 		}
 		return popup_window// Place window right below first block modal
 	}
@@ -18052,7 +18077,8 @@ ClosePopupsExceptModals :: proc()
 	}
 
 	if popup_count_to_keep < g.OpenPopupStack.Size {
-		// This test is not required but it allows to set a convenient breakpoint on the statement belowClosePopupToLevel(popup_count_to_keep, true)
+		// This test is not required but it allows to set a convenient breakpoint on the statement below
+		ClosePopupToLevel(popup_count_to_keep, true)
 	}
 }
 
@@ -19084,7 +19110,8 @@ NavProcessItemForTabbingRequest :: proc(id : ImGuiID, item_flags : ImGuiItemFlag
 	else if g.NavTabbingDir == 0 {
 		if can_stop && g.NavId == id { NavMoveRequestResolveWithLastItem(result) }
 		if can_stop && g.NavTabbingResultFirst.ID == 0 {
-			// Tab initNavApplyItemToResult(&g.NavTabbingResultFirst)
+			// Tab init
+			NavApplyItemToResult(&g.NavTabbingResultFirst)
 		}
 	}
 }
@@ -19313,7 +19340,8 @@ GetNavTweakPressedAmount :: proc(axis : ImGuiAxis) -> f32
 	}
 	amount : f32 = cast(f32) GetKeyPressedAmount(key_more, repeat_delay, repeat_rate) - cast(f32) GetKeyPressedAmount(key_less, repeat_delay, repeat_rate)
 	if amount != 0.0 && IsKeyDown(key_less) && IsKeyDown(key_more) {
-		// Cancel when opposite directions are held, regardless of repeat phaseamount = 0.0
+		// Cancel when opposite directions are held, regardless of repeat phase
+		amount = 0.0
 	}
 	return amount
 }
@@ -19785,7 +19813,8 @@ NavUpdatePageUpPageDown :: proc() -> f32
 	home_pressed : bool = IsKeyPressed(ImGuiKey.ImGuiKey_Home, ImGuiInputFlags_.ImGuiInputFlags_Repeat, ImGuiKeyOwner_NoOwner)
 	end_pressed : bool = IsKeyPressed(ImGuiKey.ImGuiKey_End, ImGuiInputFlags_.ImGuiInputFlags_Repeat, ImGuiKeyOwner_NoOwner)
 	if page_up_held == page_down_held && home_pressed == end_pressed {
-		// Proceed if either (not both) are pressed, otherwise early outreturn 0.0
+		// Proceed if either (not both) are pressed, otherwise early out
+		return 0.0
 	}
 
 	if g.NavLayer != ImGuiNavLayer.ImGuiNavLayer_Main { NavRestoreLayer(ImGuiNavLayer.ImGuiNavLayer_Main) }
@@ -23216,7 +23245,8 @@ DockNodeUpdate :: proc(node : ^ImGuiDockNode)
 		IM_ASSERT(node.Windows.Size > 0)
 		ref_window : ^ImGuiWindow = nil
 		if node.SelectedTabId != 0 {
-			// Note that we prune single-window-node settings on .ini loading, so this is generally 0 for them!ref_window = DockNodeFindWindowByID(node, node.SelectedTabId)
+			// Note that we prune single-window-node settings on .ini loading, so this is generally 0 for them!
+			ref_window = DockNodeFindWindowByID(node, node.SelectedTabId)
 		}
 		if ref_window == nil { ref_window = node.Windows.Data[0] }
 		if ref_window.AutoFitFramesX > 0 || ref_window.AutoFitFramesY > 0 {
@@ -23577,7 +23607,8 @@ DockNodeUpdateTabBar :: proc(node : ^ImGuiDockNode, host_window : ^ImGuiWindow)
 	// Docking/Collapse button
 	if has_window_menu_button {
 		if CollapseButton(GetID(host_window, "#COLLAPSE"), window_menu_button_pos, node) {
-			// == DockNodeGetWindowMenuButtonId(node)OpenPopup("#WindowMenu")
+			// == DockNodeGetWindowMenuButtonId(node)
+			OpenPopup("#WindowMenu")
 		}
 		if IsItemActive() { focus_tab_id = tab_bar.SelectedTabId }
 		if IsItemHovered(ImGuiHoveredFlags_.ImGuiHoveredFlags_ForTooltip | ImGuiHoveredFlags_.ImGuiHoveredFlags_DelayNormal) && g.HoveredIdTimer > 0.5 { SetTooltip("%s", LocalizeGetMsg(ImGuiLocKey.ImGuiLocKey_DockingDragToUndockOrMoveNode)) }
@@ -23919,7 +23950,8 @@ DockNodePreviewDockSetup :: proc(host_window : ^ImGuiWindow, host_node : ^ImGuiD
 	else if (dst_node_flags & cast(ImGuiDockNodeFlags) ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_NoDockingOverMe) != {} { data.IsCenterAvailable = false }
 	else if host_node != nil && (dst_node_flags & ImGuiDockNodeFlags_.ImGuiDockNodeFlags_NoDockingOverCentralNode) != {} && IsCentralNode(host_node) { data.IsCenterAvailable = false }
 	else if (host_node == nil || !IsEmpty(host_node)) && payload_node != nil && IsSplitNode(payload_node) && (payload_node.OnlyNodeWithWindows == nil) {
-		// Is _visibly_ split?data.IsCenterAvailable = false
+		// Is _visibly_ split?
+		data.IsCenterAvailable = false
 	}
 	else if (src_node_flags & cast(ImGuiDockNodeFlags) ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_NoDockingOverOther) != {} && (host_node == nil || !IsEmpty(host_node)) { data.IsCenterAvailable = false }
 	else if (src_node_flags & cast(ImGuiDockNodeFlags) ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_NoDockingOverEmpty) != {} && host_node != nil && IsEmpty(host_node) { data.IsCenterAvailable = false }
@@ -25013,8 +25045,9 @@ GetWindowAlwaysWantOwnTabBar :: proc(window : ^ImGuiWindow) -> bool
 {
 	g : ^ImGuiContext = GImGui
 	if g.IO.ConfigDockingAlwaysTabBar || window.WindowClass.DockingAlwaysTabBar { if (window.Flags & (ImGuiWindowFlags_.ImGuiWindowFlags_ChildWindow | ImGuiWindowFlags_.ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_.ImGuiWindowFlags_NoDocking)) == {} { if !window.IsFallbackWindow {
-	// We don't support AlwaysTabBar on the fallback/implicit window to avoid unused dock-node overhead/noisereturn true
-} } }
+		// We don't support AlwaysTabBar on the fallback/implicit window to avoid unused dock-node overhead/noise
+		return true
+	} } }
 	return false
 }
 
@@ -25118,7 +25151,8 @@ BeginDocked :: proc(window : ^ImGuiWindow, p_open : ^bool)
 	if node.HostWindow == nil {
 		if node.State == ImGuiDockNodeState.ImGuiDockNodeState_HostWindowHiddenBecauseWindowsAreResizing { window.DockIsActive = true }
 		if node.Windows.Size > 1 && window.Appearing {
-			// Only hide appearing windowDockNodeHideWindowDuringHostWindowCreation(window)
+			// Only hide appearing window
+			DockNodeHideWindowDuringHostWindowCreation(window)
 		}
 		return
 	}
@@ -27315,7 +27349,8 @@ DebugHookIdInfo :: proc(id : ImGuiID, data_type : ImGuiDataType, data_id : rawpt
 
 		case cast(ImGuiDataType_) ImGuiDataTypePrivate_.ImGuiDataType_ID:
 			if info.Desc[0] != 0 {
-				// PushOverrideID() is often used to avoid hashing twice, which would lead to 2 calls to DebugHookIdInfo(). We prioritize the first one.return
+				// PushOverrideID() is often used to avoid hashing twice, which would lead to 2 calls to DebugHookIdInfo(). We prioritize the first one.
+				return
 			}
 			ImFormatString(info.Desc[:], "0x%08X [override]", id)
 			break
@@ -29485,7 +29520,8 @@ ImDrawListSplitter_Merge :: proc(this : ^ImDrawListSplitter, draw_list : ^ImDraw
 	for i : i32 = 1; i < this._Count; i += 1 {
 		ch : ^ImDrawChannel = &this._Channels.Data[i]
 		if ch._CmdBuffer.Size > 0 && back(&ch._CmdBuffer).ElemCount == 0 && back(&ch._CmdBuffer).UserCallback == nil {
-			// Equivalent of PopUnusedDrawCmd()pop_back(&ch._CmdBuffer)
+			// Equivalent of PopUnusedDrawCmd()
+			pop_back(&ch._CmdBuffer)
 		}
 
 		if ch._CmdBuffer.Size > 0 && last_cmd != nil {
@@ -30195,12 +30231,14 @@ ImFontBuildDstData :: struct {
 UnpackBitVectorToFlatIndexList :: proc(in_ : ^ImBitVector, out : ^ImVector(rune))
 {
 	IM_ASSERT(size_of(in_.Storage.Data[0]) == size_of(i32))
-	it_begin : ^ImU32 = begin(&in_.Storage)
-	it_end : ^ImU32 = end(&in_.Storage)
-	for it : ^ImU32 = it_begin; it < it_end; it = mem.ptr_offset(it, 1) {
-		if entries_32 : ImU32 = it^; entries_32 != 0 {
+	it_begin := begin(&in_.Storage)
+	it_end := end(&in_.Storage)
+	for it := it_begin; it < it_end; it = it[1:] {
+		if entries_32 := it[0]; entries_32 != 0 {
 			for bit_n : ImU32 = 0; bit_n < 32; bit_n += 1 {
-				if (entries_32 & (cast(ImU32) 1 << bit_n)) != 0 { push_back(out, cast(rune) (u32(mem.ptr_sub(it, it_begin) << 5) + bit_n)) }
+				if (entries_32 & (ImU32(1) << bit_n)) != 0 {
+					push_back(out, rune(u32(mem.ptr_sub(it, it_begin) << 5) + bit_n))
+				}
 			}
 		}
 	}
@@ -30275,10 +30313,12 @@ ImFontAtlasBuildWithStbTruetype :: proc(atlas : ^ImFontAtlas) -> bool
 		for src_range : [^]ImWchar = src_tmp.SrcRanges; src_range[0] != 0 && src_range[1] != 0; src_range = src_range[2:] {
 			for codepoint := src_range[0]; codepoint <= src_range[1]; codepoint += 1 {
 				if TestBit(&dst_tmp.GlyphsSet, cast(u32) codepoint) {
-					// Don't overwrite existing glyphs. We could make this an option for MergeMode (e.g. MergeOverwrite==true)continue
+					// Don't overwrite existing glyphs. We could make this an option for MergeMode (e.g. MergeOverwrite==true)
+					continue
 				}
 				if stbtt.FindGlyphIndex(&src_tmp.FontInfo, cast(rune)codepoint) == 0 {
-					// It is actually in the font?continue
+					// It is actually in the font?
+					continue
 				}
 
 				// Add to avail set/counters
@@ -31061,7 +31101,8 @@ ImFont_BuildLookupTable :: proc(this : ^ImFont)
 	// FIXME: Needs proper TAB handling but it needs to be contextualized (or we could arbitrary say that each string starts at "column 0" ?)
 	if ImFont_FindGlyph(this, cast(ImWchar) ' ') != nil {
 		if back(&this.Glyphs).Codepoint != '\t' {
-			// So we can call this function multiple times (FIXME: Flaky)resize(&this.Glyphs, this.Glyphs.Size + 1)
+			// So we can call this function multiple times (FIXME: Flaky)
+			resize(&this.Glyphs, this.Glyphs.Size + 1)
 		}
 		tab_glyph : ^ImFontGlyph = back(&this.Glyphs)
 		tab_glyph = ImFont_FindGlyph(this, cast(ImWchar) ' ')
@@ -31801,7 +31842,7 @@ RenderColorRectWithAlphaCheckerboard :: proc(draw_list : ^ImDrawList, p_min : Im
 
 stb_decompress_length :: proc(input : [^]u8) -> u32
 {
-	return u32(input[8] << 24) + u32(input[9] << 16) + u32(input[10] << 8) + u32(input[11])
+	return (u32(input[8]) << 24) + (u32(input[9]) << 16) + (u32(input[10]) << 8) + u32(input[11])
 }
 
 stb__barrier_out_e : [^]u8; stb__barrier_out_b : [^]u8
@@ -31845,17 +31886,17 @@ stb__in4 :: #force_inline proc "contextless" (i : [^]$T0, x : $T1) -> u32
 stb_decompress_token :: proc(i : [^]u8) -> [^]u8
 {
 	i := i
-	if i[0] >= 0x20 {// use fewer if's for cases that expand small
-		if i[0] >= 0x80 { stb__match(stb__dout[- i[1] - 1:], u32(i[0]) - 0x80 + 1); i = i[2:] }
-		else if i[0] >= 0x40 { stb__match(stb__dout[-(stb__in2(i, 0) - 0x4000 + 1):], u32(i[2]) + 1); i = i[3:] }
-		else { stb__lit(i[1:], u32(i[0]) - 0x20 + 1); i = i[1 + (i[0] - 0x20 + 1):] }
+	if i[0] >= 0x20 { // use fewer ifs for cases that expand small
+		if i[0] >= 0x80       { stb__match(stb__dout[-i32(i[1]) - 1:], u32(i[0] - 0x80 + 1)); i = i[2:] }
+		else if i[0] >= 0x40  { stb__match(stb__dout[-(stb__in2(i, 0) - 0x4000 + 1):], u32(i[2] + 1)); i = i[3:] }
+		else /* *i >= 0x20 */ { stb__lit(i[1:], u32(i[0] - 0x20 + 1)); i = i[1 + (i[0] - 0x20 + 1):] }
 	}
 	else {// more ifs for cases that expand large, since overhead is amortized
-		if i[0] >= 0x18 { stb__match(stb__dout[-(stb__in3(i, 0) - 0x180000 + 1):], u32(i[3]) + 1); i = i[4:] }
+		if i[0] >= 0x18      { stb__match(stb__dout[-(stb__in3(i, 0) - 0x180000 + 1):], u32(i[3] + 1)); i = i[4:] }
 		else if i[0] >= 0x10 { stb__match(stb__dout[-(stb__in3(i, 0) - 0x100000 + 1):], stb__in2(i, 3) + 1); i = i[5:] }
 		else if i[0] >= 0x08 { stb__lit(i[2:], stb__in2(i, 0) - 0x0800 + 1); i = i[2 + (stb__in2(i, 0) - 0x0800 + 1):] }
 		else if i[0] == 0x07 { stb__lit(i[3:], stb__in2(i, 1) + 1); i = i[3 + (stb__in2(i, 1) + 1):] }
-		else if i[0] == 0x06 { stb__match(stb__dout[-(stb__in3(i, 1) + 1):], u32(i[4]) + 1); i = i[5:] }
+		else if i[0] == 0x06 { stb__match(stb__dout[-(stb__in3(i, 1) + 1):], u32(i[4] + 1)); i = i[5:] }
 		else if i[0] == 0x04 { stb__match(stb__dout[-(stb__in3(i, 1) + 1):], stb__in2(i, 4) + 1); i = i[6:] }
 	}
 	return i
@@ -31863,12 +31904,14 @@ stb_decompress_token :: proc(i : [^]u8) -> [^]u8
 
 stb_adler32 :: proc(adler32 : u32, buffer : [^]u8, buflen : u32) -> u32
 {
-	ADLER_MOD : u32 = 65521
+	buflen, buffer := buflen, buffer
+
+	ADLER_MOD :: 65521
 	s1 : u32 = adler32 & 0xffff; s2 : u32 = adler32 >> 16
 	blocklen : u32 = buflen % 5552
 
 	i : u32
-	for buflen, buffer := buflen, buffer; buflen != 0; {
+	for buflen != 0 {
 		for i = 0; i + 7 < blocklen; i += 8 {
 			s1 += u32(buffer[0]); s2 += s1
 			s1 += u32(buffer[1]); s2 += s1
@@ -33390,7 +33433,8 @@ NewLine :: proc()
 	window.DC.LayoutType = ImGuiLayoutType_.ImGuiLayoutType_Vertical
 	window.DC.IsSameLine = false
 	if window.DC.CurrLineSize.y > 0.0 {
-		// In the event that we are on a line with items that is smaller that FontSize high, we will preserve its height.ItemSize(ImVec2{0, 0})
+		// In the event that we are on a line with items that is smaller that FontSize high, we will preserve its height.
+		ItemSize(ImVec2{0, 0})
 	}
 	else { ItemSize(ImVec2{0.0, g.FontSize}) }
 	window.DC.LayoutType = backup_layout_type
@@ -33739,7 +33783,8 @@ BeginComboPopup :: proc(popup_id : ImGuiID, bb : ImRect, flags : ImGuiComboFlags
 		else if (flags & ImGuiComboFlags_.ImGuiComboFlags_HeightLarge) != {} { popup_max_height_in_items = 20 }
 		constraint_min := ImVec2{ 0.0, 0.0}; constraint_max := ImVec2{ FLT_MAX, FLT_MAX }
 		if (g.NextWindowData.Flags & ImGuiNextWindowDataFlags_.ImGuiNextWindowDataFlags_HasSize) == {} || g.NextWindowData.SizeVal.x <= 0.0 {
-			// Don't apply constraints if user specified a sizeconstraint_min.x = w
+			// Don't apply constraints if user specified a size
+			constraint_min.x = w
 		}
 		if (g.NextWindowData.Flags & ImGuiNextWindowDataFlags_.ImGuiNextWindowDataFlags_HasSize) == {} || g.NextWindowData.SizeVal.y <= 0.0 { constraint_max.y = CalcMaxPopupHeightFromItemCount(popup_max_height_in_items) }
 		SetNextWindowSizeConstraints(constraint_min, constraint_max)
@@ -34678,7 +34723,8 @@ ScaleValueFromRatioT :: proc($TYPE : typeid, $SIGNEDTYPE : typeid, $FLOATTYPE : 
 			else { result = cast(TYPE) (cast(FLOATTYPE)logarithmic_zero_epsilon * ImPow(v_max_fudged / cast(FLOATTYPE)logarithmic_zero_epsilon, cast(FLOATTYPE) ((t_with_flip - zero_point_snap_R) / (1.0 - zero_point_snap_R)))) }
 		}
 		else if (v_min < 0.0) || (v_max < 0.0) {
-			// Entirely negative sliderresult = cast(TYPE) -(-v_max_fudged * ImPow(-v_min_fudged / -v_max_fudged, cast(FLOATTYPE) (1.0 - t_with_flip)))
+			// Entirely negative slider
+			result = cast(TYPE) -(-v_max_fudged * ImPow(-v_min_fudged / -v_max_fudged, cast(FLOATTYPE) (1.0 - t_with_flip)))
 		}
 		else { result = cast(TYPE) (v_min_fudged * ImPow(v_max_fudged / v_min_fudged, cast(FLOATTYPE) t_with_flip)) }
 	}
@@ -35576,7 +35622,8 @@ InputTextCalcTextSize :: proc(ctx : ^ImGuiContext, text_begin : [^]u8, text_end 
 	}
 
 	if line_width > 0 || text_size.y == 0.0 {
-		// whereas size.y will ignore the trailing \ntext_size.y += line_height
+		// whereas size.y will ignore the trailing \n
+		text_size.y += line_height
 	}
 
 	if remaining != nil { remaining^ = s }
@@ -37667,7 +37714,8 @@ InputTextEx :: proc(label : string, hint : string, buf : []u8, size_arg : ImVec2
 
 	// Release focus when we click outside
 	if g.ActiveId == id && io.MouseClicked[0] && !init_state && !init_make_active {
-		//-V560clear_active_id = true
+		//-V560
+		clear_active_id = true
 	}
 
 	// Lock the decision of whether we are going to take the path displaying the cursor or selection
@@ -37777,13 +37825,14 @@ InputTextEx :: proc(label : string, hint : string, buf : []u8, size_arg : ImVec2
 		ignore_char_inputs : bool = (io.KeyCtrl && !io.KeyAlt) || (is_osx && io.KeyCtrl)
 		if io.InputQueueCharacters.Size > 0 {
 			if !ignore_char_inputs && !is_readonly && !input_requested_by_nav { for n : i32 = 0; n < io.InputQueueCharacters.Size; n += 1 {
-	// Insert character if they pass filtering
-	c : u32 = cast(u32) io.InputQueueCharacters.Data[n]
-	if c == '\t' {
-		// Skip Tab, see above.continue
-	}
-	if InputTextFilterCharacter(g, &c, flags, callback, callback_user_data) { OnCharPressed(state, c) }
-} }
+				// Insert character if they pass filtering
+				c : u32 = cast(u32) io.InputQueueCharacters.Data[n]
+				if c == '\t' {
+					// Skip Tab, see above.
+					continue
+				}
+				if InputTextFilterCharacter(g, &c, flags, callback, callback_user_data) { OnCharPressed(state, c) }
+			} }
 
 			// Consume characters
 			resize(&io.InputQueueCharacters, 0)
@@ -38361,7 +38410,7 @@ DebugNodeInputTextState :: proc(state : ^ImGuiInputTextState)
 // - ColorPickerOptionsPopup() [Internal]
 //-------------------------------------------------------------------------
 
-ColorEdit3 :: proc(label : string, col : ^[3]f32, flags : ImGuiColorEditFlags) -> bool
+ColorEdit3 :: proc(label : string, col : ^[3]f32, flags : ImGuiColorEditFlags = {}) -> bool
 {
 	return ColorEdit4(label, cast(^[4]f32) col, flags | ImGuiColorEditFlags_.ImGuiColorEditFlags_NoAlpha)
 }
@@ -39714,12 +39763,14 @@ Selectable_0 :: proc(label : string, selected : bool = false, flags : ImGuiSelec
 
 	is_multi_select : bool = (g.LastItemData.ItemFlags & cast(ImGuiItemFlags) ImGuiItemFlagsPrivate_.ImGuiItemFlags_IsMultiSelect) != {}
 	if !is_visible { if !is_multi_select || !g.BoxSelectState.UnclipMode || !Overlaps(g.BoxSelectState.UnclipRect, bb) {
-	// Extra layer of "no logic clip" for box-select support (would be more overhead to add to ItemAdd)return false
+	// Extra layer of "no logic clip" for box-select support (would be more overhead to add to ItemAdd)
+	return false
 } }
 
 	disabled_global : bool = (g.CurrentItemFlags & cast(ImGuiItemFlags) ImGuiItemFlagsPrivate_.ImGuiItemFlags_Disabled) != {}
 	if disabled_item && !disabled_global {
-		// Only testing this as an optimizationBeginDisabled()
+		// Only testing this as an optimization
+		BeginDisabled()
 	}
 
 	// FIXME: We can standardize the behavior of those two, we could also keep the fast path of override ClipRect + full push on render only,
@@ -39943,7 +39994,8 @@ ImStrimatchlen :: proc(s1 : [^]u8, s1_end : ^u8, s2 : [^]u8) -> i32
 TypingSelectFindMatch :: proc(req : ^ImGuiTypingSelectRequest, items_count : i32, get_item_name_func : proc(_ : rawptr, _ : i32) -> string, user_data : rawptr, nav_item_idx : i32) -> i32
 {
 	if req == nil || req.SelectRequest == false {
-		// Support NULL parameter so both calls can be done from same spot.return -1
+		// Support NULL parameter so both calls can be done from same spot.
+		return -1
 	}
 	idx : i32 = -1
 	if req.SingleCharMode && (req.Flags & ImGuiTypingSelectFlags_.ImGuiTypingSelectFlags_AllowSingleCharMode) != {} { idx = TypingSelectFindNextSingleCharMatch(req, items_count, get_item_name_func, user_data, nav_item_idx) }
@@ -39973,7 +40025,8 @@ TypingSelectFindNextSingleCharMatch :: proc(req : ^ImGuiTypingSelectRequest, ite
 			return idx
 		}
 		if first_match_idx == -1 {
-			// Record first match for wrapping.first_match_idx = idx
+			// Record first match for wrapping.
+			first_match_idx = idx
 		}
 		if nav_item_idx == idx {
 			// Record that we encountering nav_item so we can return next match.
@@ -41009,7 +41062,8 @@ PlotEx :: proc(plot_type : ImGuiPlotType, label : string, values_getter : proc(d
 		for i : i32 = 0; i < values_count; i += 1 {
 			v : f32 = values_getter(data, i)
 			if v != v {
-				// Ignore NaN valuescontinue
+				// Ignore NaN values
+				continue
 			}
 			v_min = ImMin(v_min, v)
 			v_max = ImMax(v_max, v)
@@ -45312,7 +45366,8 @@ TableDrawBorders :: proc(table : ^ImGuiTable)
 			// Decide whether right-most column is visible
 			if column.NextEnabledColumn == -1 && !is_resizable { if (table.Flags & ImGuiTableFlags_.ImGuiTableFlags_SizingMask_) != ImGuiTableFlags_.ImGuiTableFlags_SizingFixedSame || (table.Flags & ImGuiTableFlags_.ImGuiTableFlags_NoHostExtendX) != {} { continue } }
 			if column.MaxX <= column.ClipRect.Min.x {
-				// FIXME-TABLE FIXME-STYLE: Assume BorderSize==1, this is problematic if we want to increase the border size..continue
+				// FIXME-TABLE FIXME-STYLE: Assume BorderSize==1, this is problematic if we want to increase the border size..
+				continue
 			}
 
 			// Draw in outer window so right-most column won't be clipped
@@ -45895,11 +45950,14 @@ TableOpenContextMenu :: proc(column_n : i32)
 {
 	g : ^ImGuiContext = GImGui
 	table : ^ImGuiTable = g.CurrentTable
+	column_n := column_n
 	if column_n == -1 && table.CurrentColumn != -1 {
-		// When called within a column automatically use this one (for consistency)column_n = table.CurrentColumn
+		// When called within a column automatically use this one (for consistency)
+		column_n = table.CurrentColumn
 	}
 	if column_n == table.ColumnsCount {
-		// To facilitate using with TableGetHoveredColumn()column_n = -1
+		// To facilitate using with TableGetHoveredColumn()
+		column_n = -1
 	}
 	IM_ASSERT(column_n >= -1 && column_n < table.ColumnsCount)
 	if (table.Flags & (ImGuiTableFlags_.ImGuiTableFlags_Resizable | ImGuiTableFlags_.ImGuiTableFlags_Reorderable | ImGuiTableFlags_.ImGuiTableFlags_Hideable)) != {} {

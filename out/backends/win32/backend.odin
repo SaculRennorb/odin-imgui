@@ -2479,6 +2479,11 @@ ImGuiIO :: struct {
 	InputQueueCharacters : ImVector(ImWchar), // Queue of _characters_ input (obtained by platform backend). Fill using AddInputCharacter() helper.
 }
 
+ImGuiIO_deinit :: proc(this : ^ImGuiIO)
+{
+	deinit(&this.InputQueueCharacters)
+}
+
 // Shared state of InputText() when using custom ImGuiInputTextCallback (rare/advanced use)
 //-----------------------------------------------------------------------------
 // [SECTION] Misc data structures (ImGuiInputTextCallbackData, ImGuiSizeCallbackData, ImGuiPayload)
@@ -2532,6 +2537,13 @@ ImGuiSizeCallbackData :: struct {
 	Pos : ImVec2, // Read-only.   Window position, for reference.
 	CurrentSize : ImVec2, // Read-only.   Current window size.
 	DesiredSize : ImVec2, // Read-write.  Desired size, based on user's mouse position. Write to this field to restrain resizing.
+}
+
+ImGuiSizeCallbackData_init :: proc(this : ^ImGuiSizeCallbackData)
+{
+	init(&this.Pos)
+	init(&this.CurrentSize)
+	init(&this.DesiredSize)
 }
 
 // Window class (rare/advanced uses: provide hints to the platform backend via altered viewport flags and parent/child info)
@@ -2617,6 +2629,11 @@ ImGuiTextFilter :: struct {
 	CountGrep : i32,
 }
 
+ImGuiTextFilter_deinit :: proc(this : ^ImGuiTextFilter)
+{
+	deinit(&this.Filters)
+}
+
 ImGuiTextFilter_Clear :: proc(this : ^ImGuiTextFilter)
 {
 	this.InputBuf[0] = 0; ImGuiTextFilter_Build(this)
@@ -2649,7 +2666,12 @@ ImGuiTextBuffer :: struct {
 
 ImGuiTextBuffer_EmptyString : [1]u8
 
-ImGuiTextBuffer_init :: proc(this : ^ImGuiTextBuffer) { }
+ImGuiTextBuffer_deinit :: proc(this : ^ImGuiTextBuffer)
+{
+	deinit(&this.Buf)
+}
+
+ImGuiTextBuffer_init :: proc(this : ^ImGuiTextBuffer) { init(&this.Buf) }
 
 ImGuiTextBuffer_begin :: proc(this : ^ImGuiTextBuffer) -> ^u8 { return this.Buf.Data != nil ? &front(&this.Buf) : EmptyString }
 
@@ -2702,10 +2724,17 @@ ImGuiStorage :: struct {
 	Data : ImVector(ImGuiStoragePair),
 }
 
+ImGuiStorage_deinit :: proc(this : ^ImGuiStorage)
+{
+	deinit(&this.Data)
+}
+
 // - Get***() functions find pair, never add/allocate. Pairs are sorted so a query is O(log N)
 // - Set***() functions find pair, insertion on demand if missing.
 // - Sorted insertion is costly, paid once. A typical frame shouldn't need to insert any new pair.
 ImGuiStorage_Clear :: proc(this : ^ImGuiStorage) { clear(&this.Data) }
+
+ImGuiStorage_init :: proc(this : ^ImGuiStorage) { init(&this.Data) }
 
 // Helper to manually clip large list of items
 // Helper: Manually clip large list of items.
@@ -2791,27 +2820,15 @@ ImColor :: struct {
 	// FIXME-OBSOLETE: May need to obsolete/cleanup those helpers.
 }
 
-ImColor_init_0 :: proc(this : ^ImColor) { }
+ImColor_init_0 :: proc(this : ^ImColor) { init(&this.Value) }
 
-ImColor_init_1 :: proc(this : ^ImColor, r : f32, g : f32, b : f32, a : f32 = 1.0)
-{
-	init(&this.Value, r, g, b, a)
-}
+ImColor_init_1 :: proc(this : ^ImColor, r : f32, g : f32, b : f32, a : f32 = 1.0) { init(&this.Value, r, g, b, a) }
 
-ImColor_init_2 :: proc(this : ^ImColor, col : ^ImVec4)
-{
-	init(&this.Value, col)
-}
+ImColor_init_2 :: proc(this : ^ImColor, col : ^ImVec4) { init(&this.Value, col) }
 
-ImColor_init_3 :: proc(this : ^ImColor, r : i32, g : i32, b : i32, a : i32 = 255)
-{
-	init(&this.Value, cast(f32) r * (1.0 / 255.0), cast(f32) g * (1.0 / 255.0), cast(f32) b * (1.0 / 255.0), cast(f32) a * (1.0 / 255.0))
-}
+ImColor_init_3 :: proc(this : ^ImColor, r : i32, g : i32, b : i32, a : i32 = 255) { init(&this.Value, cast(f32) r * (1.0 / 255.0), cast(f32) g * (1.0 / 255.0), cast(f32) b * (1.0 / 255.0), cast(f32) a * (1.0 / 255.0)) }
 
-ImColor_init_4 :: proc(this : ^ImColor, rgba : ImU32)
-{
-	init(&this.Value, cast(f32) ((rgba >> IM_COL32_R_SHIFT) & 0xFF) * (1.0 / 255.0), cast(f32) ((rgba >> IM_COL32_G_SHIFT) & 0xFF) * (1.0 / 255.0), cast(f32) ((rgba >> IM_COL32_B_SHIFT) & 0xFF) * (1.0 / 255.0), cast(f32) ((rgba >> IM_COL32_A_SHIFT) & 0xFF) * (1.0 / 255.0))
-}
+ImColor_init_4 :: proc(this : ^ImColor, rgba : ImU32) { init(&this.Value, cast(f32) ((rgba >> IM_COL32_R_SHIFT) & 0xFF) * (1.0 / 255.0), cast(f32) ((rgba >> IM_COL32_G_SHIFT) & 0xFF) * (1.0 / 255.0), cast(f32) ((rgba >> IM_COL32_B_SHIFT) & 0xFF) * (1.0 / 255.0), cast(f32) ((rgba >> IM_COL32_A_SHIFT) & 0xFF) * (1.0 / 255.0)) }
 
 ImColor_SetHSV :: #force_inline proc(this : ^ImColor, h : f32, s : f32, v : f32, a : f32 = 1.0)
 {
@@ -2901,6 +2918,13 @@ ImGuiMultiSelectIO :: struct {
 	ItemsCount : i32, //  ms:w, app:r     /        app:r   // 'int items_count' parameter to BeginMultiSelect() is copied here for convenience, allowing simpler calls to your ApplyRequests handler. Not used internally.
 }
 
+ImGuiMultiSelectIO_deinit :: proc(this : ^ImGuiMultiSelectIO)
+{
+	deinit(&this.Requests)
+}
+
+ImGuiMultiSelectIO_init :: proc(this : ^ImGuiMultiSelectIO) { init(&this.Requests) }
+
 // Selection request type
 ImGuiSelectionRequestType :: enum i32 {
 	ImGuiSelectionRequestType_None = 0,
@@ -2944,6 +2968,11 @@ ImGuiSelectionBasicStorage :: struct {
 	AdapterIndexToStorageId : proc(self : ^ImGuiSelectionBasicStorage, idx : i32) -> ImGuiID, // e.g. selection.AdapterIndexToStorageId = [](ImGuiSelectionBasicStorage* self, int idx) { return ((MyItems**)self->UserData)[idx]->ID; };
 	_SelectionOrder : i32, // [Internal] Increasing counter to store selection order
 	_Storage : ImGuiStorage, // [Internal] Selection set. Think of this as similar to e.g. std::set<ImGuiID>. Prefer not accessing directly: iterate with GetNextSelectedItem().
+}
+
+ImGuiSelectionBasicStorage_deinit :: proc(this : ^ImGuiSelectionBasicStorage)
+{
+	deinit(&this._Storage)
 }
 
 // Convert index to item id based on provided adapter.
@@ -3004,7 +3033,10 @@ ImDrawCmd :: struct {
 }
 
 // Also ensure our padding fields are zeroed
-ImDrawCmd_init :: proc(this : ^ImDrawCmd) { memset(this, 0, size_of(this^)) }
+ImDrawCmd_init :: proc(this : ^ImDrawCmd)
+{
+	init(&this.ClipRect)memset(this, 0, size_of(this^))
+}
 
 // Since 1.83: returns ImTextureID associated with this draw call. Warning: DO NOT assume this is always same as 'TextureId' (we will change this function for an upcoming feature)
 ImDrawCmd_GetTexID :: #force_inline proc(this : ^ImDrawCmd) -> ImTextureID { return this.TextureId }
@@ -3016,6 +3048,12 @@ ImDrawVert :: struct {
 	pos : ImVec2,
 	uv : ImVec2,
 	col : ImU32,
+}
+
+ImDrawVert_init :: proc(this : ^ImDrawVert)
+{
+	init(&this.pos)
+	init(&this.uv)
 }
 } else { // preproc else
 // You can override the vertex format layout by defining IMGUI_OVERRIDE_DRAWVERT_STRUCT_LAYOUT in imconfig.h
@@ -3032,12 +3070,26 @@ ImDrawCmdHeader :: struct {
 	VtxOffset : u32,
 }
 
+ImDrawCmdHeader_init :: proc(this : ^ImDrawCmdHeader) { init(&this.ClipRect) }
+
 // Forward declarations
 // Temporary storage to output draw commands out of order, used by ImDrawListSplitter and ImDrawList::ChannelsSplit()
 // [Internal] For use by ImDrawListSplitter
 ImDrawChannel :: struct {
 	_CmdBuffer : ImVector(ImDrawCmd),
 	_IdxBuffer : ImVector(ImDrawIdx),
+}
+
+ImDrawChannel_deinit :: proc(this : ^ImDrawChannel)
+{
+	deinit(&this._CmdBuffer)
+	deinit(&this._IdxBuffer)
+}
+
+ImDrawChannel_init :: proc(this : ^ImDrawChannel)
+{
+	init(&this._CmdBuffer)
+	init(&this._IdxBuffer)
 }
 
 
@@ -3051,9 +3103,14 @@ ImDrawListSplitter :: struct {
 }
 
 ImDrawListSplitter_deinit :: proc(this : ^ImDrawListSplitter)
-{ClearFreeMemory()}
+{
+	deinit(&this._Channels)
+ClearFreeMemory()}
 
-ImDrawListSplitter_init :: #force_inline proc(this : ^ImDrawListSplitter) { memset(this, 0, size_of(this^)) }
+ImDrawListSplitter_init :: #force_inline proc(this : ^ImDrawListSplitter)
+{
+	init(&this._Channels)memset(this, 0, size_of(this^))
+}
 
 // Do not clear Channels[] so our allocations are reused next frame
 ImDrawListSplitter_Clear :: #force_inline proc(this : ^ImDrawListSplitter)
@@ -3120,6 +3177,18 @@ ImDrawList :: struct {
 	_CallbacksDataBuf : ImVector(ImU8), // [Internal]
 	_FringeScale : f32, // [Internal] anti-alias fringe is scaled by this value, this helps to keep things sharp while zooming at vertex buffer content
 	_OwnerName : ^u8, // Pointer to owner window's name for debugging
+}
+
+ImDrawList_deinit :: proc(this : ^ImDrawList)
+{
+	deinit(&this.CmdBuffer)
+	deinit(&this.IdxBuffer)
+	deinit(&this.VtxBuffer)
+	deinit(&this._Path)
+	deinit(&this._Splitter)
+	deinit(&this._ClipRectStack)
+	deinit(&this._TextureIdStack)
+	deinit(&this._CallbacksDataBuf)
 }
 
 ImDrawList_GetClipRectMin :: #force_inline proc(this : ^ImDrawList) -> ImVec2
@@ -3200,8 +3269,19 @@ ImDrawData :: struct {
 	OwnerViewport : ^ImGuiViewport, // Viewport carrying the ImDrawData instance, might be of use to the renderer (generally not).
 }
 
+ImDrawData_deinit :: proc(this : ^ImDrawData)
+{
+	deinit(&this.CmdLists)
+}
+
 // Functions
-ImDrawData_init :: proc(this : ^ImDrawData) { Clear() }
+ImDrawData_init :: proc(this : ^ImDrawData)
+{
+	init(&this.CmdLists)
+	init(&this.DisplayPos)
+	init(&this.DisplaySize)
+	init(&this.FramebufferScale)Clear()
+}
 
 // Configuration data when adding a font or merging fonts
 //-----------------------------------------------------------------------------
@@ -3254,7 +3334,15 @@ ImFontGlyphRangesBuilder :: struct {
 	UsedChars : ImVector(ImU32), // Store 1-bit per Unicode code point (0=unused, 1=used)
 }
 
-ImFontGlyphRangesBuilder_init :: proc(this : ^ImFontGlyphRangesBuilder) { Clear() }
+ImFontGlyphRangesBuilder_deinit :: proc(this : ^ImFontGlyphRangesBuilder)
+{
+	deinit(&this.UsedChars)
+}
+
+ImFontGlyphRangesBuilder_init :: proc(this : ^ImFontGlyphRangesBuilder)
+{
+	init(&this.UsedChars)Clear()
+}
 
 ImFontGlyphRangesBuilder_Clear :: #force_inline proc(this : ^ImFontGlyphRangesBuilder)
 {
@@ -3293,7 +3381,7 @@ ImFontAtlasCustomRect :: struct {
 
 ImFontAtlasCustomRect_init :: proc(this : ^ImFontAtlasCustomRect)
 {
-	this.Y = 0xFFFF; this.X = this.Y; this.Height = 0; this.Width = this.Height; this.GlyphID = 0; this.GlyphColored = 0; this.GlyphAdvanceX = 0.0; this.GlyphOffset = ImVec2(0, 0); this.Font = nil
+	init(&this.GlyphOffset)this.Y = 0xFFFF; this.X = this.Y; this.Height = 0; this.Width = this.Height; this.GlyphID = 0; this.GlyphColored = 0; this.GlyphAdvanceX = 0.0; this.GlyphOffset = ImVec2(0, 0); this.Font = nil
 }
 
 ImFontAtlasCustomRect_IsPacked :: proc(this : ^ImFontAtlasCustomRect) -> bool { return this.X != 0xFFFF }
@@ -3364,6 +3452,13 @@ ImFontAtlas :: struct {
 	//typedef ImFontGlyphRangesBuilder GlyphRangesBuilder; // OBSOLETED in 1.67+
 }
 
+ImFontAtlas_deinit :: proc(this : ^ImFontAtlas)
+{
+	deinit(&this.Fonts)
+	deinit(&this.CustomRects)
+	deinit(&this.ConfigData)
+}
+
 // Bit ambiguous: used to detect when user didn't build texture but effectively we should check TexID != 0 except that would be backend dependent...
 ImFontAtlas_IsBuilt :: proc(this : ^ImFontAtlas) -> bool { return this.Fonts.Size > 0 && this.TexReady }
 
@@ -3403,6 +3498,13 @@ ImFont :: struct {
 	Ascent : f32, Descent : f32, // 4+4   // out //            // Ascent: distance from top to bottom of e.g. 'A' [0..FontSize] (unscaled)
 	MetricsTotalSurface : i32, // 4     // out //            // Total surface in pixels to get an idea of the font rasterization/texture cost (not exact, we approximate the cost of padding between glyphs)
 	Used4kPagesMap : [(IM_UNICODE_CODEPOINT_MAX + 1) / 4096 / 8]ImU8, // 2 bytes if ImWchar=ImWchar16, 34 bytes if ImWchar==ImWchar32. Store 1-bit for each block of 4K codepoints that has one active glyph. This is mainly used to facilitate iterations across all used codepoints.
+}
+
+ImFont_deinit :: proc(this : ^ImFont)
+{
+	deinit(&this.IndexAdvanceX)
+	deinit(&this.IndexLookup)
+	deinit(&this.Glyphs)
 }
 
 ImFont_GetCharAdvance :: proc(this : ^ImFont, c : ImWchar) -> f32 { return (cast(i32) c < this.IndexAdvanceX.Size) ? this.IndexAdvanceX[cast(i32) c] : this.FallbackAdvanceX }
@@ -3473,7 +3575,13 @@ ImGuiViewport :: struct {
 ImGuiViewport_deinit :: proc(this : ^ImGuiViewport)
 {IM_ASSERT(this.PlatformUserData == nil && this.RendererUserData == nil)}
 
-ImGuiViewport_init :: proc(this : ^ImGuiViewport) { memset(this, 0, size_of(this^)) }
+ImGuiViewport_init :: proc(this : ^ImGuiViewport)
+{
+	init(&this.Pos)
+	init(&this.Size)
+	init(&this.WorkPos)
+	init(&this.WorkSize)memset(this, 0, size_of(this^))
+}
 
 // Helpers
 ImGuiViewport_GetCenter :: proc(this : ^ImGuiViewport) -> ImVec2 { return ImVec2(this.Pos.x + this.Size.x * 0.5, this.Pos.y + this.Size.y * 0.5) }
@@ -3623,6 +3731,12 @@ ImGuiPlatformIO :: struct {
 	Viewports : ImVector(^ImGuiViewport), // Main viewports, followed by all secondary viewports.
 }
 
+ImGuiPlatformIO_deinit :: proc(this : ^ImGuiPlatformIO)
+{
+	deinit(&this.Monitors)
+	deinit(&this.Viewports)
+}
+
 // Multi-viewport support: user-provided bounds for each connected monitor/display. Used when positioning popups and tooltips to avoid them straddling monitors
 // (Optional) This is required when enabling multi-viewport. Represent the bounds of each connected monitor/display and their DPI.
 // We use this information for multiple DPI support + clamping the position of popups and tooltips so they don't straddle multiple monitors.
@@ -3635,7 +3749,10 @@ ImGuiPlatformMonitor :: struct {
 
 ImGuiPlatformMonitor_init :: proc(this : ^ImGuiPlatformMonitor)
 {
-	this.WorkSize = ImVec2(0, 0); this.WorkPos = this.WorkSize; this.MainSize = this.WorkPos; this.MainPos = this.MainSize; this.DpiScale = 1.0; this.PlatformHandle = nil
+	init(&this.MainPos)
+	init(&this.MainSize)
+	init(&this.WorkPos)
+	init(&this.WorkSize)this.WorkSize = ImVec2(0, 0); this.WorkPos = this.WorkSize; this.MainSize = this.WorkPos; this.MainPos = this.MainSize; this.DpiScale = 1.0; this.PlatformHandle = nil
 }
 
 // Platform IME data for io.PlatformSetImeDataFn() function.
@@ -3646,7 +3763,10 @@ ImGuiPlatformImeData :: struct {
 	InputLineHeight : f32, // Line height
 }
 
-ImGuiPlatformImeData_init :: proc(this : ^ImGuiPlatformImeData) { memset(this, 0, size_of(this^)) }
+ImGuiPlatformImeData_init :: proc(this : ^ImGuiPlatformImeData)
+{
+	init(&this.InputPos)memset(this, 0, size_of(this^))
+}
 
 //-----------------------------------------------------------------------------
 // [SECTION] Obsolete functions and types

@@ -10,7 +10,4 @@ B1042 :: struct {
 	a : A1042,
 }
 
-B1042_init :: proc(this : ^B1042)
-{
-	init(&this.a, 1, 2)
-}
+B1042_init :: proc(this : ^B1042) { init(&this.a, 1, 2) }

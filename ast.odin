@@ -7,6 +7,7 @@ import "core:log"
 import "base:intrinsics"
 import "base:runtime"
 import str "core:strings"
+import "ordered_map"
 
 AstContext :: struct {
 	ast: ^[dynamic]AstNode,
@@ -1016,19 +1017,19 @@ ast_parse_function_def_no_return_type_and_name :: proc(ctx: ^AstContext, tokens 
 			t, sss = peek_token(tokens)
 			#partial switch t.kind {
 				case .Identifier:
-					node := ast_parse_function_call(ctx, tokens) or_return
-					
-					initialized_member := node.function_call.expression
+					initializer := ast_parse_function_call(ctx, tokens) or_return
 
-					node.function_call.expression = append_simple_identifier(ctx, Token{ kind = .Identifier, source = "init" })
+					initialized_member := initializer.function_call.expression
+
+					initializer.function_call.expression = append_simple_identifier(ctx, Token{ kind = .Identifier, source = "init" })
 
 					call := AstNode{ kind = .MemberAccess, member_access = {
 						expression = initialized_member,
-						member = ast_append_node(ctx, node)
+						member = ast_append_node(ctx, initializer)
 					}}
 
-					append(&body_sequence, ast_append_node(ctx, AstNode{ kind = .NewLine }))
-					append(&body_sequence, ast_append_node(ctx, call))
+					// these always take priority
+					ordered_map.insert(&node.function_def.initializers, ctx.ast[initialized_member].identifier.token.source, ast_append_node(ctx, call))
 
 				case .Comma:
 					tokens^ = sss
@@ -1650,6 +1651,7 @@ ast_parse_scoped_sequence_no_open_brace :: proc(ctx: ^AstContext, tokens : ^[]To
 			case .FunctionDefinition:
 				if parent_node != nil {
 					if .IsCtor in member.function_def.flags {
+						parent_node.structure.flags |= { .HasNontrivialCtor }
 						append(sequence, member_index)
 					}
 					else if .IsDtor in member.function_def.flags {
@@ -1663,7 +1665,7 @@ ast_parse_scoped_sequence_no_open_brace :: proc(ctx: ^AstContext, tokens : ^[]To
 
 			case .VariableDeclaration:
 				if parent_node != nil && member.var_declaration.initializer_expression != {} {
-					parent_node.structure.flags |= { .HasImplicitCtor }
+					parent_node.structure.flags |= { .HasNontrivialCtor, .HasImplicitCtor }
 				}
 
 				when F == type_of(ast_parse_enum_value_declaration) {
@@ -3126,6 +3128,7 @@ AstNode :: struct {
 			body_sequence : [dynamic]AstNodeIndex,
 			attached_comments : [dynamic]AstNodeIndex,
 			template_spec : [dynamic]AstNodeIndex,
+			initializers :  ordered_map.Map(string, AstNodeIndex),
 			flags : AstFunctionDefFlags,
 			declared_names : map[string]AstNodeIndex,
 			parent_scope : AstNodeIndex,
@@ -3239,7 +3242,9 @@ AstFunctionDefFlags :: bit_set[enum{
 
 AstStructureFlags :: bit_set[enum {
 	IsForwardDeclared,
+	HasNontrivialCtor,
 	HasImplicitCtor,
+	HasImplicitDtor,
 }]
 
 
@@ -3263,7 +3268,12 @@ fmt_astindex :: proc(fi: ^fmt.Info, idx: ^AstNodeIndex, verb: rune) -> bool
 		return true
 	}
 	
-	io.write_string(fi.writer, fmt.tprintf("NodeIndex %v -> ", transmute(int) idx^))
+	if idx^ < 0 || int(idx^) >= len(current_ast) {
+		fmt.wprintf(fi.writer, "OOB %v", int(idx^))
+		return true
+	}
+	
+	fmt.wprintf(fi.writer, "NodeIndex %v -> ", int(idx^))
 
 	if _, _, not_yet_shown, _ := map_entry(&displayed_nodes, idx^); not_yet_shown {
 		fmt.fmt_arg(fi, current_ast[idx^], verb)

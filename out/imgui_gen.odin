@@ -3478,6 +3478,11 @@ ImGuiIO :: struct {
 	InputQueueCharacters : ImVector(ImWchar), // Queue of _characters_ input (obtained by platform backend). Fill using AddInputCharacter() helper.
 }
 
+ImGuiIO_deinit :: proc(this : ^ImGuiIO)
+{
+	deinit(&this.InputQueueCharacters)
+}
+
 // Shared state of InputText() when using custom ImGuiInputTextCallback (rare/advanced use)
 //-----------------------------------------------------------------------------
 // [SECTION] Misc data structures (ImGuiInputTextCallbackData, ImGuiSizeCallbackData, ImGuiPayload)
@@ -3531,6 +3536,13 @@ ImGuiSizeCallbackData :: struct {
 	Pos : ImVec2, // Read-only.   Window position, for reference.
 	CurrentSize : ImVec2, // Read-only.   Current window size.
 	DesiredSize : ImVec2, // Read-write.  Desired size, based on user's mouse position. Write to this field to restrain resizing.
+}
+
+ImGuiSizeCallbackData_init :: proc(this : ^ImGuiSizeCallbackData)
+{
+	init(&this.Pos)
+	init(&this.CurrentSize)
+	init(&this.DesiredSize)
 }
 
 // Window class (rare/advanced uses: provide hints to the platform backend via altered viewport flags and parent/child info)
@@ -3616,6 +3628,11 @@ ImGuiTextFilter :: struct {
 	CountGrep : i32,
 }
 
+ImGuiTextFilter_deinit :: proc(this : ^ImGuiTextFilter)
+{
+	deinit(&this.Filters)
+}
+
 ImGuiTextFilter_Clear :: proc(this : ^ImGuiTextFilter)
 {
 	this.InputBuf[0] = 0; ImGuiTextFilter_Build(this)
@@ -3648,7 +3665,12 @@ ImGuiTextBuffer :: struct {
 
 ImGuiTextBuffer_EmptyString : [1]u8
 
-ImGuiTextBuffer_init :: proc(this : ^ImGuiTextBuffer) { }
+ImGuiTextBuffer_deinit :: proc(this : ^ImGuiTextBuffer)
+{
+	deinit(&this.Buf)
+}
+
+ImGuiTextBuffer_init :: proc(this : ^ImGuiTextBuffer) { init(&this.Buf) }
 
 ImGuiTextBuffer_begin :: proc(this : ^ImGuiTextBuffer) -> ^u8 { return this.Buf.Data != nil ? &front(&this.Buf) : EmptyString }
 
@@ -3701,10 +3723,17 @@ ImGuiStorage :: struct {
 	Data : ImVector(ImGuiStoragePair),
 }
 
+ImGuiStorage_deinit :: proc(this : ^ImGuiStorage)
+{
+	deinit(&this.Data)
+}
+
 // - Get***() functions find pair, never add/allocate. Pairs are sorted so a query is O(log N)
 // - Set***() functions find pair, insertion on demand if missing.
 // - Sorted insertion is costly, paid once. A typical frame shouldn't need to insert any new pair.
 ImGuiStorage_Clear :: proc(this : ^ImGuiStorage) { clear(&this.Data) }
+
+ImGuiStorage_init :: proc(this : ^ImGuiStorage) { init(&this.Data) }
 
 // Helper to manually clip large list of items
 // Helper: Manually clip large list of items.
@@ -3790,27 +3819,15 @@ ImColor :: struct {
 	// FIXME-OBSOLETE: May need to obsolete/cleanup those helpers.
 }
 
-ImColor_init_0 :: proc(this : ^ImColor) { }
+ImColor_init_0 :: proc(this : ^ImColor) { init(&this.Value) }
 
-ImColor_init_1 :: proc(this : ^ImColor, r : f32, g : f32, b : f32, a : f32 = 1.0)
-{
-	init(&this.Value, r, g, b, a)
-}
+ImColor_init_1 :: proc(this : ^ImColor, r : f32, g : f32, b : f32, a : f32 = 1.0) { init(&this.Value, r, g, b, a) }
 
-ImColor_init_2 :: proc(this : ^ImColor, col : ^ImVec4)
-{
-	init(&this.Value, col)
-}
+ImColor_init_2 :: proc(this : ^ImColor, col : ^ImVec4) { init(&this.Value, col) }
 
-ImColor_init_3 :: proc(this : ^ImColor, r : i32, g : i32, b : i32, a : i32 = 255)
-{
-	init(&this.Value, cast(f32) r * (1.0 / 255.0), cast(f32) g * (1.0 / 255.0), cast(f32) b * (1.0 / 255.0), cast(f32) a * (1.0 / 255.0))
-}
+ImColor_init_3 :: proc(this : ^ImColor, r : i32, g : i32, b : i32, a : i32 = 255) { init(&this.Value, cast(f32) r * (1.0 / 255.0), cast(f32) g * (1.0 / 255.0), cast(f32) b * (1.0 / 255.0), cast(f32) a * (1.0 / 255.0)) }
 
-ImColor_init_4 :: proc(this : ^ImColor, rgba : ImU32)
-{
-	init(&this.Value, cast(f32) ((rgba >> IM_COL32_R_SHIFT) & 0xFF) * (1.0 / 255.0), cast(f32) ((rgba >> IM_COL32_G_SHIFT) & 0xFF) * (1.0 / 255.0), cast(f32) ((rgba >> IM_COL32_B_SHIFT) & 0xFF) * (1.0 / 255.0), cast(f32) ((rgba >> IM_COL32_A_SHIFT) & 0xFF) * (1.0 / 255.0))
-}
+ImColor_init_4 :: proc(this : ^ImColor, rgba : ImU32) { init(&this.Value, cast(f32) ((rgba >> IM_COL32_R_SHIFT) & 0xFF) * (1.0 / 255.0), cast(f32) ((rgba >> IM_COL32_G_SHIFT) & 0xFF) * (1.0 / 255.0), cast(f32) ((rgba >> IM_COL32_B_SHIFT) & 0xFF) * (1.0 / 255.0), cast(f32) ((rgba >> IM_COL32_A_SHIFT) & 0xFF) * (1.0 / 255.0)) }
 
 ImColor_SetHSV :: #force_inline proc(this : ^ImColor, h : f32, s : f32, v : f32, a : f32 = 1.0)
 {
@@ -3900,6 +3917,13 @@ ImGuiMultiSelectIO :: struct {
 	ItemsCount : i32, //  ms:w, app:r     /        app:r   // 'int items_count' parameter to BeginMultiSelect() is copied here for convenience, allowing simpler calls to your ApplyRequests handler. Not used internally.
 }
 
+ImGuiMultiSelectIO_deinit :: proc(this : ^ImGuiMultiSelectIO)
+{
+	deinit(&this.Requests)
+}
+
+ImGuiMultiSelectIO_init :: proc(this : ^ImGuiMultiSelectIO) { init(&this.Requests) }
+
 // Selection request type
 ImGuiSelectionRequestType :: enum i32 {
 	ImGuiSelectionRequestType_None = 0,
@@ -3943,6 +3967,11 @@ ImGuiSelectionBasicStorage :: struct {
 	AdapterIndexToStorageId : proc(self : ^ImGuiSelectionBasicStorage, idx : i32) -> ImGuiID, // e.g. selection.AdapterIndexToStorageId = [](ImGuiSelectionBasicStorage* self, int idx) { return ((MyItems**)self->UserData)[idx]->ID; };
 	_SelectionOrder : i32, // [Internal] Increasing counter to store selection order
 	_Storage : ImGuiStorage, // [Internal] Selection set. Think of this as similar to e.g. std::set<ImGuiID>. Prefer not accessing directly: iterate with GetNextSelectedItem().
+}
+
+ImGuiSelectionBasicStorage_deinit :: proc(this : ^ImGuiSelectionBasicStorage)
+{
+	deinit(&this._Storage)
 }
 
 // Convert index to item id based on provided adapter.
@@ -4003,7 +4032,10 @@ ImDrawCmd :: struct {
 }
 
 // Also ensure our padding fields are zeroed
-ImDrawCmd_init :: proc(this : ^ImDrawCmd) { memset(this, 0, size_of(this^)) }
+ImDrawCmd_init :: proc(this : ^ImDrawCmd)
+{
+	init(&this.ClipRect)memset(this, 0, size_of(this^))
+}
 
 // Since 1.83: returns ImTextureID associated with this draw call. Warning: DO NOT assume this is always same as 'TextureId' (we will change this function for an upcoming feature)
 ImDrawCmd_GetTexID :: #force_inline proc(this : ^ImDrawCmd) -> ImTextureID { return this.TextureId }
@@ -4015,6 +4047,12 @@ ImDrawVert :: struct {
 	pos : ImVec2,
 	uv : ImVec2,
 	col : ImU32,
+}
+
+ImDrawVert_init :: proc(this : ^ImDrawVert)
+{
+	init(&this.pos)
+	init(&this.uv)
 }
 } else { // preproc else
 // You can override the vertex format layout by defining IMGUI_OVERRIDE_DRAWVERT_STRUCT_LAYOUT in imconfig.h
@@ -4031,12 +4069,26 @@ ImDrawCmdHeader :: struct {
 	VtxOffset : u32,
 }
 
+ImDrawCmdHeader_init :: proc(this : ^ImDrawCmdHeader) { init(&this.ClipRect) }
+
 // Forward declarations
 // Temporary storage to output draw commands out of order, used by ImDrawListSplitter and ImDrawList::ChannelsSplit()
 // [Internal] For use by ImDrawListSplitter
 ImDrawChannel :: struct {
 	_CmdBuffer : ImVector(ImDrawCmd),
 	_IdxBuffer : ImVector(ImDrawIdx),
+}
+
+ImDrawChannel_deinit :: proc(this : ^ImDrawChannel)
+{
+	deinit(&this._CmdBuffer)
+	deinit(&this._IdxBuffer)
+}
+
+ImDrawChannel_init :: proc(this : ^ImDrawChannel)
+{
+	init(&this._CmdBuffer)
+	init(&this._IdxBuffer)
 }
 
 
@@ -4050,9 +4102,14 @@ ImDrawListSplitter :: struct {
 }
 
 ImDrawListSplitter_deinit :: proc(this : ^ImDrawListSplitter)
-{ClearFreeMemory()}
+{
+	deinit(&this._Channels)
+ClearFreeMemory()}
 
-ImDrawListSplitter_init :: #force_inline proc(this : ^ImDrawListSplitter) { memset(this, 0, size_of(this^)) }
+ImDrawListSplitter_init :: #force_inline proc(this : ^ImDrawListSplitter)
+{
+	init(&this._Channels)memset(this, 0, size_of(this^))
+}
 
 // Do not clear Channels[] so our allocations are reused next frame
 ImDrawListSplitter_Clear :: #force_inline proc(this : ^ImDrawListSplitter)
@@ -4119,6 +4176,18 @@ ImDrawList :: struct {
 	_CallbacksDataBuf : ImVector(ImU8), // [Internal]
 	_FringeScale : f32, // [Internal] anti-alias fringe is scaled by this value, this helps to keep things sharp while zooming at vertex buffer content
 	_OwnerName : ^u8, // Pointer to owner window's name for debugging
+}
+
+ImDrawList_deinit :: proc(this : ^ImDrawList)
+{
+	deinit(&this.CmdBuffer)
+	deinit(&this.IdxBuffer)
+	deinit(&this.VtxBuffer)
+	deinit(&this._Path)
+	deinit(&this._Splitter)
+	deinit(&this._ClipRectStack)
+	deinit(&this._TextureIdStack)
+	deinit(&this._CallbacksDataBuf)
 }
 
 ImDrawList_GetClipRectMin :: #force_inline proc(this : ^ImDrawList) -> ImVec2
@@ -4199,8 +4268,19 @@ ImDrawData :: struct {
 	OwnerViewport : ^ImGuiViewport, // Viewport carrying the ImDrawData instance, might be of use to the renderer (generally not).
 }
 
+ImDrawData_deinit :: proc(this : ^ImDrawData)
+{
+	deinit(&this.CmdLists)
+}
+
 // Functions
-ImDrawData_init :: proc(this : ^ImDrawData) { Clear() }
+ImDrawData_init :: proc(this : ^ImDrawData)
+{
+	init(&this.CmdLists)
+	init(&this.DisplayPos)
+	init(&this.DisplaySize)
+	init(&this.FramebufferScale)Clear()
+}
 
 // Configuration data when adding a font or merging fonts
 //-----------------------------------------------------------------------------
@@ -4253,7 +4333,15 @@ ImFontGlyphRangesBuilder :: struct {
 	UsedChars : ImVector(ImU32), // Store 1-bit per Unicode code point (0=unused, 1=used)
 }
 
-ImFontGlyphRangesBuilder_init :: proc(this : ^ImFontGlyphRangesBuilder) { Clear() }
+ImFontGlyphRangesBuilder_deinit :: proc(this : ^ImFontGlyphRangesBuilder)
+{
+	deinit(&this.UsedChars)
+}
+
+ImFontGlyphRangesBuilder_init :: proc(this : ^ImFontGlyphRangesBuilder)
+{
+	init(&this.UsedChars)Clear()
+}
 
 ImFontGlyphRangesBuilder_Clear :: #force_inline proc(this : ^ImFontGlyphRangesBuilder)
 {
@@ -4292,7 +4380,7 @@ ImFontAtlasCustomRect :: struct {
 
 ImFontAtlasCustomRect_init :: proc(this : ^ImFontAtlasCustomRect)
 {
-	this.Y = 0xFFFF; this.X = this.Y; this.Height = 0; this.Width = this.Height; this.GlyphID = 0; this.GlyphColored = 0; this.GlyphAdvanceX = 0.0; this.GlyphOffset = ImVec2(0, 0); this.Font = nil
+	init(&this.GlyphOffset)this.Y = 0xFFFF; this.X = this.Y; this.Height = 0; this.Width = this.Height; this.GlyphID = 0; this.GlyphColored = 0; this.GlyphAdvanceX = 0.0; this.GlyphOffset = ImVec2(0, 0); this.Font = nil
 }
 
 ImFontAtlasCustomRect_IsPacked :: proc(this : ^ImFontAtlasCustomRect) -> bool { return this.X != 0xFFFF }
@@ -4363,6 +4451,13 @@ ImFontAtlas :: struct {
 	//typedef ImFontGlyphRangesBuilder GlyphRangesBuilder; // OBSOLETED in 1.67+
 }
 
+ImFontAtlas_deinit :: proc(this : ^ImFontAtlas)
+{
+	deinit(&this.Fonts)
+	deinit(&this.CustomRects)
+	deinit(&this.ConfigData)
+}
+
 // Bit ambiguous: used to detect when user didn't build texture but effectively we should check TexID != 0 except that would be backend dependent...
 ImFontAtlas_IsBuilt :: proc(this : ^ImFontAtlas) -> bool { return this.Fonts.Size > 0 && this.TexReady }
 
@@ -4402,6 +4497,13 @@ ImFont :: struct {
 	Ascent : f32, Descent : f32, // 4+4   // out //            // Ascent: distance from top to bottom of e.g. 'A' [0..FontSize] (unscaled)
 	MetricsTotalSurface : i32, // 4     // out //            // Total surface in pixels to get an idea of the font rasterization/texture cost (not exact, we approximate the cost of padding between glyphs)
 	Used4kPagesMap : [(IM_UNICODE_CODEPOINT_MAX + 1) / 4096 / 8]ImU8, // 2 bytes if ImWchar=ImWchar16, 34 bytes if ImWchar==ImWchar32. Store 1-bit for each block of 4K codepoints that has one active glyph. This is mainly used to facilitate iterations across all used codepoints.
+}
+
+ImFont_deinit :: proc(this : ^ImFont)
+{
+	deinit(&this.IndexAdvanceX)
+	deinit(&this.IndexLookup)
+	deinit(&this.Glyphs)
 }
 
 ImFont_GetCharAdvance :: proc(this : ^ImFont, c : ImWchar) -> f32 { return (cast(i32) c < this.IndexAdvanceX.Size) ? this.IndexAdvanceX[cast(i32) c] : this.FallbackAdvanceX }
@@ -4472,7 +4574,13 @@ ImGuiViewport :: struct {
 ImGuiViewport_deinit :: proc(this : ^ImGuiViewport)
 {IM_ASSERT(this.PlatformUserData == nil && this.RendererUserData == nil)}
 
-ImGuiViewport_init :: proc(this : ^ImGuiViewport) { memset(this, 0, size_of(this^)) }
+ImGuiViewport_init :: proc(this : ^ImGuiViewport)
+{
+	init(&this.Pos)
+	init(&this.Size)
+	init(&this.WorkPos)
+	init(&this.WorkSize)memset(this, 0, size_of(this^))
+}
 
 // Helpers
 ImGuiViewport_GetCenter :: proc(this : ^ImGuiViewport) -> ImVec2 { return ImVec2(this.Pos.x + this.Size.x * 0.5, this.Pos.y + this.Size.y * 0.5) }
@@ -4622,6 +4730,12 @@ ImGuiPlatformIO :: struct {
 	Viewports : ImVector(^ImGuiViewport), // Main viewports, followed by all secondary viewports.
 }
 
+ImGuiPlatformIO_deinit :: proc(this : ^ImGuiPlatformIO)
+{
+	deinit(&this.Monitors)
+	deinit(&this.Viewports)
+}
+
 // Multi-viewport support: user-provided bounds for each connected monitor/display. Used when positioning popups and tooltips to avoid them straddling monitors
 // (Optional) This is required when enabling multi-viewport. Represent the bounds of each connected monitor/display and their DPI.
 // We use this information for multiple DPI support + clamping the position of popups and tooltips so they don't straddle multiple monitors.
@@ -4634,7 +4748,10 @@ ImGuiPlatformMonitor :: struct {
 
 ImGuiPlatformMonitor_init :: proc(this : ^ImGuiPlatformMonitor)
 {
-	this.WorkSize = ImVec2(0, 0); this.WorkPos = this.WorkSize; this.MainSize = this.WorkPos; this.MainPos = this.MainSize; this.DpiScale = 1.0; this.PlatformHandle = nil
+	init(&this.MainPos)
+	init(&this.MainSize)
+	init(&this.WorkPos)
+	init(&this.WorkSize)this.WorkSize = ImVec2(0, 0); this.WorkPos = this.WorkSize; this.MainSize = this.WorkPos; this.MainPos = this.MainSize; this.DpiScale = 1.0; this.PlatformHandle = nil
 }
 
 // Platform IME data for io.PlatformSetImeDataFn() function.
@@ -4645,7 +4762,10 @@ ImGuiPlatformImeData :: struct {
 	InputLineHeight : f32, // Line height
 }
 
-ImGuiPlatformImeData_init :: proc(this : ^ImGuiPlatformImeData) { memset(this, 0, size_of(this^)) }
+ImGuiPlatformImeData_init :: proc(this : ^ImGuiPlatformImeData)
+{
+	init(&this.InputPos)memset(this, 0, size_of(this^))
+}
 
 //-----------------------------------------------------------------------------
 // [SECTION] Obsolete functions and types
@@ -5231,15 +5351,9 @@ ImVec1 :: struct {
 	x : f32,
 }
 
-ImVec1_init_0 :: proc(this : ^ImVec1)
-{
-	this.x = 0.0
-}
+ImVec1_init_0 :: proc(this : ^ImVec1) { this.x = 0.0 }
 
-ImVec1_init_1 :: proc(this : ^ImVec1, _x : f32)
-{
-	this.x = _x
-}
+ImVec1_init_1 :: proc(this : ^ImVec1, _x : f32) { this.x = _x }
 
 // Helper: ImVec2ih (2D vector, half-size integer, for long-term packed storage)
 ImVec2ih :: struct {
@@ -5466,6 +5580,11 @@ ImBitVector :: struct {
 	Storage : ImVector(ImU32),
 }
 
+ImBitVector_deinit :: proc(this : ^ImBitVector)
+{
+	deinit(&this.Storage)
+}
+
 ImBitVector_Create :: proc(this : ^ImBitVector, sz : i32)
 {
 	resize(&this.Storage, (sz + 31) >> 5); memset(this.Storage.Data, 0, cast(uint) this.Storage.Size * size_of(this.Storage.Data[0]))
@@ -5487,6 +5606,8 @@ ImBitVector_ClearBit :: proc(this : ^ImBitVector, n : i32)
 {
 	IM_ASSERT(n < (this.Storage.Size << 5)); ImBitArrayClearBit(this.Storage.Data, n)
 }
+
+ImBitVector_init :: proc(this : ^ImBitVector) { init(&this.Storage) }
 
 
 // Helper: ImSpan<>
@@ -5584,9 +5705,16 @@ ImPool :: struct($T : typeid) {
 }
 
 ImPool_deinit :: proc(this : ^ImPool)
-{Clear()}
+{
+	deinit(&this.Buf)
+	deinit(&this.Map)
+Clear()}
 
-ImPool_init :: proc(this : ^ImPool($T)) { this.AliveCount = 0; this.FreeIdx = this.AliveCount }
+ImPool_init :: proc(this : ^ImPool($T))
+{
+	init(&this.Buf)
+	init(&this.Map)this.AliveCount = 0; this.FreeIdx = this.AliveCount
+}
 
 ImPool_GetByKey :: proc(this : ^ImPool($T), key : ImGuiID) -> ^T
 {
@@ -5657,6 +5785,11 @@ ImChunkStream :: struct($T : typeid) {
 	Buf : ImVector(u8),
 }
 
+ImChunkStream_deinit :: proc(this : ^ImChunkStream)
+{
+	deinit(&this.Buf)
+}
+
 ImChunkStream_clear :: proc(this : ^ImChunkStream($T)) { clear(&this.Buf) }
 
 ImChunkStream_empty :: proc(this : ^ImChunkStream($T)) -> bool { return this.Buf.Size == 0 }
@@ -5694,11 +5827,18 @@ ImChunkStream_ptr_from_offset :: proc(this : ^ImChunkStream($T), off : i32) -> ^
 
 ImChunkStream_swap :: proc(this : ^ImChunkStream($T), rhs : ^ImChunkStream(T)) { swap(&rhs.Buf, this.Buf) }
 
+ImChunkStream_init :: proc(this : ^ImChunkStream($T)) { init(&this.Buf) }
+
 // Helper: ImGuiTextIndex
 // Maintain a line index for a text buffer. This is a strong candidate to be moved into the public API.
 ImGuiTextIndex :: struct {
 	LineOffsets : ImVector(i32),
 	EndOffset : i32, // Because we don't own text buffer we need to maintain EndOffset (may bake in LineOffsets?)
+}
+
+ImGuiTextIndex_deinit :: proc(this : ^ImGuiTextIndex)
+{
+	deinit(&this.LineOffsets)
 }
 
 ImGuiTextIndex_clear :: proc(this : ^ImGuiTextIndex)
@@ -5712,7 +5852,11 @@ ImGuiTextIndex_get_line_begin :: proc(this : ^ImGuiTextIndex, base : ^u8, n : i3
 
 ImGuiTextIndex_get_line_end :: proc(this : ^ImGuiTextIndex, base : ^u8, n : i32) -> ^u8 { return base + (n + 1 < this.LineOffsets.Size ? (this.LineOffsets[n + 1] - 1) : this.EndOffset) }
 
-ImGuiTextIndex_init :: proc(this : ^ImGuiTextIndex) { this.EndOffset = 0 }
+ImGuiTextIndex_init :: proc(this : ^ImGuiTextIndex)
+{
+	init(&this.LineOffsets)
+	this.EndOffset = 0
+}
 
 //-----------------------------------------------------------------------------
 // [SECTION] ImDrawList support
@@ -5783,13 +5927,26 @@ ImDrawListSharedData :: struct {
 	CircleSegmentCounts : [64]ImU8, // Precomputed segment count for given radius before we calculate it dynamically (to avoid calculation overhead)
 }
 
+ImDrawListSharedData_deinit :: proc(this : ^ImDrawListSharedData)
+{
+	deinit(&this.TempBuffer)
+}
+
 // Helper to build a ImDrawData instance
 ImDrawDataBuilder :: struct {
 	Layers : [2]^ImVector(^ImDrawList), // Pointers to global layers for: regular, tooltip. LayersP[0] is owned by DrawData.
 	LayerData1 : ImVector(^ImDrawList),
 }
 
-ImDrawDataBuilder_init :: proc(this : ^ImDrawDataBuilder) { memset(this, 0, size_of(this^)) }
+ImDrawDataBuilder_deinit :: proc(this : ^ImDrawDataBuilder)
+{
+	deinit(&this.LayerData1)
+}
+
+ImDrawDataBuilder_init :: proc(this : ^ImDrawDataBuilder)
+{
+	init(&this.LayerData1)memset(this, 0, size_of(this^))
+}
 
 // Variable information (e.g. to access style variables from an enum)
 //-----------------------------------------------------------------------------
@@ -6010,6 +6167,8 @@ ImGuiColorMod :: struct {
 	BackupValue : ImVec4,
 }
 
+ImGuiColorMod_init :: proc(this : ^ImGuiColorMod) { init(&this.BackupValue) }
+
 // Stacked style modifier, backup of modified data so we can restore it
 // Stacked style modifier, backup of modified data so we can restore it. Data type inferred from the variable.
 ImGuiStyleMod :: struct {
@@ -6042,7 +6201,13 @@ ImGuiComboPreviewData :: struct {
 	BackupLayout : ImGuiLayoutType,
 }
 
-ImGuiComboPreviewData_init :: proc(this : ^ImGuiComboPreviewData) { memset(this, 0, size_of(this^)) }
+ImGuiComboPreviewData_init :: proc(this : ^ImGuiComboPreviewData)
+{
+	init(&this.PreviewRect)
+	init(&this.BackupCursorPos)
+	init(&this.BackupCursorMaxPos)
+	init(&this.BackupCursorPosPrevLine)memset(this, 0, size_of(this^))
+}
 
 // Stacked storage data for BeginGroup()/EndGroup()
 // Stacked storage data for BeginGroup()/EndGroup()
@@ -6060,6 +6225,16 @@ ImGuiGroupData :: struct {
 	BackupHoveredIdIsAlive : bool,
 	BackupIsSameLine : bool,
 	EmitItem : bool,
+}
+
+ImGuiGroupData_init :: proc(this : ^ImGuiGroupData)
+{
+	init(&this.BackupCursorPos)
+	init(&this.BackupCursorMaxPos)
+	init(&this.BackupCursorPosPrevLine)
+	init(&this.BackupIndent)
+	init(&this.BackupGroupOffset)
+	init(&this.BackupCurrLineSize)
 }
 
 // Simple column measurement, currently used for MenuItem() only
@@ -6083,7 +6258,15 @@ ImGuiInputTextDeactivatedState :: struct {
 	TextA : ImVector(u8), // text buffer
 }
 
-ImGuiInputTextDeactivatedState_init :: proc(this : ^ImGuiInputTextDeactivatedState) { memset(this, 0, size_of(this^)) }
+ImGuiInputTextDeactivatedState_deinit :: proc(this : ^ImGuiInputTextDeactivatedState)
+{
+	deinit(&this.TextA)
+}
+
+ImGuiInputTextDeactivatedState_init :: proc(this : ^ImGuiInputTextDeactivatedState)
+{
+	init(&this.TextA)memset(this, 0, size_of(this^))
+}
 
 ImGuiInputTextDeactivatedState_ClearFreeMemory :: proc(this : ^ImGuiInputTextDeactivatedState)
 {
@@ -6122,6 +6305,13 @@ ImGuiInputTextState :: struct {
 	WantReloadUserBuf : bool, // force a reload of user buf so it may be modified externally. may be automatic in future version.
 	ReloadSelectionStart : i32,
 	ReloadSelectionEnd : i32,
+}
+
+ImGuiInputTextState_deinit :: proc(this : ^ImGuiInputTextState)
+{
+	deinit(&this.TextA)
+	deinit(&this.TextToRevertTo)
+	deinit(&this.CallbackTextBackup)
 }
 
 ImGuiInputTextState_ClearText :: proc(this : ^ImGuiInputTextState)
@@ -6186,7 +6376,17 @@ ImGuiNextWindowData :: struct {
 	RefreshFlagsVal : ImGuiWindowRefreshFlags,
 }
 
-ImGuiNextWindowData_init :: proc(this : ^ImGuiNextWindowData) { memset(this, 0, size_of(this^)) }
+ImGuiNextWindowData_init :: proc(this : ^ImGuiNextWindowData)
+{
+	init(&this.PosVal)
+	init(&this.PosPivotVal)
+	init(&this.SizeVal)
+	init(&this.ContentSizeVal)
+	init(&this.ScrollVal)
+	init(&this.SizeConstraintRect)
+	init(&this.WindowClass)
+	init(&this.MenuBarOffsetMinVal)memset(this, 0, size_of(this^))
+}
 
 ImGuiNextWindowData_ClearFlags :: #force_inline proc(this : ^ImGuiNextWindowData) { this.Flags = ImGuiNextWindowDataFlags_.ImGuiNextWindowDataFlags_None }
 
@@ -6240,7 +6440,13 @@ ImGuiLastItemData :: struct {
 	Shortcut : ImGuiKeyChord, // Shortcut at the time of submitting item. ONLY VALID IF (StatusFlags & ImGuiItemStatusFlags_HasShortcut) is set..
 }
 
-ImGuiLastItemData_init :: proc(this : ^ImGuiLastItemData) { memset(this, 0, size_of(this^)) }
+ImGuiLastItemData_init :: proc(this : ^ImGuiLastItemData)
+{
+	init(&this.Rect)
+	init(&this.NavRect)
+	init(&this.DisplayRect)
+	init(&this.ClipRect)memset(this, 0, size_of(this^))
+}
 
 // Temporary storage for TreeNode().
 // Store data emitted by TreeNode() for usage by TreePop()
@@ -6253,6 +6459,8 @@ ImGuiTreeNodeStackData :: struct {
 	ItemFlags : ImGuiItemFlags, // Used for nav landing
 	NavRect : ImRect, // Used for nav landing
 }
+
+ImGuiTreeNodeStackData_init :: proc(this : ^ImGuiTreeNodeStackData) { init(&this.NavRect) }
 
 // Storage of stack sizes for error handling and recovery
 // sizeof() = 20
@@ -6278,6 +6486,12 @@ ImGuiWindowStackData :: struct {
 	ParentLastItemDataBackup : ImGuiLastItemData,
 	StackSizesInBegin : ImGuiErrorRecoveryState, // Store size of various stacks for asserting
 	DisabledOverrideReenable : bool, // Non-child window override disabled flag
+}
+
+ImGuiWindowStackData_init :: proc(this : ^ImGuiWindowStackData)
+{
+	init(&this.ParentLastItemDataBackup)
+	init(&this.StackSizesInBegin)
 }
 
 ImGuiShrinkWidthItem :: struct {
@@ -6326,7 +6540,8 @@ ImGuiPopupData :: struct {
 
 ImGuiPopupData_init :: proc(this : ^ImGuiPopupData)
 {
-	memset(this, 0, size_of(this^)); this.OpenFrameCount = -1; this.ParentNavLayer = this.OpenFrameCount
+	init(&this.OpenPopupPos)
+	init(&this.OpenMousePos)memset(this, 0, size_of(this^)); this.OpenFrameCount = -1; this.ParentNavLayer = this.OpenFrameCount
 }
 
 //-----------------------------------------------------------------------------
@@ -6436,7 +6651,17 @@ ImGuiKeyRoutingTable :: struct {
 	EntriesNext : ImVector(ImGuiKeyRoutingData), // Double-buffer to avoid reallocation (could use a shared buffer)
 }
 
-ImGuiKeyRoutingTable_init :: proc(this : ^ImGuiKeyRoutingTable) { Clear() }
+ImGuiKeyRoutingTable_deinit :: proc(this : ^ImGuiKeyRoutingTable)
+{
+	deinit(&this.Entries)
+	deinit(&this.EntriesNext)
+}
+
+ImGuiKeyRoutingTable_init :: proc(this : ^ImGuiKeyRoutingTable)
+{
+	init(&this.Entries)
+	init(&this.EntriesNext)Clear()
+}
 
 ImGuiKeyRoutingTable_Clear :: proc(this : ^ImGuiKeyRoutingTable)
 {
@@ -6532,7 +6757,15 @@ ImGuiListClipperData :: struct {
 	Ranges : ImVector(ImGuiListClipperRange),
 }
 
-ImGuiListClipperData_init :: proc(this : ^ImGuiListClipperData) { memset(this, 0, size_of(this^)) }
+ImGuiListClipperData_deinit :: proc(this : ^ImGuiListClipperData)
+{
+	deinit(&this.Ranges)
+}
+
+ImGuiListClipperData_init :: proc(this : ^ImGuiListClipperData)
+{
+	init(&this.Ranges)memset(this, 0, size_of(this^))
+}
 
 ImGuiListClipperData_Reset :: proc(this : ^ImGuiListClipperData, clipper : ^ImGuiListClipper)
 {
@@ -6615,7 +6848,10 @@ ImGuiNavItemData :: struct {
 	SelectionUserData : ImGuiSelectionUserData, //I+Mov    // Best candidate SetNextItemSelectionUserData() value. Valid if (ItemFlags & ImGuiItemFlags_HasSelectionUserData)
 }
 
-ImGuiNavItemData_init :: proc(this : ^ImGuiNavItemData) { Clear() }
+ImGuiNavItemData_init :: proc(this : ^ImGuiNavItemData)
+{
+	init(&this.RectRel)Clear()
+}
 
 ImGuiNavItemData_Clear :: proc(this : ^ImGuiNavItemData)
 {
@@ -6663,10 +6899,10 @@ ImGuiTypingSelectState :: struct {
 
 ImGuiTypingSelectState_init :: proc(this : ^ImGuiTypingSelectState)
 {
-this.LastRequestFrame = 0
-this.LastRequestTime = 0.0
-this.SingleCharModeLock = false
-memset(this, 0, size_of(this^))
+	this.LastRequestFrame = 0
+	this.LastRequestTime = 0.0
+	this.SingleCharModeLock = false
+	memset(this, 0, size_of(this^))
 }
 
 // We preserve remaining data for easier debugging
@@ -6700,7 +6936,10 @@ ImGuiOldColumnData :: struct {
 	ClipRect : ImRect,
 }
 
-ImGuiOldColumnData_init :: proc(this : ^ImGuiOldColumnData) { memset(this, 0, size_of(this^)) }
+ImGuiOldColumnData_init :: proc(this : ^ImGuiOldColumnData)
+{
+	init(&this.ClipRect)memset(this, 0, size_of(this^))
+}
 
 // Storage data for a columns set for legacy Columns() api
 ImGuiOldColumns :: struct {
@@ -6721,7 +6960,20 @@ ImGuiOldColumns :: struct {
 	Splitter : ImDrawListSplitter,
 }
 
-ImGuiOldColumns_init :: proc(this : ^ImGuiOldColumns) { memset(this, 0, size_of(this^)) }
+ImGuiOldColumns_deinit :: proc(this : ^ImGuiOldColumns)
+{
+	deinit(&this.Columns)
+	deinit(&this.Splitter)
+}
+
+ImGuiOldColumns_init :: proc(this : ^ImGuiOldColumns)
+{
+	init(&this.HostInitialClipRect)
+	init(&this.HostBackupClipRect)
+	init(&this.HostBackupParentWorkRect)
+	init(&this.Columns)
+	init(&this.Splitter)memset(this, 0, size_of(this^))
+}
 
 // Box-selection state (currently used by multi-selection, could potentially be used by others)
 //-----------------------------------------------------------------------------
@@ -6751,7 +7003,15 @@ ImGuiBoxSelectState :: struct {
 	BoxSelectRectCurr : ImRect,
 }
 
-ImGuiBoxSelectState_init :: proc(this : ^ImGuiBoxSelectState) { memset(this, 0, size_of(this^)) }
+ImGuiBoxSelectState_init :: proc(this : ^ImGuiBoxSelectState)
+{
+	init(&this.StartPosRel)
+	init(&this.EndPosRel)
+	init(&this.ScrollAccum)
+	init(&this.UnclipRect)
+	init(&this.BoxSelectRectPrev)
+	init(&this.BoxSelectRectCurr)memset(this, 0, size_of(this^))
+}
 
 //-----------------------------------------------------------------------------
 // [SECTION] Multi-select support
@@ -6781,7 +7041,17 @@ ImGuiMultiSelectTempData :: struct {
 	RangeDstPassedBy : bool, // Set by the item that matches NavJustMovedToId when IsSetRange is set.
 }
 
-ImGuiMultiSelectTempData_init :: proc(this : ^ImGuiMultiSelectTempData) { Clear() }
+ImGuiMultiSelectTempData_deinit :: proc(this : ^ImGuiMultiSelectTempData)
+{
+	deinit(&this.IO)
+}
+
+ImGuiMultiSelectTempData_init :: proc(this : ^ImGuiMultiSelectTempData)
+{
+	init(&this.IO)
+	init(&this.ScopeRectMin)
+	init(&this.BackupCursorMaxPos)Clear()
+}
 
 // Zero-clear except IO as we preserve IO.Requests[] buffer allocation.
 ImGuiMultiSelectTempData_Clear :: proc(this : ^ImGuiMultiSelectTempData)
@@ -6916,6 +7186,11 @@ ImGuiDockNode :: struct {
 	},
 }
 
+ImGuiDockNode_deinit :: proc(this : ^ImGuiDockNode)
+{
+	deinit(&this.Windows)
+}
+
 ImGuiDockNode_IsRootNode :: proc(this : ^ImGuiDockNode) -> bool { return this.ParentNode == nil }
 
 ImGuiDockNode_IsDockSpace :: proc(this : ^ImGuiDockNode) -> bool { return (this.MergedFlags & ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_DockSpace) != {} }
@@ -6975,7 +7250,19 @@ ImGuiDockContext :: struct {
 	WantFullRebuild : bool,
 }
 
-ImGuiDockContext_init :: proc(this : ^ImGuiDockContext) { memset(this, 0, size_of(this^)) }
+ImGuiDockContext_deinit :: proc(this : ^ImGuiDockContext)
+{
+	deinit(&this.Nodes)
+	deinit(&this.Requests)
+	deinit(&this.NodesSettings)
+}
+
+ImGuiDockContext_init :: proc(this : ^ImGuiDockContext)
+{
+	init(&this.Nodes)
+	init(&this.Requests)
+	init(&this.NodesSettings)memset(this, 0, size_of(this^))
+}
 
 } // preproc endif// #ifdef IMGUI_HAS_DOCK
 
@@ -7017,11 +7304,24 @@ ImGuiViewportP :: struct {
 }
 
 ImGuiViewportP_deinit :: proc(this : ^ImGuiViewportP)
-{if this.BgFgDrawLists[0] != nil { IM_DELETE(this.BgFgDrawLists[0]) }; if this.BgFgDrawLists[1] != nil { IM_DELETE(this.BgFgDrawLists[1]) }}
+{
+	deinit(&this.DrawDataP)
+	deinit(&this.DrawDataBuilder)
+if this.BgFgDrawLists[0] != nil { IM_DELETE(this.BgFgDrawLists[0]) }; if this.BgFgDrawLists[1] != nil { IM_DELETE(this.BgFgDrawLists[1]) }}
 
 ImGuiViewportP_init :: proc(this : ^ImGuiViewportP)
 {
-	this.Window = nil; this.Idx = -1; this.LastFocusedStampCount = -1; this.BgFgDrawListsLastFrame[1] = this.LastFocusedStampCount; this.BgFgDrawListsLastFrame[0] = this.BgFgDrawListsLastFrame[1]; this.LastFrameActive = this.BgFgDrawListsLastFrame[0]; this.LastNameHash = 0; this.LastAlpha = 1.0; this.Alpha = this.LastAlpha; this.LastFocusedHadNavWindow = false; this.PlatformMonitor = -1; this.BgFgDrawLists[1] = nil; this.BgFgDrawLists[0] = this.BgFgDrawLists[1]; this.LastRendererSize = ImVec2(FLT_MAX, FLT_MAX); this.LastPlatformSize = this.LastRendererSize; this.LastPlatformPos = this.LastPlatformSize
+	init(&this.LastPos)
+	init(&this.LastSize)
+	init(&this.DrawDataP)
+	init(&this.DrawDataBuilder)
+	init(&this.LastPlatformPos)
+	init(&this.LastPlatformSize)
+	init(&this.LastRendererSize)
+	init(&this.WorkInsetMin)
+	init(&this.WorkInsetMax)
+	init(&this.BuildWorkInsetMin)
+	init(&this.BuildWorkInsetMax)this.Window = nil; this.Idx = -1; this.LastFocusedStampCount = -1; this.BgFgDrawListsLastFrame[1] = this.LastFocusedStampCount; this.BgFgDrawListsLastFrame[0] = this.BgFgDrawListsLastFrame[1]; this.LastFrameActive = this.BgFgDrawListsLastFrame[0]; this.LastNameHash = 0; this.LastAlpha = 1.0; this.Alpha = this.LastAlpha; this.LastFocusedHadNavWindow = false; this.PlatformMonitor = -1; this.BgFgDrawLists[1] = nil; this.BgFgDrawLists[0] = this.BgFgDrawLists[1]; this.LastRendererSize = ImVec2(FLT_MAX, FLT_MAX); this.LastPlatformSize = this.LastRendererSize; this.LastPlatformPos = this.LastPlatformSize
 }
 
 ImGuiViewportP_ClearRequestFlags :: proc(this : ^ImGuiViewportP) { this.PlatformRequestResize = false; this.PlatformRequestMove = this.PlatformRequestResize; this.PlatformRequestClose = this.PlatformRequestMove }
@@ -7072,7 +7372,9 @@ ImGuiWindowSettings :: struct {
 
 ImGuiWindowSettings_init :: proc(this : ^ImGuiWindowSettings)
 {
-	memset(this, 0, size_of(this^)); this.DockOrder = -1
+	init(&this.Pos)
+	init(&this.Size)
+	init(&this.ViewportPos)memset(this, 0, size_of(this^)); this.DockOrder = -1
 }
 
 ImGuiWindowSettings_GetName :: proc(this : ^ImGuiWindowSettings) -> ^u8 { return cast(^u8) (this + 1) }
@@ -7205,21 +7507,20 @@ ImGuiMetricsConfig :: struct {
 
 ImGuiMetricsConfig_init :: proc(this : ^ImGuiMetricsConfig)
 {
-this.ShowDebugLog = false
-this.ShowIDStackTool = false
-this.ShowWindowsRects = false
-this.ShowWindowsBeginOrder = false
-this.ShowTablesRects = false
-this.ShowDrawCmdMesh = true
-this.ShowDrawCmdBoundingBoxes = true
-this.ShowTextEncodingViewer = false
-this.ShowAtlasTintedWithTextColor = false
-this.ShowDockingNodes = false
-this.ShowWindowsRectsType = -1
-this.ShowTablesRectsType = -1
-this.HighlightMonitorIdx = -1
-this.HighlightViewportID = 0
-
+	this.ShowDebugLog = false
+	this.ShowIDStackTool = false
+	this.ShowWindowsRects = false
+	this.ShowWindowsBeginOrder = false
+	this.ShowTablesRects = false
+	this.ShowDrawCmdMesh = true
+	this.ShowDrawCmdBoundingBoxes = true
+	this.ShowTextEncodingViewer = false
+	this.ShowAtlasTintedWithTextColor = false
+	this.ShowDockingNodes = false
+	this.ShowWindowsRectsType = -1
+	this.ShowTablesRectsType = -1
+	this.HighlightMonitorIdx = -1
+	this.HighlightViewportID = 0
 }
 
 ImGuiStackLevelInfo :: struct {
@@ -7244,9 +7545,14 @@ ImGuiIDStackTool :: struct {
 	CopyToClipboardLastTime : f32,
 }
 
+ImGuiIDStackTool_deinit :: proc(this : ^ImGuiIDStackTool)
+{
+	deinit(&this.Results)
+}
+
 ImGuiIDStackTool_init :: proc(this : ^ImGuiIDStackTool)
 {
-	memset(this, 0, size_of(this^)); this.CopyToClipboardLastTime = -FLT_MAX
+	init(&this.Results)memset(this, 0, size_of(this^)); this.CopyToClipboardLastTime = -FLT_MAX
 }
 
 //-----------------------------------------------------------------------------
@@ -7657,6 +7963,59 @@ ImGuiContext :: struct {
 	TempKeychordName : [64]u8,
 }
 
+ImGuiContext_deinit :: proc(this : ^ImGuiContext)
+{
+	deinit(&this.IO)
+	deinit(&this.PlatformIO)
+	deinit(&this.DrawListSharedData)
+	deinit(&this.InputEventsQueue)
+	deinit(&this.InputEventsTrail)
+	deinit(&this.Windows)
+	deinit(&this.WindowsFocusOrder)
+	deinit(&this.WindowsTempSortBuffer)
+	deinit(&this.CurrentWindowStack)
+	deinit(&this.WindowsById)
+	deinit(&this.KeysRoutingTable)
+	deinit(&this.ColorStack)
+	deinit(&this.StyleVarStack)
+	deinit(&this.FontStack)
+	deinit(&this.FocusScopeStack)
+	deinit(&this.ItemFlagsStack)
+	deinit(&this.GroupStack)
+	deinit(&this.OpenPopupStack)
+	deinit(&this.BeginPopupStack)
+	deinit(&this.TreeNodeStack)
+	deinit(&this.Viewports)
+	deinit(&this.NavFocusRoute)
+	deinit(&this.DragDropPayloadBufHeap)
+	deinit(&this.ClipperTempData)
+	deinit(&this.TablesTempData)
+	deinit(&this.Tables)
+	deinit(&this.TablesLastTimeActive)
+	deinit(&this.DrawChannelsTempMergeBuffer)
+	deinit(&this.TabBars)
+	deinit(&this.CurrentTabBarStack)
+	deinit(&this.ShrinkWidthBuffer)
+	deinit(&this.MultiSelectTempData)
+	deinit(&this.MultiSelectStorage)
+	deinit(&this.InputTextState)
+	deinit(&this.InputTextDeactivatedState)
+	deinit(&this.InputTextPasswordFont)
+	deinit(&this.ClipboardHandlerData)
+	deinit(&this.MenusIdSubmittedThisFrame)
+	deinit(&this.DockContext)
+	deinit(&this.SettingsIniData)
+	deinit(&this.SettingsHandlers)
+	deinit(&this.SettingsWindows)
+	deinit(&this.SettingsTables)
+	deinit(&this.Hooks)
+	deinit(&this.LogBuffer)
+	deinit(&this.DebugLogBuf)
+	deinit(&this.DebugLogIndex)
+	deinit(&this.DebugIDStackTool)
+	deinit(&this.TempBuffer)
+}
+
 // Temporary storage for one window (that's the data which in theory we could ditch at the end of the frame, in practice we currently keep it for each window)
 //-----------------------------------------------------------------------------
 // [SECTION] ImGuiWindowTempData, ImGuiWindow
@@ -7711,6 +8070,33 @@ ImGuiWindowTempData :: struct {
 	TextWrapPos : f32, // Current text wrap pos.
 	ItemWidthStack : ImVector(f32), // Store item widths to restore (attention: .back() is not == ItemWidth)
 	TextWrapPosStack : ImVector(f32), // Store text wrap pos to restore (attention: .back() is not == TextWrapPos)
+}
+
+ImGuiWindowTempData_deinit :: proc(this : ^ImGuiWindowTempData)
+{
+	deinit(&this.ChildWindows)
+	deinit(&this.ItemWidthStack)
+	deinit(&this.TextWrapPosStack)
+}
+
+ImGuiWindowTempData_init :: proc(this : ^ImGuiWindowTempData)
+{
+	init(&this.CursorPos)
+	init(&this.CursorPosPrevLine)
+	init(&this.CursorStartPos)
+	init(&this.CursorMaxPos)
+	init(&this.IdealMaxPos)
+	init(&this.CurrLineSize)
+	init(&this.PrevLineSize)
+	init(&this.Indent)
+	init(&this.ColumnsOffset)
+	init(&this.GroupOffset)
+	init(&this.CursorStartPosLossyness)
+	init(&this.MenuBarOffset)
+	init(&this.MenuColumns)
+	init(&this.ChildWindows)
+	init(&this.ItemWidthStack)
+	init(&this.TextWrapPosStack)
 }
 
 // Storage for one window
@@ -7849,6 +8235,15 @@ ImGuiWindow :: struct {
 	DockTabItemRect : ImRect,
 }
 
+ImGuiWindow_deinit :: proc(this : ^ImGuiWindow)
+{
+	deinit(&this.IDStack)
+	deinit(&this.DC)
+	deinit(&this.StateStorage)
+	deinit(&this.ColumnsStorage)
+	deinit(&this.DrawListInst)
+}
+
 // We don't use g.FontSize because the window may be != g.CurrentWindow.
 ImGuiWindow_Rect :: proc(this : ^ImGuiWindow) -> ImRect { return ImRect(this.Pos.x, this.Pos.y, this.Pos.x + this.Size.x, this.Pos.y + this.Size.y) }
 
@@ -7945,6 +8340,12 @@ ImGuiTabBar :: struct {
 	TabsNames : ImGuiTextBuffer, // For non-docking tab bar we re-append names in a contiguous buffer.
 }
 
+ImGuiTabBar_deinit :: proc(this : ^ImGuiTabBar)
+{
+	deinit(&this.Tabs)
+	deinit(&this.TabsNames)
+}
+
 //-----------------------------------------------------------------------------
 // [SECTION] Table support
 //-----------------------------------------------------------------------------
@@ -8010,6 +8411,7 @@ ImGuiTableColumn :: struct {
 
 ImGuiTableColumn_init :: proc(this : ^ImGuiTableColumn)
 {
+	init(&this.ClipRect)
 	memset(this, 0, size_of(this^))
 	this.WidthRequest = -1.0; this.StretchWeight = this.WidthRequest
 	this.NameOffset = -1
@@ -8175,11 +8577,32 @@ ImGuiTable :: struct {
 }
 
 ImGuiTable_deinit :: proc(this : ^ImGuiTable)
-{IM_FREE(this.RawData)}
+{
+	deinit(&this.ColumnsNames)
+	deinit(&this.InstanceDataExtra)
+	deinit(&this.SortSpecsMulti)
+IM_FREE(this.RawData)}
 
 ImGuiTable_init :: proc(this : ^ImGuiTable)
 {
-	memset(this, 0, size_of(this^)); this.LastFrameActive = -1
+	init(&this.Columns)
+	init(&this.DisplayOrderToIndex)
+	init(&this.RowCellData)
+	init(&this.OuterRect)
+	init(&this.InnerRect)
+	init(&this.WorkRect)
+	init(&this.InnerClipRect)
+	init(&this.BgClipRect)
+	init(&this.Bg0ClipRectForDrawCmd)
+	init(&this.Bg2ClipRectForDrawCmd)
+	init(&this.HostClipRect)
+	init(&this.HostBackupInnerClipRect)
+	init(&this.ColumnsNames)
+	init(&this.InstanceDataFirst)
+	init(&this.InstanceDataExtra)
+	init(&this.SortSpecsSingle)
+	init(&this.SortSpecsMulti)
+	init(&this.SortSpecs)memset(this, 0, size_of(this^)); this.LastFrameActive = -1
 }
 
 // Temporary storage for one table (one per table in the stack), shared between tables.
@@ -8207,9 +8630,23 @@ ImGuiTableTempData :: struct {
 	HostBackupItemWidthStackSize : i32, //Backup of OuterWindow->DC.ItemWidthStack.Size at the end of BeginTable()
 }
 
+ImGuiTableTempData_deinit :: proc(this : ^ImGuiTableTempData)
+{
+	deinit(&this.AngledHeadersRequests)
+	deinit(&this.DrawSplitter)
+}
+
 ImGuiTableTempData_init :: proc(this : ^ImGuiTableTempData)
 {
-	memset(this, 0, size_of(this^)); this.LastTimeActive = -1.0
+	init(&this.AngledHeadersRequests)
+	init(&this.UserOuterSize)
+	init(&this.DrawSplitter)
+	init(&this.HostBackupWorkRect)
+	init(&this.HostBackupParentWorkRect)
+	init(&this.HostBackupPrevLineSize)
+	init(&this.HostBackupCurrLineSize)
+	init(&this.HostBackupCursorMaxPos)
+	init(&this.HostBackupColumnsOffset)memset(this, 0, size_of(this^)); this.LastTimeActive = -1.0
 }
 
 // sizeof() ~ 12
@@ -8294,7 +8731,8 @@ LocalizeGetMsg :: #force_inline proc(key : ImGuiLocKey) -> ^u8
 	g : ^ImGuiContext = GImGui; msg : ^u8 = g.LocalizationTable[key]; return msg != nil ? msg : "*Missing Text*"
 }
 
-//#ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS//#ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS
+//#ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS
+//#ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS
 ScrollToBringRectIntoView :: #force_inline proc(window : ^ImGuiWindow, rect : ^ImRect) { ScrollToRect(window, rect, ImGuiScrollFlags_.ImGuiScrollFlags_KeepVisibleEdgeY) }
 //#endif
 
@@ -8615,6 +9053,21 @@ GImAllocatorUserData : rawptr = nil
 
 ImGuiStyle_init :: proc(this : ^ImGuiStyle)
 {
+	init(&this.WindowPadding)
+	init(&this.WindowMinSize)
+	init(&this.WindowTitleAlign)
+	init(&this.FramePadding)
+	init(&this.ItemSpacing)
+	init(&this.ItemInnerSpacing)
+	init(&this.CellPadding)
+	init(&this.TouchExtraPadding)
+	init(&this.TableAngledHeadersTextAlign)
+	init(&this.ButtonTextAlign)
+	init(&this.SelectableTextAlign)
+	init(&this.SeparatorTextAlign)
+	init(&this.SeparatorTextPadding)
+	init(&this.DisplayWindowPadding)
+	init(&this.DisplaySafeAreaPadding)
 	this.Alpha = 1.0; // Global alpha applies to everything in Dear ImGui.
 	this.DisabledAlpha = 0.60; // Additional alpha multiplier applied by BeginDisabled(). Multiply over current value of Alpha.
 	this.WindowPadding = ImVec2(8, 8); // Padding within a window
@@ -8723,6 +9176,12 @@ ImGuiStyle_ScaleAllSizes :: proc(this : ^ImGuiStyle, scale_factor : f32)
 
 ImGuiIO_init :: proc(this : ^ImGuiIO)
 {
+	init(&this.DisplaySize)
+	init(&this.DisplayFramebufferScale)
+	init(&this.MouseDelta)
+	init(&this.MousePos)
+	init(&this.MousePosPrev)
+	init(&this.InputQueueCharacters)
 	// Most fields are initialized with zero
 	memset(this, 0, size_of(this^))
 	IM_STATIC_ASSERT(IM_ARRAYSIZE(this.ImGuiIO_MouseDown) == ImGuiMouseButton_.ImGuiMouseButton_COUNT && IM_ARRAYSIZE(this.ImGuiIO_MouseClicked) == ImGuiMouseButton_.ImGuiMouseButton_COUNT)
@@ -9157,6 +9616,8 @@ ImGuiIO_AddFocusEvent :: proc(this : ^ImGuiIO, focused : bool)
 
 ImGuiPlatformIO_init :: proc(this : ^ImGuiPlatformIO)
 {
+	init(&this.Monitors)
+	init(&this.Viewports)
 	// Most fields are initialized with zero
 	memset(this, 0, size_of(this^))
 	this.Platform_LocaleDecimalPoint = '.'
@@ -10146,6 +10607,7 @@ ImGuiStorage_SetAllInt :: proc(this : ^ImGuiStorage, v : i32)
 // Helper: Parse and apply text filters. In format "aaaaa[,bbbb][,ccccc]"
 ImGuiTextFilter_init :: proc(this : ^ImGuiTextFilter, default_filter : ^u8 = "")
 {
+	init(&this.Filters)
 	this.InputBuf[0] = 0
 	this.CountGrep = 0
 	if default_filter != nil {
@@ -11226,6 +11688,91 @@ GLocalizationEntriesEnUS : [^]ImGuiLocEntry = {
 
 ImGuiContext_init :: proc(this : ^ImGuiContext, shared_font_atlas : ^ImFontAtlas)
 {
+	init(&this.IO)
+	init(&this.PlatformIO)
+	init(&this.Style)
+	init(&this.DrawListSharedData)
+	init(&this.InputEventsQueue)
+	init(&this.InputEventsTrail)
+	init(&this.Windows)
+	init(&this.WindowsFocusOrder)
+	init(&this.WindowsTempSortBuffer)
+	init(&this.CurrentWindowStack)
+	init(&this.WindowsById)
+	init(&this.WindowsHoverPadding)
+	init(&this.WheelingWindowRefMousePos)
+	init(&this.WheelingWindowWheelRemainder)
+	init(&this.WheelingAxisAvg)
+	init(&this.ActiveIdClickOffset)
+	init(&this.KeysRoutingTable)
+	init(&this.NextItemData)
+	init(&this.LastItemData)
+	init(&this.NextWindowData)
+	init(&this.ColorStack)
+	init(&this.StyleVarStack)
+	init(&this.FontStack)
+	init(&this.FocusScopeStack)
+	init(&this.ItemFlagsStack)
+	init(&this.GroupStack)
+	init(&this.OpenPopupStack)
+	init(&this.BeginPopupStack)
+	init(&this.TreeNodeStack)
+	init(&this.Viewports)
+	init(&this.FallbackMonitor)
+	init(&this.PlatformMonitorsFullWorkRect)
+	init(&this.NavFocusRoute)
+	init(&this.NavInitResult)
+	init(&this.NavScoringRect)
+	init(&this.NavScoringNoClipRect)
+	init(&this.NavMoveResultLocal)
+	init(&this.NavMoveResultLocalVisible)
+	init(&this.NavMoveResultOther)
+	init(&this.NavTabbingResultFirst)
+	init(&this.NavWindowingAccumDeltaPos)
+	init(&this.NavWindowingAccumDeltaSize)
+	init(&this.DragDropPayload)
+	init(&this.DragDropTargetRect)
+	init(&this.DragDropTargetClipRect)
+	init(&this.DragDropPayloadBufHeap)
+	init(&this.ClipperTempData)
+	init(&this.TablesTempData)
+	init(&this.Tables)
+	init(&this.TablesLastTimeActive)
+	init(&this.DrawChannelsTempMergeBuffer)
+	init(&this.TabBars)
+	init(&this.CurrentTabBarStack)
+	init(&this.ShrinkWidthBuffer)
+	init(&this.BoxSelectState)
+	init(&this.MultiSelectTempData)
+	init(&this.MultiSelectStorage)
+	init(&this.MouseLastValidPos)
+	init(&this.InputTextState)
+	init(&this.InputTextDeactivatedState)
+	init(&this.InputTextPasswordFont)
+	init(&this.ColorPickerRef)
+	init(&this.ComboPreviewData)
+	init(&this.WindowResizeBorderExpectedRect)
+	init(&this.ClipboardHandlerData)
+	init(&this.MenusIdSubmittedThisFrame)
+	init(&this.TypingSelectState)
+	init(&this.PlatformImeData)
+	init(&this.PlatformImeDataPrev)
+	init(&this.DockContext)
+	init(&this.SettingsIniData)
+	init(&this.SettingsHandlers)
+	init(&this.SettingsWindows)
+	init(&this.SettingsTables)
+	init(&this.Hooks)
+	init(&this.LogBuffer)
+	init(&this.ErrorTooltipLockedPos)
+	init(&this.StackSizesInNewFrame)
+	init(&this.DebugLogBuf)
+	init(&this.DebugLogIndex)
+	init(&this.DebugFlashStyleColorBackup)
+	init(&this.DebugMetricsConfig)
+	init(&this.DebugIDStackTool)
+	init(&this.DebugAllocInfo)
+	init(&this.TempBuffer)
 	this.IO.Ctx = this
 	this.InputTextState.Ctx = this
 
@@ -11623,6 +12170,37 @@ CallContextHooks :: proc(ctx : ^ImGuiContext, hook_type : ImGuiContextHookType)
 // ImGuiWindow is mostly a dumb struct. It merely has a constructor and a few helper methods
 ImGuiWindow_init :: proc(this : ^ImGuiWindow, ctx : ^ImGuiContext, name : ^u8)
 {
+	init(&this.WindowClass)
+	init(&this.ViewportPos)
+	init(&this.Pos)
+	init(&this.Size)
+	init(&this.SizeFull)
+	init(&this.ContentSize)
+	init(&this.ContentSizeIdeal)
+	init(&this.ContentSizeExplicit)
+	init(&this.WindowPadding)
+	init(&this.Scroll)
+	init(&this.ScrollMax)
+	init(&this.ScrollTarget)
+	init(&this.ScrollTargetCenterRatio)
+	init(&this.ScrollTargetEdgeSnapDist)
+	init(&this.ScrollbarSizes)
+	init(&this.SetWindowPosVal)
+	init(&this.SetWindowPosPivot)
+	init(&this.IDStack)
+	init(&this.DC)
+	init(&this.OuterRectClipped)
+	init(&this.InnerRect)
+	init(&this.InnerClipRect)
+	init(&this.WorkRect)
+	init(&this.ParentWorkRect)
+	init(&this.ClipRect)
+	init(&this.ContentRegionRect)
+	init(&this.HitTestHoleSize)
+	init(&this.HitTestHoleOffset)
+	init(&this.StateStorage)
+	init(&this.ColumnsStorage)
+	init(&this.DockTabItemRect)
 	init(&this.DrawListInst, nil)
 	memset(this, 0, size_of(this^))
 	this.Ctx = ctx
@@ -13693,6 +14271,12 @@ ImGuiResizeGripDef :: struct {
 	InnerDir : ImVec2,
 	AngleMin12 : i32, AngleMax12 : i32,
 }
+
+ImGuiResizeGripDef_init :: proc(this : ^ImGuiResizeGripDef)
+{
+	init(&this.CornerPosN)
+	init(&this.InnerDir)
+}
 resize_grip_def : [4]ImGuiResizeGripDef = {
 	{ImVec2(1, 1), ImVec2(-1, -1), 0, 3}, // Lower-right
 	{ImVec2(0, 1), ImVec2(+1, -1), 3, 6}, // Lower-left
@@ -13705,6 +14289,13 @@ ImGuiResizeBorderDef :: struct {
 	InnerDir : ImVec2, // Normal toward inside
 	SegmentN1 : ImVec2, SegmentN2 : ImVec2, // End positions, normalized (0,0: upper left)
 	OuterAngle : f32, // Angle toward outside
+}
+
+ImGuiResizeBorderDef_init :: proc(this : ^ImGuiResizeBorderDef)
+{
+	init(&this.InnerDir)
+	init(&this.SegmentN1)
+	init(&this.SegmentN2)
 }
 resize_border_def : [4]ImGuiResizeBorderDef = {
 	{ImVec2(+1, 0), ImVec2(0, 1), ImVec2(0, 0), IM_PI * 1.00}, // Left
@@ -22556,9 +23147,14 @@ ImGuiDockPreviewData :: struct {
 	DropRectsDraw : [ImGuiDir.ImGuiDir_COUNT + 1]ImRect, // May be slightly different from hit-testing drop rects used in DockNodeCalcDropRects()
 }
 
+ImGuiDockPreviewData_deinit :: proc(this : ^ImGuiDockPreviewData)
+{
+	deinit(&this.FutureNode)
+}
+
 ImGuiDockPreviewData_init :: proc(this : ^ImGuiDockPreviewData)
 {
-	init(&this.FutureNode, 0); this.IsSplitDirExplicit = false; this.IsSidesAvailable = this.IsSplitDirExplicit; this.IsCenterAvailable = this.IsSidesAvailable; this.IsDropAllowed = this.IsCenterAvailable; this.SplitNode = nil; this.SplitDir = ImGuiDir.ImGuiDir_None; this.SplitRatio = 0.; for n : i32 = 0; n < IM_ARRAYSIZE(this.DropRectsDraw); post_incr(&n) { this.DropRectsDraw[n] = ImRect(+FLT_MAX, +FLT_MAX, -FLT_MAX, -FLT_MAX) }
+	init(&this.FutureNode, 0)this.IsSplitDirExplicit = false; this.IsSidesAvailable = this.IsSplitDirExplicit; this.IsCenterAvailable = this.IsSidesAvailable; this.IsDropAllowed = this.IsCenterAvailable; this.SplitNode = nil; this.SplitDir = ImGuiDir.ImGuiDir_None; this.SplitRatio = 0.; for n : i32 = 0; n < IM_ARRAYSIZE(this.DropRectsDraw); post_incr(&n) { this.DropRectsDraw[n] = ImRect(+FLT_MAX, +FLT_MAX, -FLT_MAX, -FLT_MAX) }
 }
 
 // Storage for a dock node in .ini file (we preserve those even if the associated dock node isn't active during the session)
@@ -22578,7 +23174,9 @@ ImGuiDockNodeSettings :: struct {
 
 ImGuiDockNodeSettings_init :: proc(this : ^ImGuiDockNodeSettings)
 {
-	memset(this, 0, size_of(this^)); this.SplitAxis = ImGuiAxis.ImGuiAxis_None
+	init(&this.Pos)
+	init(&this.Size)
+	init(&this.SizeRef)memset(this, 0, size_of(this^)); this.SplitAxis = ImGuiAxis.ImGuiAxis_None
 }
 
 //-----------------------------------------------------------------------------
@@ -23186,6 +23784,11 @@ DockContextCalcDropPosForDocking :: proc(target : ^ImGuiWindow, target_node : ^I
 
 ImGuiDockNode_init :: proc(this : ^ImGuiDockNode, id : ImGuiID)
 {
+	init(&this.Windows)
+	init(&this.Pos)
+	init(&this.Size)
+	init(&this.SizeRef)
+	init(&this.WindowClass)
 	this.ID = id
 	this.MergedFlags = ImGuiDockNodeFlags_.ImGuiDockNodeFlags_None; this.LocalFlagsInWindows = this.MergedFlags; this.LocalFlags = this.LocalFlagsInWindows; this.SharedFlags = this.LocalFlags
 	this.ChildNodes[1] = nil; this.ChildNodes[0] = this.ChildNodes[1]; this.ParentNode = this.ChildNodes[0]
@@ -28267,6 +28870,9 @@ StyleColorsLight :: proc(dst : ^ImGuiStyle)
 
 ImDrawListSharedData_init :: proc(this : ^ImDrawListSharedData)
 {
+	init(&this.TexUvWhitePixel)
+	init(&this.ClipRectFullscreen)
+	init(&this.TempBuffer)
 	memset(this, 0, size_of(this^))
 	for i : i32 = 0; i < IM_ARRAYSIZE(this.ArcFastVtx); post_incr(&i) {
 		a : f32 = (cast(f32) i * 2 * IM_PI) / cast(f32) IM_ARRAYSIZE(this.ArcFastVtx)
@@ -28294,6 +28900,15 @@ ImDrawListSharedData_SetCircleTessellationMaxError :: proc(this : ^ImDrawListSha
 // (advanced: you may create and use your own ImDrawListSharedData so you can use ImDrawList without ImGui, but that's more involved)
 ImDrawList_init :: proc(this : ^ImDrawList, shared_data : ^ImDrawListSharedData)
 {
+	init(&this.CmdBuffer)
+	init(&this.IdxBuffer)
+	init(&this.VtxBuffer)
+	init(&this._Path)
+	init(&this._CmdHeader)
+	init(&this._Splitter)
+	init(&this._ClipRectStack)
+	init(&this._TextureIdStack)
+	init(&this._CallbacksDataBuf)
 	memset(this, 0, size_of(this^))
 	this._Data = shared_data
 }
@@ -29651,6 +30266,8 @@ ImTriangulatorNode_Unlink :: proc(this : ^ImTriangulatorNode)
 	this.Next.Prev = this.Prev; this.Prev.Next = this.Next
 }
 
+ImTriangulatorNode_init :: proc(this : ^ImTriangulatorNode) { init(&this.Pos) }
+
 ImTriangulatorNodeSpan :: struct {
 	Data : ^^ImTriangulatorNode,
 	Size : i32,
@@ -29663,9 +30280,8 @@ ImTriangulatorNodeSpan_find_erase_unsorted :: proc(this : ^ImTriangulatorNodeSpa
 
 ImTriangulatorNodeSpan_init :: proc(this : ^ImTriangulatorNodeSpan)
 {
-this.Data = nil
-this.Size = 0
-
+	this.Data = nil
+	this.Size = 0
 }
 
 ImTriangulator :: struct {
@@ -29682,9 +30298,10 @@ ImTriangulator_EstimateScratchBufferSize :: proc(this : ^ImTriangulator, points_
 
 ImTriangulator_init :: proc(this : ^ImTriangulator)
 {
-this._TrianglesLeft = 0
-this._Nodes = nil
-
+	this._TrianglesLeft = 0
+	this._Nodes = nil
+	init(&this._Ears)
+	init(&this._Reflexes)
 }
 
 // Distribute storage for nodes, ears and reflexes.
@@ -30203,6 +30820,8 @@ ShadeVertsTransformPos :: proc(draw_list : ^ImDrawList, vert_start_idx : i32, ve
 
 ImFontConfig_init :: proc(this : ^ImFontConfig)
 {
+	init(&this.GlyphExtraSpacing)
+	init(&this.GlyphOffset)
 	memset(this, 0, size_of(this^))
 	this.FontDataOwnedByAtlas = true
 	this.OversampleH = 2
@@ -30273,6 +30892,11 @@ FONT_ATLAS_DEFAULT_TEX_CURSOR_DATA : [3][ImGuiMouseCursor_.ImGuiMouseCursor_COUN
 
 ImFontAtlas_init :: proc(this : ^ImFontAtlas)
 {
+	init(&this.TexUvScale)
+	init(&this.TexUvWhitePixel)
+	init(&this.Fonts)
+	init(&this.CustomRects)
+	init(&this.ConfigData)
 	memset(this, 0, size_of(this^))
 	this.TexGlyphPadding = 1
 	this.PackIdLines = -1; this.PackIdMouseCursors = this.PackIdLines
@@ -30638,6 +31262,18 @@ ImFontBuildSrcData :: struct {
 	GlyphsList : ImVector(i32), // Glyph codepoints list (flattened version of GlyphsSet)
 }
 
+ImFontBuildSrcData_deinit :: proc(this : ^ImFontBuildSrcData)
+{
+	deinit(&this.GlyphsSet)
+	deinit(&this.GlyphsList)
+}
+
+ImFontBuildSrcData_init :: proc(this : ^ImFontBuildSrcData)
+{
+	init(&this.GlyphsSet)
+	init(&this.GlyphsList)
+}
+
 // Temporary data for one destination ImFont* (multiple source fonts can be merged into one destination ImFont)
 ImFontBuildDstData :: struct {
 	SrcCount : i32, // Number of source fonts targeting this destination font.
@@ -30645,6 +31281,13 @@ ImFontBuildDstData :: struct {
 	GlyphsCount : i32,
 	GlyphsSet : ImBitVector, // This is used to resolve collision when multiple sources are merged into a same destination font.
 }
+
+ImFontBuildDstData_deinit :: proc(this : ^ImFontBuildDstData)
+{
+	deinit(&this.GlyphsSet)
+}
+
+ImFontBuildDstData_init :: proc(this : ^ImFontBuildDstData) { init(&this.GlyphsSet) }
 
 UnpackBitVectorToFlatIndexList :: proc(in : ^ImBitVector, out : ^ImVector(i32))
 {
@@ -31420,6 +32063,9 @@ ImFontGlyphRangesBuilder_BuildRanges :: proc(this : ^ImFontGlyphRangesBuilder, o
 
 ImFont_init :: proc(this : ^ImFont)
 {
+	init(&this.IndexAdvanceX)
+	init(&this.IndexLookup)
+	init(&this.Glyphs)
 	this.FontSize = 0.0
 	this.FallbackAdvanceX = 0.0
 	this.FallbackChar = 0
@@ -38981,12 +39627,6 @@ ImStb_stb_text_createundo :: proc(state : ^StbUndoState, pos : i32, insert_len :
 //
 
 // forward declarations
-/////////////////////////////////////////////////////////////////////////////
-//
-//      Keyboard input handling
-//
-
-// forward declarations
 ImStb_stb_text_undo :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_TexteditState)
 {
 	s : ^StbUndoState = &state.undostate
@@ -39228,6 +39868,10 @@ ImStb_stb_textedit_replace :: proc(str : ^ImGuiInputTextState, state : ^ImStb_ST
 // We added an extra indirection where 'Stb' is heap-allocated, in order facilitate the work of bindings generators.
 ImGuiInputTextState_init :: proc(this : ^ImGuiInputTextState)
 {
+	init(&this.TextA)
+	init(&this.TextToRevertTo)
+	init(&this.CallbackTextBackup)
+	init(&this.Scroll)
 	memset(this, 0, size_of(this^))
 	this.Stb = IM_NEW(ImStbTexteditState)
 	memset(this.Stb, 0, size_of(this.Stb^))
@@ -42688,6 +43332,7 @@ DebugNodeMultiSelectState :: proc(storage : ^ImGuiMultiSelectState)
 
 ImGuiSelectionBasicStorage_init :: proc(this : ^ImGuiSelectionBasicStorage)
 {
+	init(&this._Storage)
 	this.Size = 0
 	this.PreserveOrder = false
 	this.UserData = nil
@@ -43727,6 +44372,11 @@ ImGuiTabBarSection_init :: proc(this : ^ImGuiTabBarSection) { memset(this, 0, si
 
 ImGuiTabBar_init :: proc(this : ^ImGuiTabBar)
 {
+	init(&this.Tabs)
+	init(&this.BarRect)
+	init(&this.FramePadding)
+	init(&this.BackupCursorPos)
+	init(&this.TabsNames)
 	memset(this, 0, size_of(this^))
 	this.PrevFrameVisible = -1; this.CurrFrameVisible = this.PrevFrameVisible
 	this.LastTabItemIdx = -1
@@ -47131,9 +47781,9 @@ MergeGroup :: struct {
 
 	MergeGroup_init :: proc(this : ^MergeGroup)
 	{
-this.ChannelsCount = 0
-this.ChannelsMask = nil
-
+		init(&this.ClipRect)
+		this.ChannelsCount = 0
+		this.ChannelsMask = nil
 	}
 	merge_group_mask : i32 = 0x00
 	merge_groups : [4]MergeGroup

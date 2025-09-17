@@ -152,7 +152,7 @@ TreePush :: proc { TreePush_0, TreePush_1 }
 
 Value :: proc { Value_0, Value_1, Value_2, Value_3 }
 
-deinit :: proc { ImVector_deinit, ImDrawListSplitter_deinit, ImGuiViewport_deinit, ImPool_deinit, ImGuiViewportP_deinit, ImGuiTable_deinit }
+deinit :: proc { ImVector_deinit, ImGuiIO_deinit, ImGuiTextFilter_deinit, ImGuiTextBuffer_deinit, ImGuiStorage_deinit, ImGuiMultiSelectIO_deinit, ImGuiSelectionBasicStorage_deinit, ImDrawChannel_deinit, ImDrawListSplitter_deinit, ImDrawList_deinit, ImDrawData_deinit, ImFontGlyphRangesBuilder_deinit, ImFontAtlas_deinit, ImFont_deinit, ImGuiViewport_deinit, ImGuiPlatformIO_deinit, ImBitVector_deinit, ImPool_deinit, ImChunkStream_deinit, ImGuiTextIndex_deinit, ImDrawListSharedData_deinit, ImDrawDataBuilder_deinit, ImGuiInputTextDeactivatedState_deinit, ImGuiInputTextState_deinit, ImGuiKeyRoutingTable_deinit, ImGuiListClipperData_deinit, ImGuiOldColumns_deinit, ImGuiMultiSelectTempData_deinit, ImGuiDockNode_deinit, ImGuiDockContext_deinit, ImGuiViewportP_deinit, ImGuiIDStackTool_deinit, ImGuiContext_deinit, ImGuiWindowTempData_deinit, ImGuiWindow_deinit, ImGuiTabBar_deinit, ImGuiTable_deinit, ImGuiTableTempData_deinit, ImGuiDockPreviewData_deinit, ImFontBuildSrcData_deinit, ImFontBuildDstData_deinit }
 
 erase :: proc { ImVector_erase_0, ImVector_erase_1 }
 

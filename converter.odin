@@ -13,6 +13,7 @@ import      "core:slice"
 import      "core:log"
 import      "core:io"
 import sa   "core:container/small_array"
+import      "ordered_map"
 
 ConverterContext :: struct {
 	result : str.Builder,
@@ -36,13 +37,14 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 				name = { kind = .Identifier, source = pair[0] },
 				expansion_tokens = { { kind = .Identifier, source = pair[1] } }
 			}})
+			assert(idx != 0)
 			ctx.ast[0].sequence.declared_names[pair[0]] = idx
 		}
 
 
 
 		str.write_string(&ctx.result, "package test\n\n")
-		write_node_sequence(ctx, ctx.root_sequence, 0, "")
+		_ = write_node_sequence(ctx, ctx.root_sequence, 0, "")
 	}
 
 	@(require_results)
@@ -61,7 +63,9 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 				sequence.parent_scope = scope_node
 
 				if sequence.braced { str.write_byte(&ctx.result, '{') }
-				write_node_sequence(ctx, sequence.members[:], current_node_index, indent_str)
+				did_clobber = write_node_sequence(ctx, sequence.members[:], current_node_index, indent_str)
+				if did_clobber { current_node = &ctx.ast[current_node_index]; sequence = &current_node.sequence }
+
 				if sequence.braced {
 					if len(sequence.members) > 1 && ctx.ast[last(sequence.members[:])^].kind == .NewLine {
 						str.write_string(&ctx.result, indent_str)
@@ -453,7 +457,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 
 							str.write_string(&ctx.result, indent_str); str.write_string(&ctx.result, "{")
 							body_indent_str := str.concatenate({ indent_str, ONE_INDENT }, context.temp_allocator)
-							write_node_sequence(ctx, function.body_sequence[:], current_node_index, body_indent_str)
+							did_clobber |= write_node_sequence(ctx, function.body_sequence[:], current_node_index, body_indent_str)
 							str.write_string(&ctx.result, indent_str); str.write_byte(&ctx.result, '}')
 					}
 				}
@@ -559,7 +563,8 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 							str.write_string(&ctx.result, "{\n")
 							str.write_string(&ctx.result, member_indent_str)
 							str.write_string(&ctx.result, "using __l")
-							write_node_sequence(ctx, function.body_sequence[:], current_node_index, member_indent_str)
+							c := write_node_sequence(ctx, function.body_sequence[:], current_node_index, member_indent_str); did_clobber |= c
+							if c { lambda = current_node.lambda_def; function_ = &ctx.ast[lambda.underlying_function]; function = &function_.function_def }
 
 							if ctx.ast[last(function.body_sequence)^].kind == .NewLine { str.write_string(&ctx.result, indent_str) }
 							str.write_string(&ctx.result, "}\n")
@@ -980,6 +985,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 					did_clobber, _, _, _ = write_node(ctx, current_node.member_access.expression, scope_node)
 					str.write_byte(&ctx.result, '.')
 
+					xxx := expression_type_node
 					expression_type_node := maybe_follow_typedef(ctx, scope_node /*@correctness wrong*/, expression_type_node)
 
 					member_definition_idx, _ := try_find_definition_for_name(ctx, expression_type_node, current_node.member_access.member)
@@ -1115,7 +1121,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 
 				body := current_node.compound_initializer.values[:]
 				str.write_byte(&ctx.result, '{')
-				write_node_sequence(ctx, body, scope_node, body_indent_str, termination = ",", always_terminate = true)
+				did_clobber |= write_node_sequence(ctx, body, scope_node, body_indent_str, termination = ",", always_terminate = true)
 				if len(body) > 0 && ctx.ast[last(body)^].kind == .NewLine { str.write_string(&ctx.result, indent_str) }
 				str.write_byte(&ctx.result, '}')
 
@@ -1140,7 +1146,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 
 				append(&ns.merged_member_sequence, ..ns.member_sequence[:])
 
-				write_node_sequence(ctx, trim_newlines_start(ctx, ns.member_sequence[:]), current_node_index, indent_str)
+				did_clobber |= write_node_sequence(ctx, trim_newlines_start(ctx, ns.member_sequence[:]), current_node_index, indent_str)
 
 				swallow_paragraph = true
 
@@ -1216,7 +1222,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 						case:
 							str.write_string(&ctx.result, " {")
 
-							write_node_sequence(ctx, loop.body_sequence[:], current_node_index, body_indent_str)
+							did_clobber |= write_node_sequence(ctx, loop.body_sequence[:], current_node_index, body_indent_str)
 
 							str.write_byte(&ctx.result, '\n')
 							str.write_string(&ctx.result, body_indent_str)
@@ -1250,7 +1256,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 								str.write_byte(&ctx.result, '\n')
 							}
 
-							write_node_sequence(ctx, loop.body_sequence[:], current_node_index, body_indent_str)
+							did_clobber |= write_node_sequence(ctx, loop.body_sequence[:], current_node_index, body_indent_str)
 
 							str.write_string(&ctx.result, indent_str)
 							str.write_string(&ctx.result, "}")
@@ -1269,7 +1275,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 						case:
 							str.write_string(&ctx.result, " {")
 
-							write_node_sequence(ctx, loop.body_sequence[:], current_node_index, body_indent_str)
+							did_clobber |= write_node_sequence(ctx, loop.body_sequence[:], current_node_index, body_indent_str)
 
 							str.write_string(&ctx.result, indent_str)
 							str.write_string(&ctx.result, "}")
@@ -1341,7 +1347,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 						case:
 							str.write_string(&ctx.result, " {")
 							body_indent_str = str.concatenate({ indent_str, ONE_INDENT }, context.temp_allocator)
-							write_node_sequence(ctx, true_branch.sequence.members[:], branch.true_branch, body_indent_str)
+							did_clobber |= write_node_sequence(ctx, true_branch.sequence.members[:], branch.true_branch, body_indent_str)
 							if ctx.ast[last(true_branch.sequence.members[:])^].kind == .NewLine {
 								str.write_string(&ctx.result, indent_str);
 							}
@@ -1392,7 +1398,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 							str.write_string(&ctx.result, indent_str)
 							str.write_string(&ctx.result, "else {")
 							if body_indent_str == "" { body_indent_str = str.concatenate({ indent_str, ONE_INDENT }, context.temp_allocator) }
-							write_node_sequence(ctx, false_branch.sequence.members[:], branch.false_branch, body_indent_str)
+							did_clobber |= write_node_sequence(ctx, false_branch.sequence.members[:], branch.false_branch, body_indent_str)
 							str.write_string(&ctx.result, indent_str)
 							str.write_byte(&ctx.result, '}')
 					}
@@ -1419,7 +1425,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 					}
 					str.write_byte(&ctx.result, ':')
 
-					write_node_sequence(ctx, case_.body_sequence[:], scope_node, case_body_indent_str)
+					did_clobber |= write_node_sequence(ctx, case_.body_sequence[:], scope_node, case_body_indent_str)
 
 					// Cpp defaults to fallthrough, so try to detect if we should break (or not).
 					// This won't catch cases where the case looks like 
@@ -1664,7 +1670,8 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 		return
 	}
 
-	write_node_sequence :: proc(ctx : ^ConverterContext, sequence : []AstNodeIndex, elements_scope_node : AstNodeIndex, indent_str : string, termination := ";", always_terminate := false)
+	@(require_results)
+	write_node_sequence :: proc(ctx : ^ConverterContext, sequence : []AstNodeIndex, elements_scope_node : AstNodeIndex, indent_str : string, termination := ";", always_terminate := false) -> (did_clobber : bool)
 	{
 		previous_requires_termination := false
 		previous_requires_new_paragraph := false
@@ -1704,7 +1711,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 				str.write_string(&ctx.result, ctx.ast[ci].label.source)
 				str.write_string(&ctx.result, ": for {\n")
 
-				write_node_sequence(ctx, sequence[cii + 1:], elements_scope_node, member_indent_str, termination, always_terminate)
+				did_clobber |= write_node_sequence(ctx, sequence[cii + 1:], elements_scope_node, member_indent_str, termination, always_terminate)
 
 				str.write_byte(&ctx.result, '\n')
 				str.write_string(&ctx.result, member_indent_str)
@@ -1715,9 +1722,10 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 				return
 			}
 
-			_, previous_requires_termination, previous_requires_new_paragraph, should_swallow_paragraph = write_node(ctx, ci, elements_scope_node, indent_str)
+			c : bool; c, previous_requires_termination, previous_requires_new_paragraph, should_swallow_paragraph = write_node(ctx, ci, elements_scope_node, indent_str); did_clobber |= c
 			previous_node_kind = node_kind
 		}
+		return
 	}
 
 	@(require_results)
@@ -1798,28 +1806,66 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 			}
 		}
 
-		if structure.deinitializer != 0 {
-			deinitializer := &ctx.ast[structure.deinitializer].function_def
-			if .IsForwardDeclared not_in deinitializer.flags {
-				deinitializer.parent_scope = structure_node_index
-				deinitializer.parent_structure = structure_node_index
-	
-				complete_deinitializer_name := str.concatenate({ complete_structure_name, "_deinit" })
-				insert_new_overload(ctx, "deinit", complete_deinitializer_name)
-	
-				deinitializer.declared_names["this"] = structure.synthetic_this_var
-	
-				str.write_string(&ctx.result, "\n\n")
-				str.write_string(&ctx.result, indent_str);
-				str.write_string(&ctx.result, complete_deinitializer_name);
-				str.write_string(&ctx.result, " :: proc(this : ^")
-				str.write_string(&ctx.result, complete_structure_name);
-				str.write_string(&ctx.result, ")\n")
-	
-				str.write_string(&ctx.result, indent_str); str.write_string(&ctx.result, "{")
-				write_node_sequence(ctx, deinitializer.body_sequence[:], structure.deinitializer, member_indent_str)
-				str.write_string(&ctx.result, indent_str); str.write_byte(&ctx.result, '}')
+		transitively_deinitialized : [dynamic]AstNodeIndex // only vardefs
+		for mid in structure.members {
+			if ctx.ast[mid].kind != .VariableDeclaration { continue }
+			vardef := &ctx.ast[mid].var_declaration
+			if vardef.width_expression != 0 { continue }
+
+			switch _ in ctx.type_heap[vardef.type] {
+				case AstTypeFragment:
+					def_idx := try_find_definition_for(ctx, parent_scope, vardef.type)
+					if def_idx == 0 { continue } //TODO(Rennorb) @correctness
+					def := &ctx.ast[def_idx]
+					if def.kind != .Struct { continue }
+
+					if .HasNontrivialCtor in def.structure.flags {
+						structure.flags |= { .HasImplicitCtor, .HasNontrivialCtor }
+					}
+
+					if .HasImplicitDtor in def.structure.flags || def.structure.deinitializer != 0 {
+						structure.flags |= { .HasImplicitDtor }
+						append(&transitively_deinitialized, mid)
+					}
+
+				case AstTypeInlineStructure, AstTypeFunction, AstTypePointer, AstTypeArray, AstTypePrimitive, AstTypeVoid:
+					/* not a complex type */
+				case AstTypeAuto:
+					unreachable()
 			}
+		}
+
+		if (structure.deinitializer != 0 && .IsForwardDeclared not_in ctx.ast[structure.deinitializer].function_def.flags) || .HasImplicitDtor in structure.flags {
+			complete_deinitializer_name := str.concatenate({ complete_structure_name, "_deinit" })
+			insert_new_overload(ctx, "deinit", complete_deinitializer_name)
+			
+			deinitializer_fn : ^type_of(AstNode{}.function_def)
+			if structure.deinitializer != 0 {
+				deinitializer_fn = &ctx.ast[structure.deinitializer].function_def
+				deinitializer_fn.parent_scope = structure_node_index
+				deinitializer_fn.parent_structure = structure_node_index
+				deinitializer_fn.declared_names["this"] = structure.synthetic_this_var
+			}
+
+			str.write_string(&ctx.result, "\n\n")
+			str.write_string(&ctx.result, indent_str);
+			str.write_string(&ctx.result, complete_deinitializer_name);
+			str.write_string(&ctx.result, " :: proc(this : ^")
+			str.write_string(&ctx.result, complete_structure_name);
+			str.write_string(&ctx.result, ")\n")
+
+			str.write_string(&ctx.result, indent_str); str.write_string(&ctx.result, "{")
+			if len(transitively_deinitialized) > 0 {
+				str.write_byte(&ctx.result, '\n');
+				for tid in transitively_deinitialized {
+					str.write_string(&ctx.result, member_indent_str);
+					str.write_string(&ctx.result, "deinit(&this."); str.write_string(&ctx.result, ctx.ast[tid].var_declaration.var_name.source); str.write_string(&ctx.result, ")\n");
+				}
+			}
+			if deinitializer_fn != nil {
+				did_clobber |= write_node_sequence(ctx, deinitializer_fn.body_sequence[:], structure.deinitializer, member_indent_str)
+			}
+			str.write_string(&ctx.result, indent_str); str.write_byte(&ctx.result, '}')
 		}
 
 		written_initializer := false
@@ -1866,6 +1912,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 
 			synth_ctor_name := append_simple_identifier(ctx, ctx.ast[structure.name].identifier.token) // remove potential parents
 			// also invalidates the structure pointer, but its no longer used from here on so its ok
+			did_clobber = true
 
 			synth := AstNode{ kind = .FunctionDefinition, function_def = {
 				parent_scope = structure_node_index,
@@ -1873,7 +1920,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 				function_name = synth_ctor_name,
 				flags = { .IsCtor },
 			}}
-			did_clobber |= write_function_inner(ctx, &synth, 0, indent_str)
+			_ = write_function_inner(ctx, &synth, 0, indent_str)
 		}
 
 		return
@@ -2645,7 +2692,7 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 			}
 		}
 
-		if fn_node.function_name != 0 {
+		if fn_node.function_name != 0 && function_node_idx != 0 /* special case where we might actually get called with a synthetic node */ {
 			function_scope := fn_node.parent_structure != 0 ? fn_node.parent_structure : fn_node.parent_scope
 			scope := cvt_get_declared_names(ctx, function_scope)
 			scope[get_identifier_string(ctx, fn_node.function_name)] = function_node_idx
@@ -2673,18 +2720,73 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 			return
 		}
 
-		body_sequence_count := len(fn_node.body_sequence)
+		body_sequence_count := len(fn_node.body_sequence) + ordered_map.len(&fn_node.initializers)
 
-		implicit_initializaitons : [dynamic]AstNodeIndex
-		if .IsCtor in fn_node.flags && .HasImplicitCtor in parent_type.structure.flags {
-			implicit_initializaitons = make([dynamic]AstNodeIndex, 0, 64, context.temp_allocator)
+		initializations := make([dynamic]AstNodeIndex, 0, ordered_map.len(&fn_node.initializers), context.temp_allocator)
+
+		// TODO(Rennorb) @perf
+		if .IsCtor in fn_node.flags {
 			for mi in parent_type.structure.members {
 				member := ctx.ast[mi]
-				if member.kind == .VariableDeclaration && member.var_declaration.initializer_expression != {} {
-					append(&implicit_initializaitons, mi)
-					body_sequence_count += 1
+				if member.kind != .VariableDeclaration { continue }
+				vardef := &member.var_declaration
+				if .Static in vardef.flags { continue }
+
+				if member.var_declaration.initializer_expression != {} {
+					if !ordered_map.contains(&fn_node.initializers, member.var_declaration.var_name.source) {
+						append(&initializations, mi)
+						body_sequence_count += 1
+					}
+					continue
+				}
+
+				switch _ in ctx.type_heap[vardef.type] {
+					case AstTypeFragment:
+						def_idx := try_find_definition_for(ctx, function_node_idx, vardef.type)
+						if def_idx == 0 { continue } //TODO(Rennorb) @correctness
+						def := &ctx.ast[def_idx]
+						if def.kind != .Struct { continue }
+	
+						if .HasNontrivialCtor in def.structure.flags {
+							if !ordered_map.contains(&fn_node.initializers, member.var_declaration.var_name.source) {
+								append(&initializations, mi)
+								body_sequence_count += 1
+							}
+						}
+	
+					case AstTypeInlineStructure, AstTypeFunction, AstTypePointer, AstTypeArray, AstTypePrimitive, AstTypeVoid:
+						/* not a complex type */
+					case AstTypeAuto:
+						unreachable()
 				}
 			}
+
+			it := ordered_map.iterate(&fn_node.initializers)
+			for _, v in ordered_map.iterate_next(&fn_node.initializers, &it) { append(&initializations, v) }
+		}
+
+		@(require_results)
+		write_implicit_member_initializer :: proc(ctx : ^ConverterContext, initializer_expr : AstNodeIndex, scope_node : AstNodeIndex, indent_str : string) -> (did_clobber : bool)
+		{
+			switch expr := &ctx.ast[initializer_expr]; true {
+				case expr.kind == .VariableDeclaration:
+					vardef := &expr.var_declaration
+					if vardef.initializer_expression != 0 {
+						str.write_string(&ctx.result, "this.")
+						str.write_string(&ctx.result, vardef.var_name.source)
+						str.write_string(&ctx.result, " = ")
+						did_clobber, _, _, _ = write_node(ctx, vardef.initializer_expression, scope_node, indent_str)
+					}
+					else {
+						str.write_string(&ctx.result, "init(&this.")
+						str.write_string(&ctx.result, vardef.var_name.source)
+						str.write_byte(&ctx.result, ')')
+					}
+
+				case:
+					did_clobber, _, _, _ := write_node(ctx, initializer_expr, scope_node, indent_str)
+			}
+			return
 		}
 
 		switch body_sequence_count {
@@ -2693,12 +2795,8 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 
 			case 1:
 				str.write_string(&ctx.result, " { ");
-				if len(implicit_initializaitons) != 0 {
-					member := ctx.ast[implicit_initializaitons[0]].var_declaration
-					str.write_string(&ctx.result, "this.")
-					str.write_string(&ctx.result, member.var_name.source)
-					str.write_string(&ctx.result, " = ")
-					c, _, _, _ := write_node(ctx, member.initializer_expression, function_node_idx, indent_str); did_clobber |= c
+				if len(initializations) != 0 {
+					did_clobber |= write_implicit_member_initializer(ctx, initializations[0], function_node_idx, indent_str)
 				}
 				else {
 					c, _, _, _ := write_node(ctx, fn_node.body_sequence[0], function_node_idx, indent_str); did_clobber |= c
@@ -2711,25 +2809,19 @@ convert_and_format :: proc(ctx : ^ConverterContext, implicit_names : [][2]string
 				str.write_string(&ctx.result, indent_str); str.write_string(&ctx.result, "{")
 				body_indent_str := str.concatenate({ indent_str, ONE_INDENT }, context.temp_allocator)
 
-				if len(implicit_initializaitons) != 0 {
-					str.write_byte(&ctx.result, '\n')
-
-					for mi in implicit_initializaitons {
-						member := ctx.ast[mi].var_declaration
-
-						str.write_string(&ctx.result, "this.")
-						str.write_string(&ctx.result, member.var_name.source)
-						str.write_string(&ctx.result, " = ")
-						c, _, _, _ := write_node(ctx, member.initializer_expression, function_node_idx); did_clobber |= c
-
+				if len(initializations) != 0 {
+					for mi in initializations {
 						str.write_byte(&ctx.result, '\n')
+						str.write_string(&ctx.result, body_indent_str)
+						did_clobber |= write_implicit_member_initializer(ctx, mi, function_node_idx, body_indent_str)
 					}
 				}
 				else if len(fn_node.body_sequence) > 0 && ctx.ast[fn_node.body_sequence[0]].kind != .NewLine {
 					str.write_byte(&ctx.result, '\n')
-					str.write_string(&ctx.result, body_indent_str);
+					str.write_string(&ctx.result, body_indent_str)
 				}
-				write_node_sequence(ctx, fn_node.body_sequence[:], function_node_idx, body_indent_str)
+				c := write_node_sequence(ctx, fn_node.body_sequence[:], function_node_idx, body_indent_str); did_clobber |= c
+				if c { fn_node = &function_node_.function_def }
 
 				if ctx.ast[last_or_nil(fn_node.body_sequence)].kind != .NewLine {
 					str.write_byte(&ctx.result, '\n');
@@ -4199,6 +4291,7 @@ try_find_definition_for_name_preflattened :: proc(ctx : ^ConverterContext, initi
 	{
 		node, found := cvt_get_declared_names(ctx, scope)[flattened_name[0]]
 		wrong_type: if found {
+			assert(node != 0)
 			if len(flattened_name) < 2 {
 				#partial switch definition_node := ctx.ast[node]; definition_node.kind {
 					case .Namespace:

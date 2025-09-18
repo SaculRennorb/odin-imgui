@@ -99,7 +99,9 @@ Data :: struct {
 
 Data_init :: proc(this : ^Data)
 {
-	im.memset(cast(rawptr) this, 0, size_of(this^)); this.VertexBufferSize = 5000; this.IndexBufferSize = 10000
+	this^ = {}
+	this.VertexBufferSize = 5000
+	this.IndexBufferSize = 10000
 }
 
 VERTEX_CONSTANT_BUFFER_DX11 :: struct {
@@ -120,7 +122,6 @@ SetupRenderState :: proc(draw_data : ^im.ImDrawData, device_ctx : ^dx11.IDeviceC
 
 	// Setup viewport
 	vp : dx11.VIEWPORT
-	im.memset(&vp, 0, size_of(dx11.VIEWPORT))
 	vp.Width = draw_data.DisplaySize.x
 	vp.Height = draw_data.DisplaySize.y
 	vp.MinDepth = 0.0
@@ -143,7 +144,7 @@ SetupRenderState :: proc(draw_data : ^im.ImDrawData, device_ctx : ^dx11.IDeviceC
 			{0.0, 0.0, 0.5, 0.0},
 			{(R + L) / (L - R), (T + B) / (B - T), 0.5, 1.0},
 		}
-		im.memcpy(&constant_buffer.mvp, &mvp, size_of(mvp))
+		constant_buffer.mvp = mvp
 		device_ctx->Unmap(bd.pVertexConstantBuffer, 0)
 	}
 

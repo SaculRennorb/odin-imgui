@@ -99,4 +99,4 @@ IMGUI_USE_STB_SPRINTF :: false
 //#define IM_DEBUG_BREAK  __debugbreak()
 
 //---- Debug Tools: Enable slower asserts
-IMGUI_DEBUG_PARANOID :: false
+IMGUI_DEBUG_PARANOID :: true

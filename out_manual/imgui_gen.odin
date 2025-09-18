@@ -7567,7 +7567,7 @@ GetDefaultFont :: #force_inline proc() -> ^ImFont
 	g : ^ImGuiContext = GImGui; return g.IO.FontDefault != nil ? g.IO.FontDefault : g.IO.Fonts.Fonts.Data[0]
 }
 // get foreground draw list for the given viewport or viewport associated to the current window. this draw list will be the top-most rendered one. Useful to quickly draw shapes/text over dear imgui contents.
-GetForegroundDrawList_w :: #force_inline proc(window : ^ImGuiWindow = nil) -> ^ImDrawList { return GetForegroundDrawList(window.Viewport) }
+GetForegroundDrawList_w :: #force_inline proc(window : ^ImGuiWindow) -> ^ImDrawList { return GetForegroundDrawList(window.Viewport) }
 LocalizeGetMsg :: #force_inline proc(key : ImGuiLocKey) -> string
 {
 	g : ^ImGuiContext = GImGui; msg := g.LocalizationTable[key]; return msg != "" ? msg : "*Missing Text*"
@@ -11472,7 +11472,7 @@ GetViewportBgFgDrawList :: proc(viewport : ^ImGuiViewportP, drawlist_no : uint, 
 
 // Background/Foreground Draw Lists
 // get background draw list for the given viewport or viewport associated to the current window. this draw list will be the first rendering one. Useful to quickly draw shapes/text behind dear imgui contents.
-GetBackgroundDrawList :: proc(viewport : ^ImGuiViewport) -> ^ImDrawList
+GetBackgroundDrawList :: proc(viewport : ^ImGuiViewport = nil) -> ^ImDrawList
 {
 	viewport := viewport
 	if viewport == nil { viewport = GImGui.CurrentWindow.Viewport }
@@ -11480,7 +11480,7 @@ GetBackgroundDrawList :: proc(viewport : ^ImGuiViewport) -> ^ImDrawList
 }
 
 // get foreground draw list for the given viewport or viewport associated to the current window. this draw list will be the top-most rendered one. Useful to quickly draw shapes/text over dear imgui contents.
-GetForegroundDrawList_vp :: proc(viewport : ^ImGuiViewport) -> ^ImDrawList
+GetForegroundDrawList_vp :: proc(viewport : ^ImGuiViewport = nil) -> ^ImDrawList
 {
 	viewport := viewport
 	if viewport == nil { viewport = GImGui.CurrentWindow.Viewport }
@@ -28597,8 +28597,8 @@ ImDrawList_AddPolyline :: proc(this : ^ImDrawList, points : []ImVec2, col : ImU3
 
 		// Thicknesses <1.0 should behave like thickness 1.0
 		thickness = ImMax(thickness, 1.0)
-		integer_thickness : i32 = cast(i32) thickness
-		fractional_thickness : f32 = thickness - cast(f32) integer_thickness
+		integer_thickness := i32(thickness)
+		fractional_thickness : f32 = thickness - f32(integer_thickness)
 
 		// Do we want to draw this line using a texture?
 		// - For now, only draw integer-width lines using textures to avoid issues with the way scaling occurs, could be improved.
@@ -28786,7 +28786,7 @@ ImDrawList_AddPolyline :: proc(this : ^ImDrawList, points : []ImVec2, col : ImU3
 				this._VtxWritePtr = this._VtxWritePtr[4:]
 			}
 		}
-		this._VtxCurrentIdx = cast(u32) cast(ImDrawIdx) vtx_count
+		this._VtxCurrentIdx += cast(u32) cast(ImDrawIdx) vtx_count
 	}
 	else {
 		// [PATH 4] Non texture-based, Non anti-aliased lines

@@ -31482,7 +31482,7 @@ ImFont_BuildLookupTable :: proc(this : ^ImFont)
 			resize(&this.Glyphs, this.Glyphs.Size + 1)
 		}
 		tab_glyph : ^ImFontGlyph = back(&this.Glyphs)
-		tab_glyph = ImFont_FindGlyph(this, cast(ImWchar) ' ')
+		tab_glyph^ = ImFont_FindGlyph(this, cast(ImWchar) ' ')^
 		tab_glyph.Codepoint = '\t'
 		tab_glyph.AdvanceX *= IM_TABSIZE
 		this.IndexAdvanceX.Data[cast(i32) tab_glyph.Codepoint] = cast(f32) tab_glyph.AdvanceX

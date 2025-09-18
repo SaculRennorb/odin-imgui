@@ -6,6 +6,8 @@ import "core:log"
 import str "core:strings"
 
 
+IMGUI_PATH :: #directory + "../../imgui/"
+
 main :: proc()
 {
 	context.logger = log.create_console_logger()
@@ -19,8 +21,9 @@ main :: proc()
 
 tokenize_file :: proc(map_ :  ^map[string]Input, path : string, alias : string = "")
 {
-	content, ok := os.read_entire_file(str.concatenate({ "in/", path }, context.temp_allocator))
-	if !ok { panic(fmt.tprintf("Failed to read %v", path)) }
+	full_path := str.concatenate({ IMGUI_PATH + "in/", path }, context.temp_allocator)
+	content, ok := os.read_entire_file(full_path)
+	if !ok { panic(fmt.tprintf("Failed to read %v from %v", path, full_path)) }
 
 	toks : [dynamic]Token
 	tokenize(&toks, cast(string) content, path)
@@ -81,7 +84,7 @@ process_main_files :: proc()
 	}
 	{
 		toks : [dynamic]Token
-		tokenize(&toks, #load("win32_type_shim.cpp"), "win32_type_shim.cpp")
+		tokenize(&toks, #load(IMGUI_PATH + "/win32_type_shim.cpp"), "win32_type_shim.cpp")
 		input_map["win32_type_shim.cpp"] = { toks[:], false}
 	}
 
@@ -151,11 +154,11 @@ process_main_files :: proc()
 		{ "SEEK_SET", "SEEK_SET" }, // TODO
 	}
 	convert_and_format(&converter_context, replaced_names)
-	os.write_entire_file("out/imgui_gen.odin", converter_context.result.buf[:])
+	os.write_entire_file(IMGUI_PATH + "out/imgui_gen.odin", converter_context.result.buf[:])
 
 	str.builder_reset(&converter_context.result)
 	write_shim(&converter_context)
-	os.write_entire_file("out/shim.odin", converter_context.result.buf[:])
+	os.write_entire_file(IMGUI_PATH + "out/shim.odin", converter_context.result.buf[:])
 }
 
 
@@ -197,12 +200,12 @@ process_dx11_backend :: proc()
 	}
 	{
 		toks : [dynamic]Token
-		tokenize(&toks, #load("win32_type_shim.cpp"), "win32_type_shim.cpp")
+		tokenize(&toks, #load(IMGUI_PATH + "/win32_type_shim.cpp"), "win32_type_shim.cpp")
 		input_map["win32_type_shim.cpp"] = { toks[:], false }
 	}
 	{
 		toks : [dynamic]Token
-		tokenize(&toks, #load("d3d11_type_shim.cpp"), "d3d11_type_shim.cpp")
+		tokenize(&toks, #load(IMGUI_PATH + "/d3d11_type_shim.cpp"), "d3d11_type_shim.cpp")
 		input_map["d3d11_type_shim.cpp"] = { toks[:], false }
 	}
 
@@ -272,7 +275,7 @@ process_dx11_backend :: proc()
 		{ "SEEK_SET", "SEEK_SET" }, // TODO
 	}
 	convert_and_format(&converter_context, replaced_names)
-	os.write_entire_file("out/backends/dx11/backend.odin", converter_context.result.buf[:])
+	os.write_entire_file(IMGUI_PATH + "out/backends/dx11/backend.odin", converter_context.result.buf[:])
 }
 
 process_win32_backend :: proc()
@@ -309,7 +312,7 @@ process_win32_backend :: proc()
 	}
 	{
 		toks : [dynamic]Token
-		tokenize(&toks, #load("win32_type_shim.cpp"), "win32_type_shim.cpp")
+		tokenize(&toks, #load(IMGUI_PATH + "/win32_type_shim.cpp"), "win32_type_shim.cpp")
 		input_map["win32_type_shim.cpp"] = { toks[:], false }
 	}
 
@@ -382,5 +385,5 @@ process_win32_backend :: proc()
 		{ "SEEK_SET", "SEEK_SET" }, // TODO
 	}
 	convert_and_format(&converter_context, replaced_names)
-	os.write_entire_file("out/backends/win32/backend.odin", converter_context.result.buf[:])
+	os.write_entire_file(IMGUI_PATH + "out/backends/win32/backend.odin", converter_context.result.buf[:])
 }

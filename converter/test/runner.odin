@@ -4,7 +4,7 @@ import "core:fmt"
 import path "core:path/filepath"
 import "core:os"
 import str "core:strings"
-import converter "../"
+import converter "../src/"
 import "core:testing"
 import "core:thread"
 import "base:runtime"
@@ -13,12 +13,12 @@ import "core:time"
 
 SEQUENTIAL :: #config(sequential, false)
 
-BASEDIR :: "test"
+BASEDIR :: #directory
 
 @(test)
 test :: proc(t : ^testing.T)
 {
-	dir_in, derr1 := os.open(BASEDIR+"/in")
+	dir_in, derr1 := os.open(BASEDIR + "in")
 	assert(derr1 == nil)
 	files_in, ferr1 := os.read_dir(dir_in, 0)
 	assert(ferr1 == nil)
@@ -119,7 +119,7 @@ test_proc :: proc(t : ^testing.T, file : ^os.File_Info) {
 	ast  : [dynamic]converter.AstNode
 	result : str.Builder
 
-	ref, err2 := os.read_entire_file(fmt.tprintf(BASEDIR+"/ref/%v.odin", path.stem(file.name)))
+	ref, err2 := os.read_entire_file(fmt.tprintf(BASEDIR + "ref/%v.odin", path.stem(file.name)))
 	assert(err2, "Missing ref file?", loc)
 
 	for _, stream in input_map { delete(stream.tokens) }
@@ -165,7 +165,7 @@ test_proc :: proc(t : ^testing.T, file : ^os.File_Info) {
 		converter.write_overloads(&converter_context)
 	}
 
-	os.write_entire_file(fmt.tprintf(BASEDIR+"/out/%v.odin", path.stem(file.name)), converter_context.result.buf[:])
+	os.write_entire_file(fmt.tprintf(BASEDIR + "out/%v.odin", path.stem(file.name)), converter_context.result.buf[:])
 
 	loc.procedure = "test.validate"
 

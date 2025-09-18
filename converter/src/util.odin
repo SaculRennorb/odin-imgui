@@ -111,7 +111,7 @@ _set_user_formatters :: proc()
 
 import win32 "core:sys/windows"
 import str "core:strings"
-import "win32/winternal"
+import "../../win32/winternal"
 
 @(init)
 install_exception_handler :: proc "contextless"()

@@ -1,8 +1,8 @@
 package test
 
 import win32 "core:sys/windows"
-import win32imm "../win32/imm"
-import win32shell "../win32/shell"
+import win32imm "../../win32/imm"
+import win32shell "../../win32/shell"
 import "base:runtime"
 import "base:intrinsics"
 import "base:builtin"

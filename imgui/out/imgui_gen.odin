@@ -6901,8 +6901,7 @@ ImGuiTypingSelectState_init :: proc(this : ^ImGuiTypingSelectState)
 {
 	this.LastRequestFrame = 0
 	this.LastRequestTime = 0.0
-	this.SingleCharModeLock = false
-	memset(this, 0, size_of(this^))
+	this.SingleCharModeLock = falsememset(this, 0, size_of(this^))
 }
 
 // We preserve remaining data for easier debugging
@@ -8731,8 +8730,7 @@ LocalizeGetMsg :: #force_inline proc(key : ImGuiLocKey) -> ^u8
 	g : ^ImGuiContext = GImGui; msg : ^u8 = g.LocalizationTable[key]; return msg != nil ? msg : "*Missing Text*"
 }
 
-//#ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS
-//#ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS
+//#ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS//#ifndef IMGUI_DISABLE_OBSOLETE_FUNCTIONS
 ScrollToBringRectIntoView :: #force_inline proc(window : ^ImGuiWindow, rect : ^ImRect) { ScrollToRect(window, rect, ImGuiScrollFlags_.ImGuiScrollFlags_KeepVisibleEdgeY) }
 //#endif
 

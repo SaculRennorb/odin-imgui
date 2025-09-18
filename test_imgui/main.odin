@@ -174,7 +174,7 @@ cleanup_render_target :: proc()
 wnd_proc :: proc "system" (hWnd : win32.HWND, msg : win32.UINT, wParam : win32.WPARAM, lParam : win32.LPARAM) -> win32.LRESULT
 {
 	@(static) c : runtime.Context
-	if msg == win32.WM_CREATE { c = ((^runtime.Context)(uintptr(lParam)))^ }
+	if msg == win32.WM_NCCREATE { c = (cast(^runtime.Context)((cast(^win32.CREATESTRUCTW)uintptr(lParam)).lpCreateParams))^ }
 	context = c
 
 	if im_win32.WndProcHandler(hWnd, msg, wParam, lParam) != {} { return 1 }

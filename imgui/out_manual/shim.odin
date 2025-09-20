@@ -138,7 +138,7 @@ slice_from_se :: #force_inline proc(start : [^]$T, end : ^T) -> []T
 	return start[:mem.ptr_sub(end, cast(^T)start)]
 }
 
-append :: proc { ImGuiTextIndex_append, ImGuiTextBuffer_append, ImGuiTextBuffer_append2 }
+append :: proc { TextIndex_append, TextBuffer_append, TextBuffer_append2 }
 
 memcpy :: mem.copy_non_overlapping
 
@@ -177,43 +177,43 @@ strncmp_c :: proc(x, y : cstring, #any_int len : int) -> i32
 	return cast(i32) ret
 }
 
-clear :: proc { runtime.clear_map, runtime.clear_dynamic_array, ImVector_clear, ImGuiTextBuffer_clear, ImChunkStream_clear, ImGuiTextIndex_clear }
+clear :: proc { runtime.clear_map, runtime.clear_dynamic_array, Vector_clear, TextBuffer_clear, ChunkStream_clear, TextIndex_clear }
 
-erase :: proc { ImVector_erase_0, ImVector_erase_1 }
+erase :: proc { Vector_erase_0, Vector_erase_1 }
 
-empty :: proc { ImVector_empty, ImChunkStream_empty, ImGuiTextBuffer_empty, ImGuiTextFilter_ImGuiTextRange_empty }
+empty :: proc { Vector_empty, ChunkStream_empty, TextBuffer_empty, TextFilter_ImGuiTextRange_empty }
 
-size :: proc { ImSpan_size, ImVector_size, ImGuiTextBuffer_size, ImChunkStream_size, ImGuiTextIndex_size }
+size :: proc { Span_size, Vector_size, TextBuffer_size, ChunkStream_size, TextIndex_size }
 
-push_back :: proc { ImVector_push_back, ImTriangulatorNodeSpan_push_back }
+push_back :: proc { Vector_push_back, TriangulatorNodeSpan_push_back }
 
-Remove :: proc { ImPool_Remove_0, ImPool_Remove_1 }
+Remove :: proc { Pool_Remove_0, Pool_Remove_1 }
 
-set :: proc { ImSpan_set_0, ImSpan_set_1 }
+set :: proc { Span_set_0, Span_set_1 }
 
-AddText :: proc { ImDrawList_AddText_0, ImDrawList_AddText_1 }
+AddText :: proc { DrawList_AddText_0, DrawList_AddText_1 }
 
-Contains :: proc { ImRect_Contains_0, ImRect_Contains_1, ImPool_Contains, ImGuiSelectionBasicStorage_Contains }
+Contains :: proc { Rect_Contains_0, Rect_Contains_1, Pool_Contains, SelectionBasicStorage_Contains }
 
-resize :: proc { ImVector_resize_0, ImVector_resize_1 }
+resize :: proc { Vector_resize_0, Vector_resize_1 }
 
-reserve :: proc { ImVector_reserve, ImGuiTextBuffer_reserve }
+reserve :: proc { Vector_reserve, TextBuffer_reserve }
 
-begin :: proc{ ImChunkStream_begin, ImGuiTextBuffer_begin, ImVector_begin }
-end :: proc{ ImChunkStream_end, ImGuiTextBuffer_end, ImVector_end }
+begin :: proc{ ChunkStream_begin, TextBuffer_begin, Vector_begin }
+end :: proc{ ChunkStream_end, TextBuffer_end, Vector_end }
 
-init :: proc { ImVector_init_0, ImVector_init_1, ImGuiTextFilter_ImGuiTextRange_init_1, ImGuiStoragePair_init_0, ImGuiStoragePair_init_1, ImGuiStoragePair_init_2, ImColor_init_1, ImColor_init_2, ImColor_init_3, ImColor_init_4, ImRect_init_1, ImRect_init_2, ImRect_init_3, ImSpan_init_0, ImSpan_init_1, ImSpan_init_2, ImGuiStyleMod_init_0, ImGuiStyleMod_init_1, ImGuiStyleMod_init_2, ImGuiPtrOrIndex_init_0, ImGuiPtrOrIndex_init_1, ImDrawList_init, ImGuiKeyRoutingData_init, ImGuiWindow_init, ImGuiWindowClass_init, ImGuiWindowSettings_init, ImGuiDockNode_init, ImFontConfig_init, ImFontAtlasCustomRect_init, ImGuiMultiSelectTempData_init, ImGuiPlotArrayGetterData_init, ImGuiTabItem_init, ImGuiTableTempData_init, ImGuiTableInstanceData_init, ImGuiTableColumn_init, ImGuiTableSettings_init, ImGuiTableColumnSettings_init, ImGuiOldColumns_init, ImFontAtlas_init, ImGuiDockContextPruneNodeData_init, ImGuiTable_init, ImGuiMultiSelectState_init, ImGuiTabBar_init, ImGuiViewportP_init, ImStbTexteditState_init, ImFont_init, ImGuiContext_init, ImDrawListSplitter_init, ImGuiMultiSelectIO_init, ImDrawData_init, ImDrawDataBuilder_init, ImGuiWindowTempData_init, ImGuiStorage_init, ImGuiTextBuffer_init, ImGuiIO_init, ImGuiPlatformIO_init, ImGuiStyle_init, ImDrawListSharedData_init, ImGuiKeyRoutingTable_init, ImGuiNextItemData_init, ImGuiInputTextDeactivatedState_init, ImGuiTextIndex_init, ImGuiDockContext_init, ImGuiMenuColumns_init, ImGuiNextWindowData_init, ImGuiPlatformMonitor_init, ImGuiNavItemData_init, ImGuiPayload_init, ImPool_init, ImGuiInputTextState_init, ImGuiComboPreviewData_init, ImGuiTypingSelectState_init, ImGuiPlatformImeData_init, ImChunkStream_init, ImGuiErrorRecoveryState_init, ImGuiMetricsConfig_init, ImGuiIDStackTool_init, ImTriangulatorNodeSpan_init, ImBitVector_init, ImFontBuildSrcData_init }
+init :: proc { Vector_init_0, Vector_init_1, TextFilter_ImGuiTextRange_init_1, StoragePair_init_0, StoragePair_init_1, StoragePair_init_2, Color_init_1, Color_init_2, Color_init_3, Color_init_4, Rect_init_1, Rect_init_2, Rect_init_3, Span_init_0, Span_init_1, Span_init_2, StyleMod_init_0, StyleMod_init_1, StyleMod_init_2, PtrOrIndex_init_0, PtrOrIndex_init_1, DrawList_init, KeyRoutingData_init, Window_init, WindowClass_init, WindowSettings_init, DockNode_init, FontConfig_init, FontAtlasCustomRect_init, MultiSelectTempData_init, PlotArrayGetterData_init, TabItem_init, TableTempData_init, TableInstanceData_init, TableColumn_init, TableSettings_init, TableColumnSettings_init, OldColumns_init, FontAtlas_init, DockContextPruneNodeData_init, Table_init, MultiSelectState_init, TabBar_init, ViewportP_init, StbTexteditState_init, Font_init, Context_init, DrawListSplitter_init, MultiSelectIO_init, DrawData_init, DrawDataBuilder_init, WindowTempData_init, Storage_init, TextBuffer_init, IO_init, PlatformIO_init, Style_init, DrawListSharedData_init, KeyRoutingTable_init, NextItemData_init, InputTextDeactivatedState_init, TextIndex_init, DockContext_init, MenuColumns_init, NextWindowData_init, PlatformMonitor_init, NavItemData_init, Payload_init, Pool_init, InputTextState_init, ComboPreviewData_init, TypingSelectState_init, PlatformImeData_init, ChunkStream_init, ErrorRecoveryState_init, MetricsConfig_init, IDStackTool_init, TriangulatorNodeSpan_init, BitVector_init, FontBuildSrcData_init }
 
-Add :: proc { ImRect_Add_0, ImRect_Add_1, ImPool_Add }
+Add :: proc { Rect_Add_0, Rect_Add_1, Pool_Add }
 
-GetID :: proc { ImGuiWindow_GetID_0, ImGuiWindow_GetID_1, ImGuiWindow_GetID_2, ImGuiWindow_GetID_3, GetID_0, GetID_1, GetID_2, GetID_3 }
+GetID :: proc { Window_GetID_0, Window_GetID_1, Window_GetID_2, Window_GetID_3, GetID_0, GetID_1, GetID_2, GetID_3 }
 
 deinit :: proc { \
-	ImVector_deinit, ImDrawListSplitter_deinit, ImGuiViewport_deinit, ImPool_deinit, ImGuiViewportP_deinit, ImGuiTable_deinit, ImDrawList_deinit, ImGuiDockNode_deinit, ImFontAtlas_deinit, ImGuiWindow_deinit, ImFont_deinit, ImDrawData_deinit, ImDrawDataBuilder_deinit, ImGuiWindowTempData_deinit, ImGuiStorage_deinit, ImGuiTextBuffer_deinit, ImGuiIO_deinit, ImGuiPlatformIO_deinit, ImDrawListSharedData_deinit, ImGuiKeyRoutingTable_deinit, ImGuiMultiSelectIO_deinit, ImGuiInputTextState_deinit, ImChunkStream_deinit, ImGuiIDStackTool_deinit, ImGuiInputTextDeactivatedState_deinit, ImGuiTextIndex_deinit, ImGuiDockContext_deinit, ImBitVector_deinit, ImGuiMultiSelectTempData_deinit, ImGuiTabBar_deinit, ImGuiListClipperData_deinit, ImGuiTableTempData_deinit, ImGuiContext_deinit, ImGuiOldColumns_deinit, ImFontBuildSrcData_deinit, ImGuiMultiSelectState_deinit, ImStb_STB_TexteditState_deinit, deinit_stub_u8
+	Vector_deinit, DrawListSplitter_deinit, Viewport_deinit, Pool_deinit, ViewportP_deinit, Table_deinit, DrawList_deinit, DockNode_deinit, FontAtlas_deinit, Window_deinit, Font_deinit, DrawData_deinit, DrawDataBuilder_deinit, WindowTempData_deinit, Storage_deinit, TextBuffer_deinit, IO_deinit, PlatformIO_deinit, DrawListSharedData_deinit, KeyRoutingTable_deinit, MultiSelectIO_deinit, InputTextState_deinit, ChunkStream_deinit, IDStackTool_deinit, InputTextDeactivatedState_deinit, TextIndex_deinit, DockContext_deinit, BitVector_deinit, MultiSelectTempData_deinit, TabBar_deinit, ListClipperData_deinit, TableTempData_deinit, Context_deinit, OldColumns_deinit, FontBuildSrcData_deinit, MultiSelectState_deinit, Stb_STB_TexteditState_deinit, deinit_stub_u8
 }
 deinit_stub_u8 :: #force_inline proc "contextless" (_ : ^u8) { }
 
-Expand :: proc { ImRect_Expand_0, ImRect_Expand_1 }
+Expand :: proc { Rect_Expand_0, Rect_Expand_1 }
 
 TableGetColumnName :: proc { TableGetColumnName_n, TableGetColumnName_tn }
 
@@ -251,32 +251,32 @@ TabItemCalcSize :: proc { TabItemCalcSize_0, TabItemCalcSize_1 }
 
 GetColorU32 :: proc { GetColorU32_0, GetColorU32_1, GetColorU32_2 }
 
-ImDrawList_AddText :: proc { ImDrawList_AddText_0, ImDrawList_AddText_1 }
+DrawList_AddText :: proc { DrawList_AddText_0, DrawList_AddText_1 }
 
 ItemSize :: proc{ ItemSize_0, ItemSize_1 }
 
-ClearFreeMemory :: proc { ImDrawListSplitter_ClearFreeMemory, ImGuiInputTextState_ClearFreeMemory, ImGuiInputTextDeactivatedState_ClearFreeMemory }
+ClearFreeMemory :: proc { DrawListSplitter_ClearFreeMemory, InputTextState_ClearFreeMemory, InputTextDeactivatedState_ClearFreeMemory }
 
 GetForegroundDrawList :: proc { GetForegroundDrawList_w, GetForegroundDrawList_vp }
 
-GetCenter :: proc { ImRect_GetCenter, ImGuiViewport_GetCenter }
+GetCenter :: proc { Rect_GetCenter, Viewport_GetCenter }
 
-Begin :: proc { Begin_, ImGuiListClipper_Begin }
+Begin :: proc { Begin_, ListClipper_Begin }
 
 PushID :: proc { PushID_0, PushID_1, PushID_2, PushID_3 }
 
-ClearFlags :: proc { ImGuiNextItemData_ClearFlags, ImGuiNextWindowData_ClearFlags }
+ClearFlags :: proc { NextItemData_ClearFlags, NextWindowData_ClearFlags }
 
 
-Clear :: proc { ImPool_Clear, ImDrawData_Clear, ImBitVector_Clear, ImGuiPayload_Clear, ImGuiStorage_Clear, ImGuiTextFilter_Clear, ImGuiNavItemData_Clear, ImDrawListSplitter_Clear, ImGuiKeyRoutingTable_Clear, ImFontGlyphRangesBuilder_Clear, ImGuiTypingSelectState_Clear, ImGuiMultiSelectTempData_Clear, ImFontAtlas_Clear, ImGuiSelectionBasicStorage_Clear }
+Clear :: proc { Pool_Clear, DrawData_Clear, BitVector_Clear, Payload_Clear, Storage_Clear, TextFilter_Clear, NavItemData_Clear, DrawListSplitter_Clear, KeyRoutingTable_Clear, FontGlyphRangesBuilder_Clear, TypingSelectState_Clear, MultiSelectTempData_Clear, FontAtlas_Clear, SelectionBasicStorage_Clear }
 
 LogTextV :: proc { LogTextV_0, LogTextV_1 }
 
 PushStyleColor :: proc { PushStyleColor_0, PushStyleColor_1 }
 
-ImIsPowerOfTwo :: proc { ImIsPowerOfTwo_0, ImIsPowerOfTwo_1 }
+IsPowerOfTwo :: proc { IsPowerOfTwo_0, IsPowerOfTwo_1 }
 
-PushClipRect :: proc { ImDrawList_PushClipRect, PushClipRect_ }
+PushClipRect :: proc { DrawList_PushClipRect, PushClipRect_ }
 
 IsMouseClicked :: proc { IsMouseClicked_0, IsMouseClicked_1 }
 
@@ -288,16 +288,16 @@ IsMouseDown :: proc { IsMouseDown_0, IsMouseDown_1 }
 
 Shortcut :: proc { Shortcut_0, Shortcut_1 }
 
-PopClipRect :: proc { PopClipRect_, ImDrawList_PopClipRect }
+PopClipRect :: proc { PopClipRect_, DrawList_PopClipRect }
 
 IsPopupOpen :: proc{ IsPopupOpen_0, IsPopupOpen_1 }
 
 SetScrollFromPosX :: proc { SetScrollFromPosX_0, SetScrollFromPosX_1 }
 SetScrollFromPosY :: proc { SetScrollFromPosY_0, SetScrollFromPosY_1 }
 
-index_from_ptr :: proc{ ImSpan_index_from_ptr, ImVector_index_from_ptr }
+index_from_ptr :: proc{ Span_index_from_ptr, Vector_index_from_ptr }
 
-ImTextCountUtf8BytesFromChar :: proc { ImTextCountUtf8BytesFromChar_0, ImTextCountUtf8BytesFromChar_1 }
+TextCountUtf8BytesFromChar :: proc { TextCountUtf8BytesFromChar_0, TextCountUtf8BytesFromChar_1 }
 
 SetWindowPos :: proc { SetWindowPos_0, SetWindowPos_1, SetWindowPos_2 }
 
@@ -309,9 +309,9 @@ SetWindowCollapsed :: proc { SetWindowCollapsed_0, SetWindowCollapsed_1, SetWind
 
 GetKeyData :: proc { GetKeyData_0, GetKeyData_k }
 
-Rect :: proc{ ImGuiWindow_Rect, ImGuiDockNode_Rect }
+GetRect :: proc{ Window_Rect, DockNode_Rect }
 
-TestBit :: proc{ ImBitArray_TestBit, ImBitVector_TestBit }
+TestBit :: proc{ BitArray_TestBit, BitVector_TestBit }
 
 IsKeyChordPressed :: proc { IsKeyChordPressed_0, IsKeyChordPressed_1 }
 
@@ -319,18 +319,18 @@ IsKeyPressed :: proc { IsKeyPressed_0, IsKeyPressed_1 }
 
 PushStyleVar :: proc { PushStyleVar_f, PushStyleVar_v2 }
 
-SelectAll :: proc { ImGuiInputTextState_SelectAll, ImGuiInputTextCallbackData_SelectAll }
-HasSelection :: proc { ImGuiInputTextState_HasSelection, ImGuiInputTextCallbackData_HasSelection }
-ClearSelection :: proc { ImGuiInputTextState_ClearSelection, ImGuiInputTextCallbackData_ClearSelection }
+SelectAll :: proc { InputTextState_SelectAll, InputTextCallbackData_SelectAll }
+HasSelection :: proc { InputTextState_HasSelection, InputTextCallbackData_HasSelection }
+ClearSelection :: proc { InputTextState_ClearSelection, InputTextCallbackData_ClearSelection }
 
 SetScrollY :: proc { SetScrollY_0, SetScrollY_1 }
 SetScrollX :: proc { SetScrollX_0, SetScrollX_1 }
 
-SetBit :: proc { ImBitArray_SetBit, ImBitVector_SetBit, ImFontGlyphRangesBuilder_SetBit }
+SetBit :: proc { BitArray_SetBit, BitVector_SetBit, FontGlyphRangesBuilder_SetBit }
 
-size_in_bytes :: proc { ImSpan_size_in_bytes, ImVector_size_in_bytes }
+size_in_bytes :: proc { Span_size_in_bytes, Vector_size_in_bytes }
 
-find_erase_unsorted :: proc{ ImVector_find_erase_unsorted, ImTriangulatorNodeSpan_find_erase_unsorted }
+find_erase_unsorted :: proc{ Vector_find_erase_unsorted, TriangulatorNodeSpan_find_erase_unsorted }
 
 GetIDWithSeed :: proc { GetIDWithSeed_0, GetIDWithSeed_1 }
 
@@ -340,9 +340,9 @@ BeginChild :: proc { BeginChild_0, BeginChild_1 }
 
 IsKeyDown :: proc { IsKeyDown_0, IsKeyDown_1 }
 
-Reserve :: proc{ ImPool_Reserve, ImSpanAllocator_Reserve }
+Reserve :: proc{ Pool_Reserve, SpanAllocator_Reserve }
 
-swap :: proc { ImVector_swap, ImChunkStream_swap }
+swap :: proc { Vector_swap, ChunkStream_swap }
 
 IsKeyReleased :: proc { IsKeyReleased_0, IsKeyReleased_1 }
 

@@ -15,14 +15,14 @@ NOGDI :: false
 // Implemented features:
 //  [X] Platform: Clipboard support (for Win32 this is actually part of core dear imgui)
 //  [X] Platform: Mouse support. Can discriminate Mouse/TouchScreen/Pen.
-//  [X] Platform: Keyboard support. Since 1.87 we are using the io.AddKeyEvent() function. Pass ImGuiKey values to all key functions e.g. ImGui::IsKeyPressed(ImGuiKey_Space). [Legacy win32.VK_* values are obsolete since 1.87 and not supported since 1.91.5]
-//  [X] Platform: Gamepad support. Enabled with 'io.ConfigFlags |= im.ImGuiConfigFlags_NavEnableGamepad'.
-//  [X] Platform: Mouse cursor shape and visibility (ImGuiBackendFlags_HasMouseCursors). Disable with 'io.ConfigFlags |= im.ImGuiConfigFlags_NoMouseCursorChange'.
-//  [X] Platform: Multi-viewport support (multiple windows). Enable with 'io.ConfigFlags |= im.ImGuiConfigFlags_ViewportsEnable'.
+//  [X] Platform: Keyboard support. Since 1.87 we are using the io.AddKeyEvent() function. Pass Key values to all key functions e.g. Gui::IsKeyPressed(Key_Space). [Legacy win32.VK_* values are obsolete since 1.87 and not supported since 1.91.5]
+//  [X] Platform: Gamepad support. Enabled with 'io.ConfigFlags |= im.ConfigFlags_NavEnableGamepad'.
+//  [X] Platform: Mouse cursor shape and visibility (BackendFlags_HasMouseCursors). Disable with 'io.ConfigFlags |= im.ConfigFlags_NoMouseCursorChange'.
+//  [X] Platform: Multi-viewport support (multiple windows). Enable with 'io.ConfigFlags |= im.ConfigFlags_ViewportsEnable'.
 
 // You can use unmodified imgui_impl_* files in your project. See examples/ folder for examples of using this.
 // Prefer including the entire imgui/ repository into your project (either as a copy or as a submodule), and only build the backends you need.
-// Learn about Dear ImGui:
+// Learn about Dear Gui:
 // - FAQ                  https://dearimgui.com/faq
 // - Getting Started      https://dearimgui.com/getting-started
 // - Documentation        https://dearimgui.com/docs (same as your local docs/ folder).
@@ -33,28 +33,28 @@ NOGDI :: false
 
 // CHANGELOG
 // (minor and older changes stripped away, please see git history for details)
-//  2025-XX-XX: Platform: Added support for multiple windows via the ImGuiPlatformIO interface.
+//  2025-XX-XX: Platform: Added support for multiple windows via the PlatformIO interface.
 //  2024-11-21: [Docking] Fixed a crash when multiple processes are running with multi-viewports, caused by misusage of GetProp(). (#8162, #8069)
 //  2024-10-28: [Docking] Rely on property stored inside win32.HWND to retrieve context/viewport, should facilitate attempt to use this for parallel contexts. (#8069)
 //  2024-09-16: [Docking] Inputs: fixed an issue where a viewport destroyed while clicking would hog mouse tracking and temporary lead to incorrect update of HoveredWindow. (#7971)
-//  2024-07-08: Inputs: Fixed ImGuiMod_Super being mapped to win32.VK_APPS instead of win32.VK_LWIN||VK_RWIN. (#7768)
-//  2023-10-05: Inputs: Added support for extra ImGuiKey values: F13 to F24 function keys, app back/forward keys.
-//  2023-09-25: Inputs: Synthesize key-down event on key-up for win32.VK_SNAPSHOT / ImGuiKey_PrintScreen as Windows doesn't emit it (same behavior as GLFW/SDL).
+//  2024-07-08: Inputs: Fixed Mod_Super being mapped to win32.VK_APPS instead of win32.VK_LWIN||VK_RWIN. (#7768)
+//  2023-10-05: Inputs: Added support for extra Key values: F13 to F24 function keys, app back/forward keys.
+//  2023-09-25: Inputs: Synthesize key-down event on key-up for win32.VK_SNAPSHOT / Key_PrintScreen as Windows doesn't emit it (same behavior as GLFW/SDL).
 //  2023-09-07: Inputs: Added support for keyboard codepage conversion for when application is compiled in MBCS mode and using a non-Unicode window.
 //  2023-04-19: Added InitForOpenGL() to facilitate combining raw Win32/Winapi with OpenGL. (#3218)
-//  2023-04-04: Inputs: Added support for io.AddMouseSourceEvent() to discriminate ImGuiMouseSource_Mouse/ImGuiMouseSource_TouchScreen/ImGuiMouseSource_Pen. (#2702)
+//  2023-04-04: Inputs: Added support for io.AddMouseSourceEvent() to discriminate MouseSource_Mouse/MouseSource_TouchScreen/MouseSource_Pen. (#2702)
 //  2023-02-15: Inputs: Use win32.WM_NCMOUSEMOVE / win32.WM_NCMOUSELEAVE to track mouse position over non-client area (e.g. OS decorations) when app is not focused. (#6045, #6162)
 //  2023-02-02: Inputs: Flipping win32.WM_MOUSEHWHEEL (horizontal mouse-wheel) value to match other backends and offer consistent horizontal scrolling direction. (#4019, #6096, #1463)
 //  2022-10-11: Using 'nullptr' instead of 'NULL' as per our switch to C++11.
 //  2022-09-28: Inputs: Convert win32.WM_CHAR values with MultiByteToWideChar() when window class was registered as MBCS (not Unicode).
-//  2022-09-26: Inputs: Renamed ImGuiKey_ModXXX introduced in 1.87 to ImGuiMod_XXX (old names still supported).
-//  2022-01-26: Inputs: replaced short-lived io.AddKeyModsEvent() (added two weeks ago) with io.AddKeyEvent() using ImGuiKey_ModXXX flags. Sorry for the confusion.
+//  2022-09-26: Inputs: Renamed Key_ModXXX introduced in 1.87 to Mod_XXX (old names still supported).
+//  2022-01-26: Inputs: replaced short-lived io.AddKeyModsEvent() (added two weeks ago) with io.AddKeyEvent() using Key_ModXXX flags. Sorry for the confusion.
 //  2021-01-20: Inputs: calling new io.AddKeyAnalogEvent() for gamepad support, instead of writing directly to io.NavInputs[].
 //  2022-01-17: Inputs: calling new io.AddMousePosEvent(), io.AddMouseButtonEvent(), io.AddMouseWheelEvent() API (1.87+).
 //  2022-01-17: Inputs: always update key mods next and before a key event (not in NewFrame) to fix input queue with very low framerates.
 //  2022-01-12: Inputs: Update mouse inputs using win32.WM_MOUSEMOVE/WM_MOUSELEAVE + fallback to provide it when focused but not hovered/captured. More standard and will allow us to pass it to future input queue API.
-//  2022-01-12: Inputs: Maintain our own copy of MouseButtonsDown mask instead of using ImGui::IsAnyMouseDown() which will be obsoleted.
-//  2022-01-10: Inputs: calling new io.AddKeyEvent(), io.AddKeyModsEvent() + io.SetKeyEventNativeData() API (1.87+). Support for full ImGuiKey range.
+//  2022-01-12: Inputs: Maintain our own copy of MouseButtonsDown mask instead of using Gui::IsAnyMouseDown() which will be obsoleted.
+//  2022-01-10: Inputs: calling new io.AddKeyEvent(), io.AddKeyModsEvent() + io.SetKeyEventNativeData() API (1.87+). Support for full Key range.
 //  2021-12-16: Inputs: Fill win32.VK_LCONTROL/VK_RCONTROL/VK_LSHIFT/VK_RSHIFT/VK_LMENU/VK_RMENU for completeness.
 //  2021-08-17: Calling io.AddFocusEvent() on win32.WM_SETFOCUS/WM_KILLFOCUS messages.
 //  2021-08-02: Inputs: Fixed keyboard modifiers being reported when host window doesn't have focus.
@@ -69,22 +69,22 @@ NOGDI :: false
 //  2020-03-03: Inputs: Calling AddInputCharacterUTF16() to support surrogate pairs leading to codepoint >= 0x10000 (for more complete CJK inputs)
 //  2020-02-17: Added EnableDpiAwareness(), GetDpiScaleForHwnd(), GetDpiScaleForMonitor() helper functions.
 //  2020-01-14: Inputs: Added support for #define IMGUI_IMPL_WIN32_DISABLE_GAMEPAD/IMGUI_IMPL_WIN32_DISABLE_LINKING_XINPUT.
-//  2019-12-05: Inputs: Added support for ImGuiMouseCursor_NotAllowed mouse cursor.
+//  2019-12-05: Inputs: Added support for MouseCursor_NotAllowed mouse cursor.
 //  2019-05-11: Inputs: Don't filter value from win32.WM_CHAR before calling AddInputCharacter().
 //  2019-01-17: Misc: Using GetForegroundWindow()+IsChild() instead of GetActiveWindow() to be compatible with windows created in a different thread or parent.
 //  2019-01-17: Inputs: Added support for mouse buttons 4 and 5 via win32.WM_XBUTTON* messages.
-//  2019-01-15: Inputs: Added support for XInput gamepads (if im.ImGuiConfigFlags_NavEnableGamepad is set by user application).
+//  2019-01-15: Inputs: Added support for XInput gamepads (if im.ConfigFlags_NavEnableGamepad is set by user application).
 //  2018-11-30: Misc: Setting up io.BackendPlatformName so it can be displayed in the About Window.
-//  2018-06-29: Inputs: Added support for the ImGuiMouseCursor_Hand cursor.
+//  2018-06-29: Inputs: Added support for the MouseCursor_Hand cursor.
 //  2018-06-10: Inputs: Fixed handling of mouse wheel messages to support fine position messages (typically sent by track-pads).
 //  2018-06-08: Misc: Extracted imgui_impl_win32.cpp/.h away from the old combined DX9/DX10/DX11/DX12 examples.
-//  2018-03-20: Misc: Setup io.BackendFlags ImGuiBackendFlags_HasMouseCursors and ImGuiBackendFlags_HasSetMousePos flags + honor im.ImGuiConfigFlags_NoMouseCursorChange flag.
-//  2018-02-20: Inputs: Added support for mouse cursors (ImGui::GetMouseCursor() value and win32.WM_SETCURSOR message handling).
-//  2018-02-06: Inputs: Added mapping for ImGuiKey_Space.
-//  2018-02-06: Inputs: Honoring the io.WantSetMousePos by repositioning the mouse (when using navigation and im.ImGuiConfigFlags_NavMoveMouse is set).
-//  2018-02-06: Misc: Removed call to ImGui::Shutdown() which is not available from 1.60 WIP, user needs to call CreateContext/DestroyContext themselves.
+//  2018-03-20: Misc: Setup io.BackendFlags BackendFlags_HasMouseCursors and BackendFlags_HasSetMousePos flags + honor im.ConfigFlags_NoMouseCursorChange flag.
+//  2018-02-20: Inputs: Added support for mouse cursors (Gui::GetMouseCursor() value and win32.WM_SETCURSOR message handling).
+//  2018-02-06: Inputs: Added mapping for Key_Space.
+//  2018-02-06: Inputs: Honoring the io.WantSetMousePos by repositioning the mouse (when using navigation and im.ConfigFlags_NavMoveMouse is set).
+//  2018-02-06: Misc: Removed call to Gui::Shutdown() which is not available from 1.60 WIP, user needs to call CreateContext/DestroyContext themselves.
 //  2018-01-20: Inputs: Added Horizontal Mouse Wheel support.
-//  2018-01-08: Inputs: Added mapping for ImGuiKey_Insert.
+//  2018-01-08: Inputs: Added mapping for Key_Insert.
 //  2018-01-05: Inputs: Added win32.WM_LBUTTONDBLCLK double-click handlers for window classes with the CS_DBLCLKS flag.
 //  2017-10-23: Inputs: Added win32.WM_SYSKEYDOWN / win32.WM_SYSKEYUP handlers so e.g. the win32.VK_MENU key can be read.
 //  2017-10-23: Inputs: Using Win32 ::SetCapture/::GetCapture() to retrieve mouse positions outside the client area when dragging.
@@ -97,14 +97,14 @@ NOGDI :: false
 // Implemented features:
 //  [X] Platform: Clipboard support (for Win32 this is actually part of core dear imgui)
 //  [X] Platform: Mouse support. Can discriminate Mouse/TouchScreen/Pen.
-//  [X] Platform: Keyboard support. Since 1.87 we are using the io.AddKeyEvent() function. Pass ImGuiKey values to all key functions e.g. ImGui::IsKeyPressed(ImGuiKey_Space). [Legacy win32.VK_* values are obsolete since 1.87 and not supported since 1.91.5]
-//  [X] Platform: Gamepad support. Enabled with 'io.ConfigFlags |= im.ImGuiConfigFlags_NavEnableGamepad'.
-//  [X] Platform: Mouse cursor shape and visibility (ImGuiBackendFlags_HasMouseCursors). Disable with 'io.ConfigFlags |= im.ImGuiConfigFlags_NoMouseCursorChange'.
-//  [X] Platform: Multi-viewport support (multiple windows). Enable with 'io.ConfigFlags |= im.ImGuiConfigFlags_ViewportsEnable'.
+//  [X] Platform: Keyboard support. Since 1.87 we are using the io.AddKeyEvent() function. Pass Key values to all key functions e.g. Gui::IsKeyPressed(Key_Space). [Legacy win32.VK_* values are obsolete since 1.87 and not supported since 1.91.5]
+//  [X] Platform: Gamepad support. Enabled with 'io.ConfigFlags |= im.ConfigFlags_NavEnableGamepad'.
+//  [X] Platform: Mouse cursor shape and visibility (BackendFlags_HasMouseCursors). Disable with 'io.ConfigFlags |= im.ConfigFlags_NoMouseCursorChange'.
+//  [X] Platform: Multi-viewport support (multiple windows). Enable with 'io.ConfigFlags |= im.ConfigFlags_ViewportsEnable'.
 
 // You can use unmodified imgui_impl_* files in your project. See examples/ folder for examples of using this.
 // Prefer including the entire imgui/ repository into your project (either as a copy or as a submodule), and only build the backends you need.
-// Learn about Dear ImGui:
+// Learn about Dear Gui:
 // - FAQ                  https://dearimgui.com/faq
 // - Getting Started      https://dearimgui.com/getting-started
 // - Documentation        https://dearimgui.com/docs (same as your local docs/ folder).
@@ -124,7 +124,7 @@ Data :: struct {
 	MouseButtonsDown : i32,
 	Time : win32.INT64,
 	TicksPerSecond : win32.INT64,
-	LastMouseCursor : im.ImGuiMouseCursor,
+	LastMouseCursor : im.MouseCursor,
 	KeyboardCodePage : win32.UINT32,
 	WantUpdateMonitors : bool,
 
@@ -142,7 +142,7 @@ Data :: struct {
 	MouseButtonsDown : i32,
 	Time : INT64,
 	TicksPerSecond : INT64,
-	LastMouseCursor : ImGuiMouseCursor,
+	LastMouseCursor : MouseCursor,
 	KeyboardCodePage : win32.UINT32,
 	WantUpdateMonitors : bool,
 }
@@ -151,21 +151,21 @@ Data :: struct {
 Data_init :: proc(this : ^Data) { this^ = {} }
 
 GetBackendData :: proc { GetBackendData_0, GetBackendData_1 }
-// Backend data stored in io.BackendPlatformUserData to allow support for multiple Dear ImGui contexts
-// It is STRONGLY preferred that you use docking branch with multi-viewports (== single Dear ImGui context + multiple windows) instead of multiple Dear ImGui contexts.
+// Backend data stored in io.BackendPlatformUserData to allow support for multiple Dear Gui contexts
+// It is STRONGLY preferred that you use docking branch with multi-viewports (== single Dear Gui context + multiple windows) instead of multiple Dear Gui contexts.
 // FIXME: multi-context support is not well tested and probably dysfunctional in this backend.
 // FIXME: some shared resources (mouse cursor shape, gamepad) are mishandled when using multi-context.
 GetBackendData_0 :: proc() -> ^Data
 {
 	return im.GetCurrentContext() != nil ? cast(^Data) im.GetIO().BackendPlatformUserData : nil
 }
-GetBackendData_1 :: proc(io : ^im.ImGuiIO) -> ^Data
+GetBackendData_1 :: proc(io : ^im.IO) -> ^Data
 {
 	return cast(^Data) io.BackendPlatformUserData
 }
 
 // Functions
-UpdateKeyboardCodePage :: proc(io : ^im.ImGuiIO)
+UpdateKeyboardCodePage :: proc(io : ^im.IO)
 {
 	// Retrieve keyboard code page, required for handling of non-Unicode Windows.
 	bd : ^Data = GetBackendData(io)
@@ -191,15 +191,15 @@ InitEx :: proc(hwnd : rawptr, platform_has_own_dc : bool) -> bool
 	bd := im.IM_NEW_MEM(Data); Data_init(bd)
 	io.BackendPlatformUserData = cast(rawptr) bd
 	io.BackendPlatformName = "imgui_impl_win32"
-	io.BackendFlags |= .ImGuiBackendFlags_HasMouseCursors; // We can honor GetMouseCursor() values (optional)
-	io.BackendFlags |= .ImGuiBackendFlags_HasSetMousePos; // We can honor io.WantSetMousePos requests (optional, rarely used)
-	io.BackendFlags |= .ImGuiBackendFlags_PlatformHasViewports; // We can create multi-viewports on the Platform side (optional)
-	io.BackendFlags |= .ImGuiBackendFlags_HasMouseHoveredViewport; // We can call io.AddMouseViewportEvent() with correct data (optional)
+	io.BackendFlags |= .BackendFlags_HasMouseCursors; // We can honor GetMouseCursor() values (optional)
+	io.BackendFlags |= .BackendFlags_HasSetMousePos; // We can honor io.WantSetMousePos requests (optional, rarely used)
+	io.BackendFlags |= .BackendFlags_PlatformHasViewports; // We can create multi-viewports on the Platform side (optional)
+	io.BackendFlags |= .BackendFlags_HasMouseHoveredViewport; // We can call io.AddMouseViewportEvent() with correct data (optional)
 
 	bd.hWnd = cast(win32.HWND) hwnd
 	bd.TicksPerSecond = perf_frequency
 	bd.Time = perf_counter
-	bd.LastMouseCursor = .ImGuiMouseCursor_COUNT
+	bd.LastMouseCursor = .MouseCursor_COUNT
 	UpdateKeyboardCodePage(io)
 
 	// Update monitor a first time during init
@@ -264,15 +264,15 @@ Shutdown :: proc()
 
 	io.BackendPlatformName = ""
 	io.BackendPlatformUserData = nil
-	io.BackendFlags &= cast(im.ImGuiBackendFlags)~i32(im.ImGuiBackendFlags_.ImGuiBackendFlags_HasMouseCursors | im.ImGuiBackendFlags_.ImGuiBackendFlags_HasSetMousePos | im.ImGuiBackendFlags_.ImGuiBackendFlags_HasGamepad | im.ImGuiBackendFlags_.ImGuiBackendFlags_PlatformHasViewports | im.ImGuiBackendFlags_.ImGuiBackendFlags_HasMouseHoveredViewport)
+	io.BackendFlags &= cast(im.BackendFlags)~i32(im.BackendFlags_.BackendFlags_HasMouseCursors | im.BackendFlags_.BackendFlags_HasSetMousePos | im.BackendFlags_.BackendFlags_HasGamepad | im.BackendFlags_.BackendFlags_PlatformHasViewports | im.BackendFlags_.BackendFlags_HasMouseHoveredViewport)
 	im.IM_FREE(bd)
 }
 
-UpdateMouseCursor :: proc(io : ^im.ImGuiIO, imgui_cursor : im.ImGuiMouseCursor) -> bool
+UpdateMouseCursor :: proc(io : ^im.IO, imgui_cursor : im.MouseCursor) -> bool
 {
-	if (io.ConfigFlags & im.ImGuiConfigFlags_.ImGuiConfigFlags_NoMouseCursorChange) != {} { return false }
+	if (io.ConfigFlags & im.ConfigFlags_.ConfigFlags_NoMouseCursorChange) != {} { return false }
 
-	if imgui_cursor == im.ImGuiMouseCursor_.ImGuiMouseCursor_None || io.MouseDrawCursor {
+	if imgui_cursor == im.MouseCursor_.MouseCursor_None || io.MouseDrawCursor {
 		// Hide OS mouse cursor if imgui is drawing it or if it wants no cursor
 		win32.SetCursor(nil)
 	}
@@ -280,15 +280,15 @@ UpdateMouseCursor :: proc(io : ^im.ImGuiIO, imgui_cursor : im.ImGuiMouseCursor) 
 		// Show OS mouse cursor
 		win32_cursor := win32.IDC_ARROW
 		#partial switch imgui_cursor {
-			case .ImGuiMouseCursor_Arrow:      win32_cursor = win32.IDC_ARROW; break
-			case .ImGuiMouseCursor_TextInput:  win32_cursor = win32.IDC_IBEAM; break
-			case .ImGuiMouseCursor_ResizeAll:  win32_cursor = win32.IDC_SIZEALL; break
-			case .ImGuiMouseCursor_ResizeEW:   win32_cursor = win32.IDC_SIZEWE; break
-			case .ImGuiMouseCursor_ResizeNS:   win32_cursor = win32.IDC_SIZENS; break
-			case .ImGuiMouseCursor_ResizeNESW: win32_cursor = win32.IDC_SIZENESW; break
-			case .ImGuiMouseCursor_ResizeNWSE: win32_cursor = win32.IDC_SIZENWSE; break
-			case .ImGuiMouseCursor_Hand:       win32_cursor = win32.IDC_HAND; break
-			case .ImGuiMouseCursor_NotAllowed: win32_cursor = win32.IDC_NO; break
+			case .MouseCursor_Arrow:      win32_cursor = win32.IDC_ARROW; break
+			case .MouseCursor_TextInput:  win32_cursor = win32.IDC_IBEAM; break
+			case .MouseCursor_ResizeAll:  win32_cursor = win32.IDC_SIZEALL; break
+			case .MouseCursor_ResizeEW:   win32_cursor = win32.IDC_SIZEWE; break
+			case .MouseCursor_ResizeNS:   win32_cursor = win32.IDC_SIZENS; break
+			case .MouseCursor_ResizeNESW: win32_cursor = win32.IDC_SIZENESW; break
+			case .MouseCursor_ResizeNWSE: win32_cursor = win32.IDC_SIZENWSE; break
+			case .MouseCursor_Hand:       win32_cursor = win32.IDC_HAND; break
+			case .MouseCursor_NotAllowed: win32_cursor = win32.IDC_NO; break
 		}
 		win32.SetCursor(win32.LoadCursorA(nil, win32_cursor))
 	}
@@ -300,45 +300,45 @@ IsVkDown :: proc(vk : i32) -> bool
 	return (win32.GetKeyState(vk) & transmute(i16) u16(0x8000)) != {}
 }
 
-AddKeyEvent :: proc(io : ^im.ImGuiIO, key : im.ImGuiKey, down : bool, native_keycode : i32, native_scancode : i32 = -1)
+AddKeyEvent :: proc(io : ^im.IO, key : im.Key, down : bool, native_keycode : i32, native_scancode : i32 = -1)
 {
 	im.AddKeyEvent(io, key, down)
 	im.SetKeyEventNativeData(io, key, native_keycode, native_scancode); // To support legacy indexing (<1.87 user code)
 	 _ = native_scancode
 }
 
-ProcessKeyEventsWorkarounds :: proc(io : ^im.ImGuiIO)
+ProcessKeyEventsWorkarounds :: proc(io : ^im.IO)
 {
 	// Left & right Shift keys: when both are pressed together, Windows tend to not generate the win32.WM_KEYUP event for the first released one.
-	if im.IsKeyDown(.ImGuiKey_LeftShift) && !IsVkDown(win32.VK_LSHIFT) { AddKeyEvent(io, .ImGuiKey_LeftShift, false, win32.VK_LSHIFT) }
-	if im.IsKeyDown(.ImGuiKey_RightShift) && !IsVkDown(win32.VK_RSHIFT) { AddKeyEvent(io, .ImGuiKey_RightShift, false, win32.VK_RSHIFT) }
+	if im.IsKeyDown(.Key_LeftShift) && !IsVkDown(win32.VK_LSHIFT) { AddKeyEvent(io, .Key_LeftShift, false, win32.VK_LSHIFT) }
+	if im.IsKeyDown(.Key_RightShift) && !IsVkDown(win32.VK_RSHIFT) { AddKeyEvent(io, .Key_RightShift, false, win32.VK_RSHIFT) }
 
 	// Sometimes win32.WM_KEYUP for Win key is not passed down to the app (e.g. for Win+V on some setups, according to GLFW).
-	if im.IsKeyDown(.ImGuiKey_LeftSuper) && !IsVkDown(win32.VK_LWIN) { AddKeyEvent(io, .ImGuiKey_LeftSuper, false, win32.VK_LWIN) }
-	if im.IsKeyDown(.ImGuiKey_RightSuper) && !IsVkDown(win32.VK_RWIN) { AddKeyEvent(io, .ImGuiKey_RightSuper, false, win32.VK_RWIN) }
+	if im.IsKeyDown(.Key_LeftSuper) && !IsVkDown(win32.VK_LWIN) { AddKeyEvent(io, .Key_LeftSuper, false, win32.VK_LWIN) }
+	if im.IsKeyDown(.Key_RightSuper) && !IsVkDown(win32.VK_RWIN) { AddKeyEvent(io, .Key_RightSuper, false, win32.VK_RWIN) }
 }
 
-UpdateKeyModifiers :: proc(io : ^im.ImGuiIO)
+UpdateKeyModifiers :: proc(io : ^im.IO)
 {
-	im.AddKeyEvent(io, .ImGuiMod_Ctrl, IsVkDown(win32.VK_CONTROL))
-	im.AddKeyEvent(io, .ImGuiMod_Shift, IsVkDown(win32.VK_SHIFT))
-	im.AddKeyEvent(io, .ImGuiMod_Alt, IsVkDown(win32.VK_MENU))
-	im.AddKeyEvent(io, .ImGuiMod_Super, IsVkDown(win32.VK_LWIN) || IsVkDown(win32.VK_RWIN))
+	im.AddKeyEvent(io, .Mod_Ctrl, IsVkDown(win32.VK_CONTROL))
+	im.AddKeyEvent(io, .Mod_Shift, IsVkDown(win32.VK_SHIFT))
+	im.AddKeyEvent(io, .Mod_Alt, IsVkDown(win32.VK_MENU))
+	im.AddKeyEvent(io, .Mod_Super, IsVkDown(win32.VK_LWIN) || IsVkDown(win32.VK_RWIN))
 }
 
-FindViewportByPlatformHandle :: proc(platform_io : ^im.ImGuiPlatformIO, hwnd : win32.HWND) -> ^im.ImGuiViewport
+FindViewportByPlatformHandle :: proc(platform_io : ^im.PlatformIO, hwnd : win32.HWND) -> ^im.Viewport
 {
-	// We cannot use ImGui::FindViewportByPlatformHandle() because it doesn't take a context.
+	// We cannot use Gui::FindViewportByPlatformHandle() because it doesn't take a context.
 	// When called from WndProcHandler_PlatformWindow() we don't assume that context is bound.
-	//return ImGui::FindViewportByPlatformHandle((void*)hwnd);
+	//return Gui::FindViewportByPlatformHandle((void*)hwnd);
 	for viewport in platform_io.Viewports.Data[:platform_io.Viewports.Size] { if viewport.PlatformHandle == hwnd { return viewport } }
 
 	return nil
 }
 
-// This code supports multi-viewports (multiple OS Windows mapped into different Dear ImGui viewports)
+// This code supports multi-viewports (multiple OS Windows mapped into different Dear Gui viewports)
 // Because of that, it is a little more complicated than your typical single-viewport binding code!
-UpdateMouseData :: proc(io : ^im.ImGuiIO, platform_io : ^im.ImGuiPlatformIO)
+UpdateMouseData :: proc(io : ^im.IO, platform_io : ^im.PlatformIO)
 {
 	bd := GetBackendData(io)
 	im.IM_ASSERT(bd.hWnd != {})
@@ -349,11 +349,11 @@ UpdateMouseData :: proc(io : ^im.ImGuiIO, platform_io : ^im.ImGuiPlatformIO)
 	focused_window := win32.GetForegroundWindow()
 	is_app_focused : bool = (focused_window != {} && (focused_window == bd.hWnd || win32.IsChild(focused_window, bd.hWnd) != {} || FindViewportByPlatformHandle(platform_io, focused_window) != nil))
 	if is_app_focused {
-		// (Optional) Set OS mouse position from Dear ImGui if requested (rarely used, only when io.ConfigNavMoveSetMousePos is enabled by user)
-		// When multi-viewports are enabled, all Dear ImGui positions are same as OS positions.
+		// (Optional) Set OS mouse position from Dear Gui if requested (rarely used, only when io.ConfigNavMoveSetMousePos is enabled by user)
+		// When multi-viewports are enabled, all Dear Gui positions are same as OS positions.
 		if io.WantSetMousePos {
 			pos : win32.POINT = {cast(i32) io.MousePos.x, cast(i32) io.MousePos.y}
-			if (io.ConfigFlags & im.ImGuiConfigFlags_.ImGuiConfigFlags_ViewportsEnable) == {} { win32.ClientToScreen(focused_window, &pos) }
+			if (io.ConfigFlags & im.ConfigFlags_.ConfigFlags_ViewportsEnable) == {} { win32.ClientToScreen(focused_window, &pos) }
 			win32.SetCursorPos(pos.x, pos.y)
 		}
 
@@ -365,19 +365,19 @@ UpdateMouseData :: proc(io : ^im.ImGuiIO, platform_io : ^im.ImGuiPlatformIO)
 			// Multi-viewport mode: mouse position in OS absolute coordinates (io.MousePos is (0,0) when the mouse is on the upper-left of the primary monitor)
 			// (This is the position you can get with ::GetCursorPos() or win32.WM_MOUSEMOVE + ::ClientToScreen(). In theory adding viewport->Pos to a client position would also be the same.)
 			mouse_pos : win32.POINT = mouse_screen_pos
-			if (io.ConfigFlags & im.ImGuiConfigFlags_.ImGuiConfigFlags_ViewportsEnable) == {} { win32.ScreenToClient(bd.hWnd, &mouse_pos) }
+			if (io.ConfigFlags & im.ConfigFlags_.ConfigFlags_ViewportsEnable) == {} { win32.ScreenToClient(bd.hWnd, &mouse_pos) }
 			im.AddMousePosEvent(io, cast(f32) mouse_pos.x, cast(f32) mouse_pos.y)
 		}
 	}
 
 	// (Optional) When using multiple viewports: call io.AddMouseViewportEvent() with the viewport the OS mouse cursor is hovering.
-	// If ImGuiBackendFlags_HasMouseHoveredViewport is not set by the backend, Dear imGui will ignore this field and infer the information using its flawed heuristic.
+	// If BackendFlags_HasMouseHoveredViewport is not set by the backend, Dear imGui will ignore this field and infer the information using its flawed heuristic.
 	// - [X] Win32 backend correctly ignore viewports with the _NoInputs flag (here using ::WindowFromPoint with win32.WM_NCHITTEST + HTTRANSPARENT in WndProc does that)
 	//       Some backend are not able to handle that correctly. If a backend report an hovered viewport that has the _NoInputs flag (e.g. when dragging a window
-	//       for docking, the viewport has the _NoInputs flag in order to allow us to find the viewport under), then Dear ImGui is forced to ignore the value reported
+	//       for docking, the viewport has the _NoInputs flag in order to allow us to find the viewport under), then Dear Gui is forced to ignore the value reported
 	//       by the backend, and use its flawed heuristic to guess the viewport behind.
 	// - [X] Win32 backend correctly reports this regardless of another viewport behind focused and dragged from (we need this to find a useful drag and drop target).
-	mouse_viewport_id : im.ImGuiID = 0
+	mouse_viewport_id : im.ID = 0
 	if has_mouse_screen_pos {
 		if hovered_hwnd := win32_ex.WindowFromPoint(mouse_screen_pos); hovered_hwnd != {} {
 			if viewport := FindViewportByPlatformHandle(platform_io, hovered_hwnd); viewport != nil {
@@ -389,11 +389,11 @@ UpdateMouseData :: proc(io : ^im.ImGuiIO, platform_io : ^im.ImGuiPlatformIO)
 }
 
 // Gamepad navigation mapping
-UpdateGamepads :: proc(io : ^im.ImGuiIO)
+UpdateGamepads :: proc(io : ^im.IO)
 {
 	when ! IMGUI_IMPL_WIN32_DISABLE_GAMEPAD { /* @gen ifndef */
 	bd := GetBackendData(io)
-	//if ((io.ConfigFlags & im.ImGuiConfigFlags_NavEnableGamepad) == 0) // FIXME: Technically feeding gamepad shouldn't depend on this now that they are regular inputs.
+	//if ((io.ConfigFlags & im.ConfigFlags_NavEnableGamepad) == 0) // FIXME: Technically feeding gamepad shouldn't depend on this now that they are regular inputs.
 	//    return;
 
 	// Calling XInputGetState() every frame on disconnected gamepads is unfortunately too slow.
@@ -404,52 +404,52 @@ UpdateGamepads :: proc(io : ^im.ImGuiIO)
 		bd.WantUpdateHasGamepad = false
 	}
 
-	io.BackendFlags &= cast(im.ImGuiBackendFlags) ~cast(i32)im.ImGuiBackendFlags_.ImGuiBackendFlags_HasGamepad
+	io.BackendFlags &= cast(im.BackendFlags) ~cast(i32)im.BackendFlags_.BackendFlags_HasGamepad
 	xinput_state : win32.XINPUT_STATE
 	gamepad : ^win32.XINPUT_GAMEPAD = &xinput_state.Gamepad
 	if !bd.HasGamepad || bd.XInputGetState == nil || bd.XInputGetState(0, &xinput_state) != win32.ERROR_SUCCESS { return }
-	io.BackendFlags |= im.ImGuiBackendFlags_.ImGuiBackendFlags_HasGamepad
+	io.BackendFlags |= im.BackendFlags_.BackendFlags_HasGamepad
 
 	IM_SATURATE :: #force_inline proc "contextless" (V : f32) -> f32
 	{
 		return (V < 0.0 ? 0.0 : (V > 1.0 ? 1.0 : V))
 	}
 
-	MAP_BUTTON :: #force_inline proc(io : ^im.ImGuiIO, gamepad : ^win32.XINPUT_GAMEPAD, KEY_NO : im.ImGuiKey, BUTTON_ENUM : win32.XINPUT_GAMEPAD_BUTTON)
+	MAP_BUTTON :: #force_inline proc(io : ^im.IO, gamepad : ^win32.XINPUT_GAMEPAD, KEY_NO : im.Key, BUTTON_ENUM : win32.XINPUT_GAMEPAD_BUTTON)
 	{
 		im.AddKeyEvent(io, KEY_NO, (gamepad.wButtons & BUTTON_ENUM) != {});
 	}
 
-	MAP_ANALOG :: #force_inline proc(io : ^im.ImGuiIO, KEY_NO : im.ImGuiKey, VALUE, V0, V1 : $T3)
+	MAP_ANALOG :: #force_inline proc(io : ^im.IO, KEY_NO : im.Key, VALUE, V0, V1 : $T3)
 	{
 		vn := cast(f32)(VALUE - V0) / (f32)(V1 - V0);
 		im.AddKeyAnalogEvent(io, KEY_NO, vn > 0.10, IM_SATURATE(vn));
 	}
 
-	MAP_BUTTON(io, gamepad, .ImGuiKey_GamepadStart, { .START })
-	MAP_BUTTON(io, gamepad, .ImGuiKey_GamepadBack, { .BACK })
-	MAP_BUTTON(io, gamepad, .ImGuiKey_GamepadFaceLeft, { .X })
-	MAP_BUTTON(io, gamepad, .ImGuiKey_GamepadFaceRight, { .B })
-	MAP_BUTTON(io, gamepad, .ImGuiKey_GamepadFaceUp, { .Y })
-	MAP_BUTTON(io, gamepad, .ImGuiKey_GamepadFaceDown, { .A })
-	MAP_BUTTON(io, gamepad, .ImGuiKey_GamepadDpadLeft, { .DPAD_LEFT })
-	MAP_BUTTON(io, gamepad, .ImGuiKey_GamepadDpadRight, { .DPAD_RIGHT })
-	MAP_BUTTON(io, gamepad, .ImGuiKey_GamepadDpadUp, { .DPAD_UP })
-	MAP_BUTTON(io, gamepad, .ImGuiKey_GamepadDpadDown, { .DPAD_DOWN })
-	MAP_BUTTON(io, gamepad, .ImGuiKey_GamepadL1, { .LEFT_SHOULDER })
-	MAP_BUTTON(io, gamepad, .ImGuiKey_GamepadR1, { .RIGHT_SHOULDER })
-	MAP_ANALOG(io,          .ImGuiKey_GamepadL2, gamepad.bLeftTrigger, win32.BYTE(win32.XINPUT_GAMEPAD_TRIGGER_THRESHOLD), 255)
-	MAP_ANALOG(io,          .ImGuiKey_GamepadR2, gamepad.bRightTrigger, win32.BYTE(win32.XINPUT_GAMEPAD_TRIGGER_THRESHOLD), 255)
-	MAP_BUTTON(io, gamepad, .ImGuiKey_GamepadL3, { .LEFT_THUMB })
-	MAP_BUTTON(io, gamepad, .ImGuiKey_GamepadR3, { .RIGHT_THUMB })
-	MAP_ANALOG(io,          .ImGuiKey_GamepadLStickLeft, gamepad.sThumbLX, -win32.XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, -32768)
-	MAP_ANALOG(io,          .ImGuiKey_GamepadLStickRight, gamepad.sThumbLX, +win32.XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, +32767)
-	MAP_ANALOG(io,          .ImGuiKey_GamepadLStickUp, gamepad.sThumbLY, +win32.XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, +32767)
-	MAP_ANALOG(io,          .ImGuiKey_GamepadLStickDown, gamepad.sThumbLY, -win32.XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, -32768)
-	MAP_ANALOG(io,          .ImGuiKey_GamepadRStickLeft, gamepad.sThumbRX, -win32.XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, -32768)
-	MAP_ANALOG(io,          .ImGuiKey_GamepadRStickRight, gamepad.sThumbRX, +win32.XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, +32767)
-	MAP_ANALOG(io,          .ImGuiKey_GamepadRStickUp, gamepad.sThumbRY, +win32.XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, +32767)
-	MAP_ANALOG(io,          .ImGuiKey_GamepadRStickDown, gamepad.sThumbRY, -win32.XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, -32768)
+	MAP_BUTTON(io, gamepad, .Key_GamepadStart, { .START })
+	MAP_BUTTON(io, gamepad, .Key_GamepadBack, { .BACK })
+	MAP_BUTTON(io, gamepad, .Key_GamepadFaceLeft, { .X })
+	MAP_BUTTON(io, gamepad, .Key_GamepadFaceRight, { .B })
+	MAP_BUTTON(io, gamepad, .Key_GamepadFaceUp, { .Y })
+	MAP_BUTTON(io, gamepad, .Key_GamepadFaceDown, { .A })
+	MAP_BUTTON(io, gamepad, .Key_GamepadDpadLeft, { .DPAD_LEFT })
+	MAP_BUTTON(io, gamepad, .Key_GamepadDpadRight, { .DPAD_RIGHT })
+	MAP_BUTTON(io, gamepad, .Key_GamepadDpadUp, { .DPAD_UP })
+	MAP_BUTTON(io, gamepad, .Key_GamepadDpadDown, { .DPAD_DOWN })
+	MAP_BUTTON(io, gamepad, .Key_GamepadL1, { .LEFT_SHOULDER })
+	MAP_BUTTON(io, gamepad, .Key_GamepadR1, { .RIGHT_SHOULDER })
+	MAP_ANALOG(io,          .Key_GamepadL2, gamepad.bLeftTrigger, win32.BYTE(win32.XINPUT_GAMEPAD_TRIGGER_THRESHOLD), 255)
+	MAP_ANALOG(io,          .Key_GamepadR2, gamepad.bRightTrigger, win32.BYTE(win32.XINPUT_GAMEPAD_TRIGGER_THRESHOLD), 255)
+	MAP_BUTTON(io, gamepad, .Key_GamepadL3, { .LEFT_THUMB })
+	MAP_BUTTON(io, gamepad, .Key_GamepadR3, { .RIGHT_THUMB })
+	MAP_ANALOG(io,          .Key_GamepadLStickLeft, gamepad.sThumbLX, -win32.XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, -32768)
+	MAP_ANALOG(io,          .Key_GamepadLStickRight, gamepad.sThumbLX, +win32.XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, +32767)
+	MAP_ANALOG(io,          .Key_GamepadLStickUp, gamepad.sThumbLY, +win32.XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, +32767)
+	MAP_ANALOG(io,          .Key_GamepadLStickDown, gamepad.sThumbLY, -win32.XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, -32768)
+	MAP_ANALOG(io,          .Key_GamepadRStickLeft, gamepad.sThumbRX, -win32.XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, -32768)
+	MAP_ANALOG(io,          .Key_GamepadRStickRight, gamepad.sThumbRX, +win32.XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, +32767)
+	MAP_ANALOG(io,          .Key_GamepadRStickUp, gamepad.sThumbRY, +win32.XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, +32767)
+	MAP_ANALOG(io,          .Key_GamepadRStickDown, gamepad.sThumbRY, -win32.XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE, -32768)
 	} else { // #ifndef IMGUI_IMPL_WIN32_DISABLE_GAMEPAD
 	_ = io
 	} // preproc endif
@@ -462,7 +462,7 @@ UpdateMonitors_EnumFunc :: proc "system" (monitor : win32.HMONITOR, _ : win32.HD
 	info : win32.MONITORINFO = {}
 	info.cbSize = size_of(win32.MONITORINFO)
 	if win32.GetMonitorInfoW(monitor, &info) == {} { return win32.TRUE }
-	imgui_monitor : im.ImGuiPlatformMonitor
+	imgui_monitor : im.PlatformMonitor
 	imgui_monitor.MainPos = {cast(f32) info.rcMonitor.left, cast(f32) info.rcMonitor.top}
 	imgui_monitor.MainSize = {cast(f32) (info.rcMonitor.right - info.rcMonitor.left), cast(f32) (info.rcMonitor.bottom - info.rcMonitor.top)}
 	imgui_monitor.WorkPos = {cast(f32) info.rcWork.left, cast(f32) info.rcWork.top}
@@ -515,7 +515,7 @@ NewFrame :: proc()
 	ProcessKeyEventsWorkarounds(io)
 
 	// Update OS mouse cursor with the cursor requested by imgui
-	mouse_cursor := io.MouseDrawCursor ? im.ImGuiMouseCursor_.ImGuiMouseCursor_None : im.GetMouseCursor()
+	mouse_cursor := io.MouseDrawCursor ? im.MouseCursor_.MouseCursor_None : im.GetMouseCursor()
 	if bd.LastMouseCursor != mouse_cursor {
 		bd.LastMouseCursor = mouse_cursor
 		UpdateMouseCursor(io, mouse_cursor)
@@ -525,156 +525,156 @@ NewFrame :: proc()
 	UpdateGamepads(io)
 }
 
-// Map VK_xxx to ImGuiKey_xxx.
+// Map VK_xxx to Key_xxx.
 // Not static to allow third-party code to use that if they want to (but undocumented)
-KeyEventToImGuiKey :: proc(wParam : win32.WPARAM, lParam : win32.LPARAM) -> im.ImGuiKey
+KeyEventToImGuiKey :: proc(wParam : win32.WPARAM, lParam : win32.LPARAM) -> im.Key
 {
 	// There is no distinct VK_xxx for keypad enter, instead it is VK_RETURN + KF_EXTENDED.
-	if (wParam == win32.VK_RETURN) && (win32.HIWORD(lParam) & win32.KF_EXTENDED) != {} { return .ImGuiKey_KeypadEnter }
+	if (wParam == win32.VK_RETURN) && (win32.HIWORD(lParam) & win32.KF_EXTENDED) != {} { return .Key_KeypadEnter }
 
 	switch wParam {
-		case win32.VK_TAB:       return .ImGuiKey_Tab
-		case win32.VK_LEFT:      return .ImGuiKey_LeftArrow
-		case win32.VK_RIGHT:     return .ImGuiKey_RightArrow
-		case win32.VK_UP:        return .ImGuiKey_UpArrow
-		case win32.VK_DOWN:      return .ImGuiKey_DownArrow
-		case win32.VK_PRIOR:     return .ImGuiKey_PageUp
-		case win32.VK_NEXT:      return .ImGuiKey_PageDown
-		case win32.VK_HOME:      return .ImGuiKey_Home
-		case win32.VK_END:       return .ImGuiKey_End
-		case win32.VK_INSERT:    return .ImGuiKey_Insert
-		case win32.VK_DELETE:    return .ImGuiKey_Delete
-		case win32.VK_BACK:      return .ImGuiKey_Backspace
-		case win32.VK_SPACE:     return .ImGuiKey_Space
-		case win32.VK_RETURN:    return .ImGuiKey_Enter
-		case win32.VK_ESCAPE:    return .ImGuiKey_Escape
-		case win32.VK_OEM_7:     return .ImGuiKey_Apostrophe
-		case win32.VK_OEM_COMMA: return .ImGuiKey_Comma
-		case win32.VK_OEM_MINUS: return .ImGuiKey_Minus
-		case win32.VK_OEM_PERIOD:return .ImGuiKey_Period
-		case win32.VK_OEM_2:     return .ImGuiKey_Slash
-		case win32.VK_OEM_1:     return .ImGuiKey_Semicolon
-		case win32.VK_OEM_PLUS:  return .ImGuiKey_Equal
-		case win32.VK_OEM_4:     return .ImGuiKey_LeftBracket
-		case win32.VK_OEM_5:     return .ImGuiKey_Backslash
-		case win32.VK_OEM_6:     return .ImGuiKey_RightBracket
-		case win32.VK_OEM_3:     return .ImGuiKey_GraveAccent
-		case win32.VK_CAPITAL:   return .ImGuiKey_CapsLock
-		case win32.VK_SCROLL:    return .ImGuiKey_ScrollLock
-		case win32.VK_NUMLOCK:   return .ImGuiKey_NumLock
-		case win32.VK_SNAPSHOT:  return .ImGuiKey_PrintScreen
-		case win32.VK_PAUSE:     return .ImGuiKey_Pause
-		case win32.VK_NUMPAD0:   return .ImGuiKey_Keypad0
-		case win32.VK_NUMPAD1:   return .ImGuiKey_Keypad1
-		case win32.VK_NUMPAD2:   return .ImGuiKey_Keypad2
-		case win32.VK_NUMPAD3:   return .ImGuiKey_Keypad3
-		case win32.VK_NUMPAD4:   return .ImGuiKey_Keypad4
-		case win32.VK_NUMPAD5:   return .ImGuiKey_Keypad5
-		case win32.VK_NUMPAD6:   return .ImGuiKey_Keypad6
-		case win32.VK_NUMPAD7:   return .ImGuiKey_Keypad7
-		case win32.VK_NUMPAD8:   return .ImGuiKey_Keypad8
-		case win32.VK_NUMPAD9:   return .ImGuiKey_Keypad9
-		case win32.VK_DECIMAL:   return .ImGuiKey_KeypadDecimal
-		case win32.VK_DIVIDE:    return .ImGuiKey_KeypadDivide
-		case win32.VK_MULTIPLY:  return .ImGuiKey_KeypadMultiply
-		case win32.VK_SUBTRACT:  return .ImGuiKey_KeypadSubtract
-		case win32.VK_ADD:       return .ImGuiKey_KeypadAdd
-		case win32.VK_LSHIFT:    return .ImGuiKey_LeftShift
-		case win32.VK_LCONTROL:  return .ImGuiKey_LeftCtrl
-		case win32.VK_LMENU:     return .ImGuiKey_LeftAlt
-		case win32.VK_LWIN:      return .ImGuiKey_LeftSuper
-		case win32.VK_RSHIFT:    return .ImGuiKey_RightShift
-		case win32.VK_RCONTROL:  return .ImGuiKey_RightCtrl
-		case win32.VK_RMENU:     return .ImGuiKey_RightAlt
-		case win32.VK_RWIN:      return .ImGuiKey_RightSuper
-		case win32.VK_APPS:      return .ImGuiKey_Menu
-		case '0':                return .ImGuiKey_0
-		case '1':                return .ImGuiKey_1
-		case '2':                return .ImGuiKey_2
-		case '3':                return .ImGuiKey_3
-		case '4':                return .ImGuiKey_4
-		case '5':                return .ImGuiKey_5
-		case '6':                return .ImGuiKey_6
-		case '7':                return .ImGuiKey_7
-		case '8':                return .ImGuiKey_8
-		case '9':                return .ImGuiKey_9
-		case 'A':                return .ImGuiKey_A
-		case 'B':                return .ImGuiKey_B
-		case 'C':                return .ImGuiKey_C
-		case 'D':                return .ImGuiKey_D
-		case 'E':                return .ImGuiKey_E
-		case 'F':                return .ImGuiKey_F
-		case 'G':                return .ImGuiKey_G
-		case 'H':                return .ImGuiKey_H
-		case 'I':                return .ImGuiKey_I
-		case 'J':                return .ImGuiKey_J
-		case 'K':                return .ImGuiKey_K
-		case 'L':                return .ImGuiKey_L
-		case 'M':                return .ImGuiKey_M
-		case 'N':                return .ImGuiKey_N
-		case 'O':                return .ImGuiKey_O
-		case 'P':                return .ImGuiKey_P
-		case 'Q':                return .ImGuiKey_Q
-		case 'R':                return .ImGuiKey_R
-		case 'S':                return .ImGuiKey_S
-		case 'T':                return .ImGuiKey_T
-		case 'U':                return .ImGuiKey_U
-		case 'V':                return .ImGuiKey_V
-		case 'W':                return .ImGuiKey_W
-		case 'X':                return .ImGuiKey_X
-		case 'Y':                return .ImGuiKey_Y
-		case 'Z':                return .ImGuiKey_Z
-		case win32.VK_F1:        return .ImGuiKey_F1
-		case win32.VK_F2:        return .ImGuiKey_F2
-		case win32.VK_F3:        return .ImGuiKey_F3
-		case win32.VK_F4:        return .ImGuiKey_F4
-		case win32.VK_F5:        return .ImGuiKey_F5
-		case win32.VK_F6:        return .ImGuiKey_F6
-		case win32.VK_F7:        return .ImGuiKey_F7
-		case win32.VK_F8:        return .ImGuiKey_F8
-		case win32.VK_F9:        return .ImGuiKey_F9
-		case win32.VK_F10:       return .ImGuiKey_F10
-		case win32.VK_F11:       return .ImGuiKey_F11
-		case win32.VK_F12:       return .ImGuiKey_F12
-		case win32.VK_F13:       return .ImGuiKey_F13
-		case win32.VK_F14:       return .ImGuiKey_F14
-		case win32.VK_F15:       return .ImGuiKey_F15
-		case win32.VK_F16:       return .ImGuiKey_F16
-		case win32.VK_F17:       return .ImGuiKey_F17
-		case win32.VK_F18:       return .ImGuiKey_F18
-		case win32.VK_F19:       return .ImGuiKey_F19
-		case win32.VK_F20:       return .ImGuiKey_F20
-		case win32.VK_F21:       return .ImGuiKey_F21
-		case win32.VK_F22:       return .ImGuiKey_F22
-		case win32.VK_F23:       return .ImGuiKey_F23
-		case win32.VK_F24:       return .ImGuiKey_F24
-		case win32.VK_BROWSER_BACK:   return .ImGuiKey_AppBack
-		case win32.VK_BROWSER_FORWARD:return .ImGuiKey_AppForward
-		case: return .ImGuiKey_None
+		case win32.VK_TAB:       return .Key_Tab
+		case win32.VK_LEFT:      return .Key_LeftArrow
+		case win32.VK_RIGHT:     return .Key_RightArrow
+		case win32.VK_UP:        return .Key_UpArrow
+		case win32.VK_DOWN:      return .Key_DownArrow
+		case win32.VK_PRIOR:     return .Key_PageUp
+		case win32.VK_NEXT:      return .Key_PageDown
+		case win32.VK_HOME:      return .Key_Home
+		case win32.VK_END:       return .Key_End
+		case win32.VK_INSERT:    return .Key_Insert
+		case win32.VK_DELETE:    return .Key_Delete
+		case win32.VK_BACK:      return .Key_Backspace
+		case win32.VK_SPACE:     return .Key_Space
+		case win32.VK_RETURN:    return .Key_Enter
+		case win32.VK_ESCAPE:    return .Key_Escape
+		case win32.VK_OEM_7:     return .Key_Apostrophe
+		case win32.VK_OEM_COMMA: return .Key_Comma
+		case win32.VK_OEM_MINUS: return .Key_Minus
+		case win32.VK_OEM_PERIOD:return .Key_Period
+		case win32.VK_OEM_2:     return .Key_Slash
+		case win32.VK_OEM_1:     return .Key_Semicolon
+		case win32.VK_OEM_PLUS:  return .Key_Equal
+		case win32.VK_OEM_4:     return .Key_LeftBracket
+		case win32.VK_OEM_5:     return .Key_Backslash
+		case win32.VK_OEM_6:     return .Key_RightBracket
+		case win32.VK_OEM_3:     return .Key_GraveAccent
+		case win32.VK_CAPITAL:   return .Key_CapsLock
+		case win32.VK_SCROLL:    return .Key_ScrollLock
+		case win32.VK_NUMLOCK:   return .Key_NumLock
+		case win32.VK_SNAPSHOT:  return .Key_PrintScreen
+		case win32.VK_PAUSE:     return .Key_Pause
+		case win32.VK_NUMPAD0:   return .Key_Keypad0
+		case win32.VK_NUMPAD1:   return .Key_Keypad1
+		case win32.VK_NUMPAD2:   return .Key_Keypad2
+		case win32.VK_NUMPAD3:   return .Key_Keypad3
+		case win32.VK_NUMPAD4:   return .Key_Keypad4
+		case win32.VK_NUMPAD5:   return .Key_Keypad5
+		case win32.VK_NUMPAD6:   return .Key_Keypad6
+		case win32.VK_NUMPAD7:   return .Key_Keypad7
+		case win32.VK_NUMPAD8:   return .Key_Keypad8
+		case win32.VK_NUMPAD9:   return .Key_Keypad9
+		case win32.VK_DECIMAL:   return .Key_KeypadDecimal
+		case win32.VK_DIVIDE:    return .Key_KeypadDivide
+		case win32.VK_MULTIPLY:  return .Key_KeypadMultiply
+		case win32.VK_SUBTRACT:  return .Key_KeypadSubtract
+		case win32.VK_ADD:       return .Key_KeypadAdd
+		case win32.VK_LSHIFT:    return .Key_LeftShift
+		case win32.VK_LCONTROL:  return .Key_LeftCtrl
+		case win32.VK_LMENU:     return .Key_LeftAlt
+		case win32.VK_LWIN:      return .Key_LeftSuper
+		case win32.VK_RSHIFT:    return .Key_RightShift
+		case win32.VK_RCONTROL:  return .Key_RightCtrl
+		case win32.VK_RMENU:     return .Key_RightAlt
+		case win32.VK_RWIN:      return .Key_RightSuper
+		case win32.VK_APPS:      return .Key_Menu
+		case '0':                return .Key_0
+		case '1':                return .Key_1
+		case '2':                return .Key_2
+		case '3':                return .Key_3
+		case '4':                return .Key_4
+		case '5':                return .Key_5
+		case '6':                return .Key_6
+		case '7':                return .Key_7
+		case '8':                return .Key_8
+		case '9':                return .Key_9
+		case 'A':                return .Key_A
+		case 'B':                return .Key_B
+		case 'C':                return .Key_C
+		case 'D':                return .Key_D
+		case 'E':                return .Key_E
+		case 'F':                return .Key_F
+		case 'G':                return .Key_G
+		case 'H':                return .Key_H
+		case 'I':                return .Key_I
+		case 'J':                return .Key_J
+		case 'K':                return .Key_K
+		case 'L':                return .Key_L
+		case 'M':                return .Key_M
+		case 'N':                return .Key_N
+		case 'O':                return .Key_O
+		case 'P':                return .Key_P
+		case 'Q':                return .Key_Q
+		case 'R':                return .Key_R
+		case 'S':                return .Key_S
+		case 'T':                return .Key_T
+		case 'U':                return .Key_U
+		case 'V':                return .Key_V
+		case 'W':                return .Key_W
+		case 'X':                return .Key_X
+		case 'Y':                return .Key_Y
+		case 'Z':                return .Key_Z
+		case win32.VK_F1:        return .Key_F1
+		case win32.VK_F2:        return .Key_F2
+		case win32.VK_F3:        return .Key_F3
+		case win32.VK_F4:        return .Key_F4
+		case win32.VK_F5:        return .Key_F5
+		case win32.VK_F6:        return .Key_F6
+		case win32.VK_F7:        return .Key_F7
+		case win32.VK_F8:        return .Key_F8
+		case win32.VK_F9:        return .Key_F9
+		case win32.VK_F10:       return .Key_F10
+		case win32.VK_F11:       return .Key_F11
+		case win32.VK_F12:       return .Key_F12
+		case win32.VK_F13:       return .Key_F13
+		case win32.VK_F14:       return .Key_F14
+		case win32.VK_F15:       return .Key_F15
+		case win32.VK_F16:       return .Key_F16
+		case win32.VK_F17:       return .Key_F17
+		case win32.VK_F18:       return .Key_F18
+		case win32.VK_F19:       return .Key_F19
+		case win32.VK_F20:       return .Key_F20
+		case win32.VK_F21:       return .Key_F21
+		case win32.VK_F22:       return .Key_F22
+		case win32.VK_F23:       return .Key_F23
+		case win32.VK_F24:       return .Key_F24
+		case win32.VK_BROWSER_BACK:   return .Key_AppBack
+		case win32.VK_BROWSER_FORWARD:return .Key_AppForward
+		case: return .Key_None
 	}
 }
 
 // Helper to obtain the source of mouse messages.
 // See https://learn.microsoft.com/en-us/windows/win32/tablet/system-events-and-mouse-messages
 // Prefer to call this at the top of the message handler to avoid the possibility of other Win32 calls interfering with this.
-GetMouseSourceFromMessageExtraInfo :: proc() -> im.ImGuiMouseSource
+GetMouseSourceFromMessageExtraInfo :: proc() -> im.MouseSource
 {
 	extra_info := win32_ex.GetMessageExtraInfo()
-	if (extra_info & 0xFFFFFF80) == 0xFF515700 { return .ImGuiMouseSource_Pen }
-	if (extra_info & 0xFFFFFF80) == 0xFF515780 { return .ImGuiMouseSource_TouchScreen }
-	return .ImGuiMouseSource_Mouse
+	if (extra_info & 0xFFFFFF80) == 0xFF515700 { return .MouseSource_Pen }
+	if (extra_info & 0xFFFFFF80) == 0xFF515780 { return .MouseSource_TouchScreen }
+	return .MouseSource_Mouse
 }
 
 // Win32 message handler (process Win32 mouse/keyboard inputs, etc.)
 // Call from your application's message handler. Keep calling your message handler unless this function returns TRUE.
-// When implementing your own backend, you can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if Dear ImGui wants to use your inputs.
+// When implementing your own backend, you can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if Dear Gui wants to use your inputs.
 // - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main application, or clear/overwrite your copy of the mouse data.
 // - When io.WantCaptureKeyboard is true, do not dispatch keyboard input data to your main application, or clear/overwrite your copy of the keyboard data.
-// Generally you may always pass all inputs to Dear ImGui, and hide them from your application based on those two flags.
+// Generally you may always pass all inputs to Dear Gui, and hide them from your application based on those two flags.
 // PS: We treat DBLCLK messages as regular mouse down messages, so this code will work on windows classes that have the CS_DBLCLKS flag set. Our own example app code doesn't set this flag.
 
 // Copy either line into your .cpp file to forward declare the function:
-// Use ImGui::GetCurrentContext()
+// Use Gui::GetCurrentContext()
 WndProcHandler :: proc(hwnd : win32.HWND, msg : win32.UINT, wparam : win32.WPARAM, lparam : win32.LPARAM) -> win32.LRESULT
 {
 	// Most backends don't have silent checks like this one, but we need it because WndProc are called early in CreateWindow().
@@ -683,9 +683,9 @@ WndProcHandler :: proc(hwnd : win32.HWND, msg : win32.UINT, wparam : win32.WPARA
 	return WndProcHandlerEx(hwnd, msg, wparam, lparam, im.GetIO())
 }
 
-// Doesn't use ImGui::GetCurrentContext()
-// This version is in theory thread-safe in the sense that no path should access ImGui::GetCurrentContext().
-WndProcHandlerEx :: proc(hwnd : win32.HWND, msg : win32.UINT, wParam : win32.WPARAM, lParam : win32.LPARAM, io : ^im.ImGuiIO) -> win32.LRESULT
+// Doesn't use Gui::GetCurrentContext()
+// This version is in theory thread-safe in the sense that no path should access Gui::GetCurrentContext().
+WndProcHandlerEx :: proc(hwnd : win32.HWND, msg : win32.UINT, wParam : win32.WPARAM, lParam : win32.LPARAM, io : ^im.IO) -> win32.LRESULT
 {
 	bd : ^Data = GetBackendData(io)
 	if bd == nil { return 0 }
@@ -706,7 +706,7 @@ WndProcHandlerEx :: proc(hwnd : win32.HWND, msg : win32.UINT, wParam : win32.WPA
 				bd.MouseTrackedArea = area
 			}
 			mouse_pos : win32.POINT = {cast(win32.LONG) win32.GET_X_LPARAM(lParam), cast(win32.LONG) win32.GET_Y_LPARAM(lParam)}
-			want_absolute_pos : bool = (io.ConfigFlags & im.ImGuiConfigFlags_.ImGuiConfigFlags_ViewportsEnable) != {}
+			want_absolute_pos : bool = (io.ConfigFlags & im.ConfigFlags_.ConfigFlags_ViewportsEnable) != {}
 			if msg == win32.WM_MOUSEMOVE && want_absolute_pos {
 				// win32.WM_MOUSEMOVE are client-relative coordinates.
 				win32.ClientToScreen(hwnd, &mouse_pos)
@@ -763,7 +763,7 @@ WndProcHandlerEx :: proc(hwnd : win32.HWND, msg : win32.UINT, wParam : win32.WPA
 			}
 			bd.MouseButtonsDown |= 1 << u32(button)
 			im.AddMouseSourceEvent(io, mouse_source)
-			im.AddMouseButtonEvent(io, im.ImGuiMouseButton(button), true)
+			im.AddMouseButtonEvent(io, im.MouseButton(button), true)
 			return 0
 			}
 			fallthrough
@@ -784,7 +784,7 @@ WndProcHandlerEx :: proc(hwnd : win32.HWND, msg : win32.UINT, wParam : win32.WPA
 			bd.MouseButtonsDown &= ~(1 << u32(button))
 			if bd.MouseButtonsDown == 0 && win32.GetCapture() == hwnd { win32.ReleaseCapture() }
 			im.AddMouseSourceEvent(io, mouse_source)
-			im.AddMouseButtonEvent(io, im.ImGuiMouseButton(button), false)
+			im.AddMouseButtonEvent(io, im.MouseButton(button), false)
 			return 0
 			}
 			fallthrough
@@ -807,30 +807,30 @@ WndProcHandlerEx :: proc(hwnd : win32.HWND, msg : win32.UINT, wParam : win32.WPA
 				// Submit modifiers
 				UpdateKeyModifiers(io)
 
-				// Obtain virtual key code and convert to ImGuiKey
+				// Obtain virtual key code and convert to Key
 				key := KeyEventToImGuiKey(wParam, lParam)
 				vk : i32 = cast(i32) wParam
 				scancode : i32 = cast(i32) win32.LOBYTE(win32.HIWORD(lParam))
 
-				// Special behavior for win32.VK_SNAPSHOT / ImGuiKey_PrintScreen as Windows doesn't emit the key down event.
-				if key == .ImGuiKey_PrintScreen && !is_key_down { AddKeyEvent(io, key, true, vk, scancode) }
+				// Special behavior for win32.VK_SNAPSHOT / Key_PrintScreen as Windows doesn't emit the key down event.
+				if key == .Key_PrintScreen && !is_key_down { AddKeyEvent(io, key, true, vk, scancode) }
 
 				// Submit key event
-				if key != .ImGuiKey_None { AddKeyEvent(io, key, is_key_down, vk, scancode) }
+				if key != .Key_None { AddKeyEvent(io, key, is_key_down, vk, scancode) }
 
 				// Submit individual left/right modifier events
 				if vk == win32.VK_SHIFT {
 					// Important: Shift keys tend to get stuck when pressed together, missing key-up events are corrected in ProcessKeyEventsWorkarounds()
-					if IsVkDown(win32.VK_LSHIFT) == is_key_down { AddKeyEvent(io, .ImGuiKey_LeftShift, is_key_down, win32.VK_LSHIFT, scancode) }
-					if IsVkDown(win32.VK_RSHIFT) == is_key_down { AddKeyEvent(io, .ImGuiKey_RightShift, is_key_down, win32.VK_RSHIFT, scancode) }
+					if IsVkDown(win32.VK_LSHIFT) == is_key_down { AddKeyEvent(io, .Key_LeftShift, is_key_down, win32.VK_LSHIFT, scancode) }
+					if IsVkDown(win32.VK_RSHIFT) == is_key_down { AddKeyEvent(io, .Key_RightShift, is_key_down, win32.VK_RSHIFT, scancode) }
 				}
 				else if vk == win32.VK_CONTROL {
-					if IsVkDown(win32.VK_LCONTROL) == is_key_down { AddKeyEvent(io, .ImGuiKey_LeftCtrl, is_key_down, win32.VK_LCONTROL, scancode) }
-					if IsVkDown(win32.VK_RCONTROL) == is_key_down { AddKeyEvent(io, .ImGuiKey_RightCtrl, is_key_down, win32.VK_RCONTROL, scancode) }
+					if IsVkDown(win32.VK_LCONTROL) == is_key_down { AddKeyEvent(io, .Key_LeftCtrl, is_key_down, win32.VK_LCONTROL, scancode) }
+					if IsVkDown(win32.VK_RCONTROL) == is_key_down { AddKeyEvent(io, .Key_RightCtrl, is_key_down, win32.VK_RCONTROL, scancode) }
 				}
 				else if vk == win32.VK_MENU {
-					if IsVkDown(win32.VK_LMENU) == is_key_down { AddKeyEvent(io, .ImGuiKey_LeftAlt, is_key_down, win32.VK_LMENU, scancode) }
-					if IsVkDown(win32.VK_RMENU) == is_key_down { AddKeyEvent(io, .ImGuiKey_RightAlt, is_key_down, win32.VK_RMENU, scancode) }
+					if IsVkDown(win32.VK_LMENU) == is_key_down { AddKeyEvent(io, .Key_LeftAlt, is_key_down, win32.VK_LMENU, scancode) }
+					if IsVkDown(win32.VK_RMENU) == is_key_down { AddKeyEvent(io, .Key_RightAlt, is_key_down, win32.VK_RMENU, scancode) }
 				}
 			}
 			return 0
@@ -1046,7 +1046,7 @@ EnableAlphaCompositing :: proc(hwnd : rawptr)
 // If you are new to dear imgui or creating a new binding for dear imgui, it is recommended that you completely ignore this section first..
 //--------------------------------------------------------------------------------------------------------
 
-// Helper structure we store in the void* RendererUserData field of each im.ImGuiViewport to easily retrieve our backend data.
+// Helper structure we store in the void* RendererUserData field of each im.Viewport to easily retrieve our backend data.
 ViewportData :: struct {
 	Hwnd : win32.HWND,
 	HwndParent : win32.HWND,
@@ -1062,24 +1062,24 @@ ViewportData_init :: proc(this : ^ViewportData)
 	this.HwndParent = nil; this.Hwnd = this.HwndParent; this.HwndOwned = false; this.DwExStyle = 0; this.DwStyle = this.DwExStyle
 }
 
-GetWin32StyleFromViewportFlags :: proc(flags : im.ImGuiViewportFlags, out_style : ^win32.DWORD, out_ex_style : ^win32.DWORD)
+GetWin32StyleFromViewportFlags :: proc(flags : im.ViewportFlags, out_style : ^win32.DWORD, out_ex_style : ^win32.DWORD)
 {
-	if (flags & im.ImGuiViewportFlags_.ImGuiViewportFlags_NoDecoration) != {} { out_style^ = win32.WS_POPUP }
+	if (flags & im.ViewportFlags_.ViewportFlags_NoDecoration) != {} { out_style^ = win32.WS_POPUP }
 	else { out_style^ = win32.WS_OVERLAPPEDWINDOW }
 
-	if (flags & im.ImGuiViewportFlags_.ImGuiViewportFlags_NoTaskBarIcon) != {} { out_ex_style^ = win32.WS_EX_TOOLWINDOW }
+	if (flags & im.ViewportFlags_.ViewportFlags_NoTaskBarIcon) != {} { out_ex_style^ = win32.WS_EX_TOOLWINDOW }
 	else { out_ex_style^ = win32.WS_EX_APPWINDOW }
 
-	if (flags & im.ImGuiViewportFlags_.ImGuiViewportFlags_TopMost) != {} { out_ex_style^ |= win32.WS_EX_TOPMOST }
+	if (flags & im.ViewportFlags_.ViewportFlags_TopMost) != {} { out_ex_style^ |= win32.WS_EX_TOPMOST }
 }
 
-GetHwndFromViewportID :: proc(viewport_id : im.ImGuiID) -> win32.HWND
+GetHwndFromViewportID :: proc(viewport_id : im.ID) -> win32.HWND
 {
 	if viewport_id != 0 { if viewport := im.FindViewportByID(viewport_id); viewport != nil { return cast(win32.HWND) viewport.PlatformHandle } }
 	return nil
 }
 
-CreateWindow :: proc(viewport : ^im.ImGuiViewport)
+CreateWindow :: proc(viewport : ^im.Viewport)
 {
 	vd := im.IM_NEW_MEM(ViewportData); ViewportData_init(vd)
 	viewport.PlatformUserData = vd
@@ -1091,7 +1091,7 @@ CreateWindow :: proc(viewport : ^im.ImGuiViewport)
 	// Create window
 	rect : win32.RECT = {cast(win32.LONG) viewport.Pos.x, cast(win32.LONG) viewport.Pos.y, cast(win32.LONG) (viewport.Pos.x + viewport.Size.x), cast(win32.LONG) (viewport.Pos.y + viewport.Size.y)}
 	win32.AdjustWindowRectEx(&rect, vd.DwStyle, win32.FALSE, vd.DwExStyle)
-	vd.Hwnd = win32.CreateWindowExW(vd.DwExStyle, "ImGui Platform", "Untitled", vd.DwStyle, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top, vd.HwndParent, nil, cast(win32.HANDLE) win32.GetModuleHandleW(nil), nil); // Owner window, Menu, Instance, Param
+	vd.Hwnd = win32.CreateWindowExW(vd.DwExStyle, "Gui Platform", "Untitled", vd.DwStyle, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top, vd.HwndParent, nil, cast(win32.HANDLE) win32.GetModuleHandleW(nil), nil); // Owner window, Menu, Instance, Param
 	vd.HwndOwned = true
 	viewport.PlatformRequestResize = false
 	viewport.PlatformHandleRaw = vd.Hwnd; viewport.PlatformHandle = viewport.PlatformHandleRaw
@@ -1100,7 +1100,7 @@ CreateWindow :: proc(viewport : ^im.ImGuiViewport)
 	win32.SetPropW(vd.Hwnd, "IMGUI_CONTEXT", cast(win32.HANDLE) im.GetCurrentContext())
 }
 
-DestroyWindow :: proc(viewport : ^im.ImGuiViewport)
+DestroyWindow :: proc(viewport : ^im.Viewport)
 {
 	bd : ^Data = GetBackendData()
 	if vd : ^ViewportData = cast(^ViewportData) viewport.PlatformUserData; vd != nil {
@@ -1116,7 +1116,7 @@ DestroyWindow :: proc(viewport : ^im.ImGuiViewport)
 	viewport.PlatformHandle = nil; viewport.PlatformUserData = viewport.PlatformHandle
 }
 
-ShowWindow :: proc(viewport : ^im.ImGuiViewport)
+ShowWindow :: proc(viewport : ^im.Viewport)
 {
 	vd : ^ViewportData = cast(^ViewportData) viewport.PlatformUserData
 	im.IM_ASSERT(vd.Hwnd != {})
@@ -1125,14 +1125,14 @@ ShowWindow :: proc(viewport : ^im.ImGuiViewport)
 	// so we temporarily disable parenting. (#7354)
 	if vd.HwndParent != nil { win32.SetWindowLongPtrW(vd.Hwnd, win32.GWLP_HWNDPARENT, cast(win32.LONG_PTR) 0) }
 
-	if (viewport.Flags & im.ImGuiViewportFlags_.ImGuiViewportFlags_NoFocusOnAppearing) != {} { win32.ShowWindow(vd.Hwnd, win32.SW_SHOWNA) }
+	if (viewport.Flags & im.ViewportFlags_.ViewportFlags_NoFocusOnAppearing) != {} { win32.ShowWindow(vd.Hwnd, win32.SW_SHOWNA) }
 	else { win32.ShowWindow(vd.Hwnd, win32.SW_SHOW) }
 
 	// Restore
 	if vd.HwndParent != nil { win32.SetWindowLongPtrW(vd.Hwnd, win32.GWLP_HWNDPARENT, cast(win32.LONG_PTR) uintptr(vd.HwndParent)) }
 }
 
-UpdateWindow :: proc(viewport : ^im.ImGuiViewport)
+UpdateWindow :: proc(viewport : ^im.Viewport)
 {
 	vd : ^ViewportData = cast(^ViewportData) viewport.PlatformUserData
 	im.IM_ASSERT(vd.Hwnd != {})
@@ -1161,7 +1161,7 @@ UpdateWindow :: proc(viewport : ^im.ImGuiViewport)
 	if vd.DwStyle != new_style || vd.DwExStyle != new_ex_style {
 		// (Optional) Update TopMost state if it changed _after_ creation
 		top_most_changed : bool = (vd.DwExStyle & win32.WS_EX_TOPMOST) != (new_ex_style & win32.WS_EX_TOPMOST)
-		insert_after : win32.HWND = top_most_changed ? ((viewport.Flags & im.ImGuiViewportFlags_.ImGuiViewportFlags_TopMost) != {} ? win32.HWND_TOPMOST : win32.HWND_NOTOPMOST) : {}
+		insert_after : win32.HWND = top_most_changed ? ((viewport.Flags & im.ViewportFlags_.ViewportFlags_TopMost) != {} ? win32.HWND_TOPMOST : win32.HWND_NOTOPMOST) : {}
 		swp_flag : win32.UINT = top_most_changed ? 0 : win32.SWP_NOZORDER
 
 		// Apply flags and position (since it is affected by flags)
@@ -1177,28 +1177,28 @@ UpdateWindow :: proc(viewport : ^im.ImGuiViewport)
 	}
 }
 
-GetWindowPos :: proc (viewport : ^im.ImGuiViewport) -> im.ImVec2
+GetWindowPos :: proc (viewport : ^im.Viewport) -> im.Vec2
 {
 	vd : ^ViewportData = cast(^ViewportData) viewport.PlatformUserData
 	im.IM_ASSERT(vd.Hwnd != {})
 	pos : win32.POINT = {0, 0}
 	win32.ClientToScreen(vd.Hwnd, &pos)
-	return im.ImVec2{cast(f32) pos.x, cast(f32) pos.y}
+	return im.Vec2{cast(f32) pos.x, cast(f32) pos.y}
 }
 
-UpdateWin32StyleFromWindow :: proc(viewport : ^im.ImGuiViewport)
+UpdateWin32StyleFromWindow :: proc(viewport : ^im.Viewport)
 {
 	vd : ^ViewportData = cast(^ViewportData) viewport.PlatformUserData
 	vd.DwStyle = cast(u32)win32.GetWindowLongW(vd.Hwnd, win32.GWL_STYLE)
 	vd.DwExStyle = cast(u32)win32.GetWindowLongW(vd.Hwnd, win32.GWL_EXSTYLE)
 }
 
-SetWindowPos :: proc(viewport : ^im.ImGuiViewport, pos : im.ImVec2)
+SetWindowPos :: proc(viewport : ^im.Viewport, pos : im.Vec2)
 {
 	vd : ^ViewportData = cast(^ViewportData) viewport.PlatformUserData
 	im.IM_ASSERT(vd.Hwnd != {})
 	rect : win32.RECT = {cast(win32.LONG) pos.x, cast(win32.LONG) pos.y, cast(win32.LONG) pos.x, cast(win32.LONG) pos.y}
-	if (viewport.Flags & im.ImGuiViewportFlags_.ImGuiViewportFlags_OwnedByApp) != {} {
+	if (viewport.Flags & im.ViewportFlags_.ViewportFlags_OwnedByApp) != {} {
 		// Not our window, poll style before using
 		UpdateWin32StyleFromWindow(viewport)
 	}
@@ -1206,21 +1206,21 @@ SetWindowPos :: proc(viewport : ^im.ImGuiViewport, pos : im.ImVec2)
 	win32.SetWindowPos(vd.Hwnd, nil, rect.left, rect.top, 0, 0, win32.SWP_NOZORDER | win32.SWP_NOSIZE | win32.SWP_NOACTIVATE)
 }
 
-GetWindowSize :: proc(viewport : ^im.ImGuiViewport) -> im.ImVec2
+GetWindowSize :: proc(viewport : ^im.Viewport) -> im.Vec2
 {
 	vd : ^ViewportData = cast(^ViewportData) viewport.PlatformUserData
 	im.IM_ASSERT(vd.Hwnd != {})
 	rect : win32.RECT
 	win32.GetClientRect(vd.Hwnd, &rect)
-	return im.ImVec2{f32(rect.right - rect.left), f32(rect.bottom - rect.top)}
+	return im.Vec2{f32(rect.right - rect.left), f32(rect.bottom - rect.top)}
 }
 
-SetWindowSize :: proc(viewport : ^im.ImGuiViewport, size : im.ImVec2)
+SetWindowSize :: proc(viewport : ^im.Viewport, size : im.Vec2)
 {
 	vd : ^ViewportData = cast(^ViewportData) viewport.PlatformUserData
 	im.IM_ASSERT(vd.Hwnd != {})
 	rect : win32.RECT = {0, 0, cast(win32.LONG) size.x, cast(win32.LONG) size.y}
-	if (viewport.Flags & im.ImGuiViewportFlags_.ImGuiViewportFlags_OwnedByApp) != {} {
+	if (viewport.Flags & im.ViewportFlags_.ViewportFlags_OwnedByApp) != {} {
 		// Not our window, poll style before using
 		UpdateWin32StyleFromWindow(viewport)
 	}
@@ -1228,7 +1228,7 @@ SetWindowSize :: proc(viewport : ^im.ImGuiViewport, size : im.ImVec2)
 	win32.SetWindowPos(vd.Hwnd, nil, 0, 0, rect.right - rect.left, rect.bottom - rect.top, win32.SWP_NOZORDER | win32.SWP_NOMOVE | win32.SWP_NOACTIVATE)
 }
 
-SetWindowFocus :: proc(viewport : ^im.ImGuiViewport)
+SetWindowFocus :: proc(viewport : ^im.Viewport)
 {
 	vd : ^ViewportData = cast(^ViewportData) viewport.PlatformUserData
 	im.IM_ASSERT(vd.Hwnd != {})
@@ -1237,33 +1237,33 @@ SetWindowFocus :: proc(viewport : ^im.ImGuiViewport)
 	win32.SetFocus(vd.Hwnd)
 }
 
-GetWindowFocus :: proc(viewport : ^im.ImGuiViewport) -> bool
+GetWindowFocus :: proc(viewport : ^im.Viewport) -> bool
 {
 	vd : ^ViewportData = cast(^ViewportData) viewport.PlatformUserData
 	im.IM_ASSERT(vd.Hwnd != {})
 	return win32.GetForegroundWindow() == vd.Hwnd
 }
 
-GetWindowMinimized :: proc(viewport : ^im.ImGuiViewport) -> bool
+GetWindowMinimized :: proc(viewport : ^im.Viewport) -> bool
 {
 	vd : ^ViewportData = cast(^ViewportData) viewport.PlatformUserData
 	im.IM_ASSERT(vd.Hwnd != {})
 	return win32.IsIconic(vd.Hwnd) != {}
 }
 
-SetWindowTitle :: proc(viewport : ^im.ImGuiViewport, title : string)
+SetWindowTitle :: proc(viewport : ^im.Viewport, title : string)
 {
 	// ::SetWindowTextA() doesn't properly handle UTF-8 so we explicitely convert our string.
 	vd : ^ViewportData = cast(^ViewportData) viewport.PlatformUserData
 	im.IM_ASSERT(vd.Hwnd != {})
 	n : i32 = win32.MultiByteToWideChar(win32.CP_UTF8, 0, raw_data(title), cast(i32)len(title), nil, 0)
-	title_w : im.ImVector(win32.wchar_t)
+	title_w : im.Vector(win32.wchar_t)
 	im.resize(&title_w, n)
 	win32.MultiByteToWideChar(win32.CP_UTF8, 0, raw_data(title), cast(i32)len(title), title_w.Data, n)
 	win32.SetWindowTextW(vd.Hwnd, cast(cstring16)title_w.Data)
 }
 
-SetWindowAlpha :: proc(viewport : ^im.ImGuiViewport, alpha : f32)
+SetWindowAlpha :: proc(viewport : ^im.Viewport, alpha : f32)
 {
 	vd : ^ViewportData = cast(^ViewportData) viewport.PlatformUserData
 	im.IM_ASSERT(vd.Hwnd != {})
@@ -1279,7 +1279,7 @@ SetWindowAlpha :: proc(viewport : ^im.ImGuiViewport, alpha : f32)
 	}
 }
 
-GetWindowDpiScale :: proc(viewport : ^im.ImGuiViewport) -> f32
+GetWindowDpiScale :: proc(viewport : ^im.Viewport) -> f32
 {
 	vd : ^ViewportData = cast(^ViewportData) viewport.PlatformUserData
 	im.IM_ASSERT(vd.Hwnd != {})
@@ -1287,7 +1287,7 @@ GetWindowDpiScale :: proc(viewport : ^im.ImGuiViewport) -> f32
 }
 
 // FIXME-DPI: Testing DPI related ideas
-OnChangedViewport :: proc(viewport : ^im.ImGuiViewport)
+OnChangedViewport :: proc(viewport : ^im.Viewport)
 {
 	_ = viewport
 
@@ -1296,7 +1296,7 @@ OnChangedViewport :: proc(viewport : ^im.ImGuiViewport)
 WndProcHandler_PlatformWindow :: proc "system" (hWnd : win32.HWND, msg : win32.UINT, wparam : win32.WPARAM, lparam : win32.LPARAM) -> win32.LRESULT
 {
 	// Allow secondary viewport WndProc to be called regardless of current context
-	ctx := cast(^im.ImGuiContext) win32.GetPropW(hWnd, "IMGUI_CONTEXT")
+	ctx := cast(^im.Context) win32.GetPropW(hWnd, "IMGUI_CONTEXT")
 	if ctx == nil {
 		// unlike WndProcHandler() we are called directly by Windows, we can't just return 0.
 		return win32.DefWindowProcW(hWnd, msg, wparam, lparam)
@@ -1308,7 +1308,7 @@ WndProcHandler_PlatformWindow :: proc "system" (hWnd : win32.HWND, msg : win32.U
 	platform_io := im.GetPlatformIOEx(ctx)
 	result : win32.LRESULT = 0
 	if WndProcHandlerEx(hWnd, msg, wparam, lparam, io) != {} { result = 1 }
-	else if viewport : ^im.ImGuiViewport = FindViewportByPlatformHandle(platform_io, hWnd); viewport != nil {
+	else if viewport : ^im.Viewport = FindViewportByPlatformHandle(platform_io, hWnd); viewport != nil {
 		switch msg {
 			case win32.WM_CLOSE:
 				viewport.PlatformRequestClose = true
@@ -1323,15 +1323,15 @@ WndProcHandler_PlatformWindow :: proc "system" (hWnd : win32.HWND, msg : win32.U
 				break
 
 			case win32.WM_MOUSEACTIVATE:
-				if (viewport.Flags & im.ImGuiViewportFlags_.ImGuiViewportFlags_NoFocusOnClick) != {} { result = win32_ex.MA_NOACTIVATE }
+				if (viewport.Flags & im.ViewportFlags_.ViewportFlags_NoFocusOnClick) != {} { result = win32_ex.MA_NOACTIVATE }
 				break
 
 			case win32.WM_NCHITTEST:
 				// Let mouse pass-through the window. This will allow the backend to call io.AddMouseViewportEvent() correctly. (which is optional).
-				// The im.ImGuiViewportFlags_NoInputs flag is set while dragging a viewport, as want to detect the window behind the one we are dragging.
+				// The im.ViewportFlags_NoInputs flag is set while dragging a viewport, as want to detect the window behind the one we are dragging.
 				// If you cannot easily access those viewport flags from your windowing/event code: you may manually synchronize its state e.g. in
 				// your main loop after calling UpdatePlatformWindows(). Iterate all viewports/platform windows and pass the flag to your windowing system.
-				if (viewport.Flags & im.ImGuiViewportFlags_.ImGuiViewportFlags_NoInputs) != {} { result = win32.HTTRANSPARENT }
+				if (viewport.Flags & im.ViewportFlags_.ViewportFlags_NoInputs) != {} { result = win32.HTTRANSPARENT }
 				break
 		}
 	}
@@ -1352,7 +1352,7 @@ InitMultiViewportSupport :: proc(platform_has_own_dc : bool)
 	wcex.hCursor = nil
 	wcex.hbrBackground = cast(win32.HBRUSH) uintptr(win32.COLOR_BACKGROUND + 1)
 	wcex.lpszMenuName = nil
-	wcex.lpszClassName = "ImGui Platform"
+	wcex.lpszClassName = "Gui Platform"
 	wcex.hIconSm = nil
 	win32.RegisterClassExW(&wcex)
 
@@ -1388,6 +1388,6 @@ InitMultiViewportSupport :: proc(platform_has_own_dc : bool)
 
 ShutdownMultiViewportSupport :: proc()
 {
-	win32.UnregisterClassW("ImGui Platform", cast(win32.HANDLE) win32.GetModuleHandleW(nil))
+	win32.UnregisterClassW("Gui Platform", cast(win32.HANDLE) win32.GetModuleHandleW(nil))
 	im.DestroyPlatformWindows()
 }

@@ -37,8 +37,8 @@ main :: proc() {
 	im.CHECKVERSION()
 	im.CreateContext(); defer im.DestroyContext()
 	io := im.GetIO()
-	io.ConfigFlags |= .ImGuiConfigFlags_NavEnableKeyboard
-	io.ConfigFlags |= .ImGuiConfigFlags_NavEnableGamepad
+	io.ConfigFlags |= .ConfigFlags_NavEnableKeyboard
+	io.ConfigFlags |= .ConfigFlags_NavEnableGamepad
 
 	im.StyleColorsDark()
 
@@ -49,7 +49,7 @@ main :: proc() {
 
 	show_demo := true
 	show_other := false
-	clear_color := im.ImVec4{.45, .55, .60, 1}
+	clear_color := im.Vec4{.45, .55, .60, 1}
 
 	for done := false; !done; {
 		msg : win32.MSG

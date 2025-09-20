@@ -2300,13 +2300,13 @@ ImVector_clear :: #force_inline proc(this : ^ImVector($T)) { if this.Data != nil
 } }
 
 // Important: never called automatically! always explicit.
-ImVector_clear_delete :: #force_inline proc(this : ^ImVector($T))
+clear_delete :: #force_inline proc(this : ^ImVector($T))
 {
 	for n : i32 = 0; n < this.Size; n += 1 { IM_DELETE(this.Data[n]) }; ImVector_clear(this)
 }
 
 // Important: never called automatically! always explicit.
-ImVector_clear_destruct :: #force_inline proc(this : ^ImVector($T))
+clear_destruct :: #force_inline proc(this : ^ImVector($T))
 {
 	for n : i32 = 0; n < this.Size; n += 1 { deinit(&this.Data[n]) }; ImVector_clear(this)
 }
@@ -2331,12 +2331,12 @@ ImVector_end :: #force_inline proc(this : ^ImVector($T)) -> ^T
 	return &this.Data[this.Size]
 }
 
-ImVector_front :: #force_inline proc(this : ^ImVector($T)) -> ^T
+front :: #force_inline proc(this : ^ImVector($T)) -> ^T
 {
 	IM_ASSERT(this.Size > 0); return &this.Data[0]
 }
 
-ImVector_back :: #force_inline proc(this : ^ImVector($T)) -> ^T
+back :: #force_inline proc(this : ^ImVector($T)) -> ^T
 {
 	IM_ASSERT(this.Size > 0); return &this.Data[this.Size - 1]
 }
@@ -2370,7 +2370,7 @@ ImVector_resize_1 :: #force_inline proc(this : ^ImVector($T), new_size : i32, v 
 }
 
 // Resize a vector to a smaller size, guaranteed not to cause a reallocation
-ImVector_shrink :: #force_inline proc(this : ^ImVector($T), new_size : i32)
+shrink :: #force_inline proc(this : ^ImVector($T), new_size : i32)
 {
 	IM_ASSERT(new_size <= this.Size); this.Size = new_size
 }
@@ -2387,7 +2387,7 @@ ImVector_reserve :: #force_inline proc(this : ^ImVector($T), new_capacity : i32)
 	this.Capacity = new_capacity
 }
 
-ImVector_reserve_discard :: #force_inline proc(this : ^ImVector($T), new_capacity : i32)
+reserve_discard :: #force_inline proc(this : ^ImVector($T), new_capacity : i32)
 {
 	if new_capacity <= this.Capacity { return }
 	if this.Data != nil { IM_FREE(this.Data) }
@@ -2403,13 +2403,13 @@ ImVector_push_back :: #force_inline proc(this : ^ImVector($T), v : T)
 	post_incr(&this.Size)
 }
 
-ImVector_pop_back :: #force_inline proc(this : ^ImVector($T))
+pop_back :: #force_inline proc(this : ^ImVector($T))
 {
 	IM_ASSERT(this.Size > 0); post_decr(&this.Size)
 }
 
-ImVector_push_front :: #force_inline proc(this : ^ImVector($T), v : T) { if this.Size == 0 { ImVector_push_back(this, v) }
-else { ImVector_insert(this, this.Data, v) } }
+push_front :: #force_inline proc(this : ^ImVector($T), v : T) { if this.Size == 0 { ImVector_push_back(this, v) }
+else { insert(this, this.Data, v) } }
 
 ImVector_erase_0 :: #force_inline proc(this : ^ImVector($T), it : ^T) -> ^T
 {
@@ -2439,7 +2439,7 @@ ImVector_erase_unsorted :: #force_inline proc(this : ^ImVector($T), it : ^T) -> 
 	return &this.Data[off]
 }
 
-ImVector_insert :: #force_inline proc(this : ^ImVector($T), it : ^T, v : T) -> ^T
+insert :: #force_inline proc(this : ^ImVector($T), it : ^T, v : T) -> ^T
 {
 	IM_ASSERT(it >= this.Data && it <= &this.Data[this.Size])
 	off := mem.ptr_sub(it, cast(^T) this.Data)
@@ -2450,12 +2450,12 @@ ImVector_insert :: #force_inline proc(this : ^ImVector($T), it : ^T, v : T) -> ^
 	return &this.Data[off]
 }
 
-ImVector_contains :: #force_inline proc(this : ImVector($T), v : T) -> bool
+contains :: #force_inline proc(this : ImVector($T), v : T) -> bool
 {
 	data : ^T = this.Data; data_end : ^T = &this.Data[this.Size]; for data < data_end { if post_incr(&data)^ == v { return true } }; return false
 }
 
-ImVector_find :: #force_inline proc(this : ^ImVector($T), v : T) -> ^T
+find :: #force_inline proc(this : ^ImVector($T), v : T) -> ^T
 {
 	data : ^T = this.Data; data_end : ^T = &this.Data[this.Size]; for data < data_end { if data^ == v { break }
 else { pre_incr(&data) } }; return data
@@ -2463,18 +2463,18 @@ else { pre_incr(&data) } }; return data
 
 ImVector_find_index :: #force_inline proc(this : ^ImVector($T), v : T) -> i32
 {
-	data_end : ^T = &this.Data[this.Size]; it : ^T = ImVector_find(this, v); if it == data_end { return -1 }; off : int = mem.ptr_sub(it, &this.Data[0]); return cast(i32) off
+	data_end : ^T = &this.Data[this.Size]; it : ^T = find(this, v); if it == data_end { return -1 }; off : int = mem.ptr_sub(it, &this.Data[0]); return cast(i32) off
 }
 
-ImVector_find_erase :: #force_inline proc(this : ^ImVector($T), v : T) -> bool
+find_erase :: #force_inline proc(this : ^ImVector($T), v : T) -> bool
 {
-	it : ^T = ImVector_find(this, v); if it < &this.Data[this.Size] {erase(this, it); return true
+	it : ^T = find(this, v); if it < &this.Data[this.Size] {erase(this, it); return true
 	}; return false
 }
 
 ImVector_find_erase_unsorted :: #force_inline proc(this : ^ImVector($T), v : T) -> bool
 {
-	it : ^T = ImVector_find(this, v); if it < &this.Data[this.Size] {ImVector_erase_unsorted(this, it); return true
+	it : ^T = find(this, v); if it < &this.Data[this.Size] {ImVector_erase_unsorted(this, it); return true
 	}; return false
 }
 
@@ -2885,13 +2885,13 @@ ImGuiPayload_Clear :: proc(this : ^ImGuiPayload)
 	this.Preview = this.Delivery
 }
 
-ImGuiPayload_IsDataType :: proc(this : ^ImGuiPayload, type : string) -> bool {
+IsDataType :: proc(this : ^ImGuiPayload, type : string) -> bool {
 	return this.DataFrameCount != -1 && type == string_from_slice(this.DataType[:])
 }
 
-ImGuiPayload_IsPreview :: proc(this : ^ImGuiPayload) -> bool { return this.Preview }
+IsPreview :: proc(this : ^ImGuiPayload) -> bool { return this.Preview }
 
-ImGuiPayload_IsDelivery :: proc(this : ^ImGuiPayload) -> bool { return this.Delivery }
+IsDelivery :: proc(this : ^ImGuiPayload) -> bool { return this.Delivery }
 
 //-----------------------------------------------------------------------------
 // [SECTION] Helpers (ImGuiOnceUponAFrame, ImGuiTextFilter, ImGuiTextBuffer, ImGuiStorage, ImGuiListClipper, Math Operators, ImColor)
@@ -2974,7 +2974,7 @@ ImGuiTextBuffer_clear :: proc(this : ^ImGuiTextBuffer) { clear(&this.Buf) }
 
 ImGuiTextBuffer_reserve :: proc(this : ^ImGuiTextBuffer, capacity : i32) { reserve(&this.Buf, capacity) }
 
-ImGuiTextBuffer_c_str :: proc(this : ^ImGuiTextBuffer) -> [^]u8 { return this.Buf.Data != nil ? this.Buf.Data : raw_data(&ImGuiTextBuffer_EmptyString) }
+c_str :: proc(this : ^ImGuiTextBuffer) -> [^]u8 { return this.Buf.Data != nil ? this.Buf.Data : raw_data(&ImGuiTextBuffer_EmptyString) }
 
 // Helper for key->value storage (pair)
 // [Internal] Key+Value for ImGuiStorage
@@ -3055,7 +3055,7 @@ ImGuiListClipper :: struct {
 
 // Call IncludeItemByIndex() or IncludeItemsByIndex() *BEFORE* first call to Step() if you need a range of items to not be clipped, regardless of their visibility.
 // (Due to alignment / padding of certain items it is possible that an extra item may be included on either end of the display range).
-ImGuiListClipper_IncludeItemByIndex :: #force_inline proc(this : ^ImGuiListClipper, item_index : i32) { IncludeItemsByIndex(this, item_index, item_index + 1) }
+IncludeItemByIndex :: #force_inline proc(this : ^ImGuiListClipper, item_index : i32) { IncludeItemsByIndex(this, item_index, item_index + 1) }
 
 // Helpers macros to generate 32-bit encoded colors
 // - User can declare their own format by #defining the 5 _SHIFT/_MASK macros in their imconfig file.
@@ -3311,7 +3311,7 @@ ImDrawCmd :: struct {
 ImDrawCmd_init :: proc(this : ^ImDrawCmd) { this^ = {} }
 
 // Since 1.83: returns ImTextureID associated with this draw call. Warning: DO NOT assume this is always same as 'TextureId' (we will change this function for an upcoming feature)
-ImDrawCmd_GetTexID :: #force_inline proc(this : ^ImDrawCmd) -> ImTextureID { return this.TextureId }
+GetTexID :: #force_inline proc(this : ^ImDrawCmd) -> ImTextureID { return this.TextureId }
 
 // Vertex layout
 //when ! defined ( IMGUI_OVERRIDE_DRAWVERT_STRUCT_LAYOUT ) {
@@ -3455,13 +3455,13 @@ ImDrawList_GetClipRectMax :: #force_inline proc(this : ^ImDrawList) -> ImVec2
 //   so e.g. 'PathArcTo(center, radius, PI * -0.5f, PI)' is ok, whereas 'PathArcTo(center, radius, PI, PI * -0.5f)' won't have correct anti-aliasing when followed by PathFillConvex().
 ImDrawList_PathClear :: #force_inline proc(this : ^ImDrawList) { this._Path.Size = 0 }
 
-ImDrawList_PathLineTo :: #force_inline proc(this : ^ImDrawList, pos : ImVec2) { push_back(&this._Path, pos) }
+PathLineTo :: #force_inline proc(this : ^ImDrawList, pos : ImVec2) { push_back(&this._Path, pos) }
 
-ImDrawList_PathLineToMergeDuplicate :: #force_inline proc(this : ^ImDrawList, pos : ImVec2) {
+PathLineToMergeDuplicate :: #force_inline proc(this : ^ImDrawList, pos : ImVec2) {
 	if this._Path.Size == 0 || this._Path.Data[this._Path.Size - 1] != pos { push_back(&this._Path, pos) }
 }
 
-ImDrawList_PathFillConvex :: #force_inline proc(this : ^ImDrawList, col : ImU32)
+PathFillConvex :: #force_inline proc(this : ^ImDrawList, col : ImU32)
 {
 	ImDrawList_AddConvexPolyFilled(this, this._Path.Data, this._Path.Size, col); this._Path.Size = 0
 }
@@ -3471,9 +3471,9 @@ ImDrawList_PathFillConcave :: #force_inline proc(this : ^ImDrawList, col : ImU32
 	ImDrawList_AddConcavePolyFilled(this, this._Path.Data[:this._Path.Size], col); this._Path.Size = 0
 }
 
-ImDrawList_PathStroke :: #force_inline proc(this : ^ImDrawList, col : ImU32, flags : ImDrawFlags = {}, thickness : f32 = 1.0)
+PathStroke :: #force_inline proc(this : ^ImDrawList, col : ImU32, flags : ImDrawFlags = {}, thickness : f32 = 1.0)
 {
-	ImDrawList_AddPolyline(this, this._Path.Data[:this._Path.Size], col, flags, thickness); this._Path.Size = 0
+	AddPolyline(this, this._Path.Data[:this._Path.Size], col, flags, thickness); this._Path.Size = 0
 }
 
 // Advanced: Channels
@@ -3482,26 +3482,26 @@ ImDrawList_PathStroke :: #force_inline proc(this : ^ImDrawList, col : ImU32, fla
 // - This API shouldn't have been in ImDrawList in the first place!
 //   Prefer using your own persistent instance of ImDrawListSplitter as you can stack them.
 //   Using the ImDrawList::ChannelsXXXX you cannot stack a split over another.
-ImDrawList_ChannelsSplit :: #force_inline proc(this : ^ImDrawList, count : i32) { Split(&this._Splitter, this, count) }
+ChannelsSplit :: #force_inline proc(this : ^ImDrawList, count : i32) { Split(&this._Splitter, this, count) }
 
-ImDrawList_ChannelsMerge :: #force_inline proc(this : ^ImDrawList) { Merge(&this._Splitter, this) }
+ChannelsMerge :: #force_inline proc(this : ^ImDrawList) { Merge(&this._Splitter, this) }
 
-ImDrawList_ChannelsSetCurrent :: #force_inline proc(this : ^ImDrawList, n : i32) { SetCurrentChannel(&this._Splitter, this, n) }
+ChannelsSetCurrent :: #force_inline proc(this : ^ImDrawList, n : i32) { SetCurrentChannel(&this._Splitter, this, n) }
 
-ImDrawList_PrimWriteVtx :: #force_inline proc(this : ^ImDrawList, pos : ImVec2, uv : ImVec2, col : ImU32)
+PrimWriteVtx :: #force_inline proc(this : ^ImDrawList, pos : ImVec2, uv : ImVec2, col : ImU32)
 {
 	this._VtxWritePtr[0].pos = pos; this._VtxWritePtr[0].uv = uv; this._VtxWritePtr[0].col = col; post_incr(&this._VtxWritePtr); post_incr(&this._VtxCurrentIdx)
 }
 
-ImDrawList_PrimWriteIdx :: #force_inline proc(this : ^ImDrawList, idx : ImDrawIdx)
+PrimWriteIdx :: #force_inline proc(this : ^ImDrawList, idx : ImDrawIdx)
 {
 	this._IdxWritePtr[0] = idx; post_incr(&this._IdxWritePtr)
 }
 
 // Write vertex with unique index
-ImDrawList_PrimVtx :: #force_inline proc(this : ^ImDrawList, pos : ImVec2, uv : ImVec2, col : ImU32)
+PrimVtx :: #force_inline proc(this : ^ImDrawList, pos : ImVec2, uv : ImVec2, col : ImU32)
 {
-	ImDrawList_PrimWriteIdx(this, cast(ImDrawIdx) this._VtxCurrentIdx); ImDrawList_PrimWriteVtx(this, pos, uv, col)
+	PrimWriteIdx(this, cast(ImDrawIdx) this._VtxCurrentIdx); PrimWriteVtx(this, pos, uv, col)
 }
 
 // All draw command lists required to render the frame + pos/size coordinates to use for the projection matrix.
@@ -3635,7 +3635,7 @@ ImFontAtlasCustomRect_init :: proc(this : ^ImFontAtlasCustomRect)
 	this.Y = 0xFFFF; this.X = this.Y; this.Height = 0; this.Width = this.Height; this.GlyphID = 0; this.GlyphColored = 0; this.GlyphAdvanceX = 0.0; this.GlyphOffset = ImVec2{0, 0}; this.Font = nil
 }
 
-ImFontAtlasCustomRect_IsPacked :: proc(this : ImFontAtlasCustomRect) -> bool { return this.X != 0xFFFF }
+IsPacked :: proc(this : ImFontAtlasCustomRect) -> bool { return this.X != 0xFFFF }
 
 // Flags for ImFontAtlas build
 ImFontAtlasFlags_ :: enum i32 {
@@ -3704,11 +3704,11 @@ ImFontAtlas :: struct {
 }
 
 // Bit ambiguous: used to detect when user didn't build texture but effectively we should check TexID != 0 except that would be backend dependent...
-ImFontAtlas_IsBuilt :: proc(this : ^ImFontAtlas) -> bool { return this.Fonts.Size > 0 && this.TexReady }
+IsBuilt :: proc(this : ^ImFontAtlas) -> bool { return this.Fonts.Size > 0 && this.TexReady }
 
-ImFontAtlas_SetTexID :: proc(this : ^ImFontAtlas, id : ImTextureID) { this.TexID = id }
+SetTexID :: proc(this : ^ImFontAtlas, id : ImTextureID) { this.TexID = id }
 
-ImFontAtlas_GetCustomRectByIndex :: proc(this : ^ImFontAtlas, index : i32) -> ^ImFontAtlasCustomRect
+GetCustomRectByIndex :: proc(this : ^ImFontAtlas, index : i32) -> ^ImFontAtlasCustomRect
 {
 	IM_ASSERT(index >= 0); return &this.CustomRects.Data[index]
 }
@@ -3744,11 +3744,11 @@ ImFont :: struct {
 	Used4kPagesMap : [(IM_UNICODE_CODEPOINT_MAX + 1) / 4096 / 8]ImU8, // 2 bytes if ImWchar=ImWchar16, 34 bytes if ImWchar==ImWchar32. Store 1-bit for each block of 4K codepoints that has one active glyph. This is mainly used to facilitate iterations across all used codepoints.
 }
 
-ImFont_GetCharAdvance :: proc(this : ^ImFont, c : ImWchar) -> f32 {
+GetCharAdvance :: proc(this : ^ImFont, c : ImWchar) -> f32 {
 	return (cast(i32) c < this.IndexAdvanceX.Size) ? this.IndexAdvanceX.Data[cast(i32) c] : this.FallbackAdvanceX
 }
 
-ImFont_IsLoaded :: proc(this : ^ImFont) -> bool { return this.ContainerAtlas != nil }
+IsLoaded :: proc(this : ^ImFont) -> bool { return this.ContainerAtlas != nil }
 
 ImFont_GetDebugName :: proc(this : ^ImFont) -> [^]u8 {
 	uk := "unknown"
@@ -4371,33 +4371,33 @@ ImRect_init_3 :: proc(this : ^ImRect, x1 : f32, y1 : f32, x2 : f32, y2 : f32)
 
 ImRect_GetCenter :: proc(this : ImRect) -> ImVec2 { return ImVec2{(this.Min.x + this.Max.x) * 0.5, (this.Min.y + this.Max.y) * 0.5} }
 
-ImRect_GetSize :: proc(this : ImRect) -> ImVec2 { return ImVec2{this.Max.x - this.Min.x, this.Max.y - this.Min.y} }
+GetSize :: proc(this : ImRect) -> ImVec2 { return ImVec2{this.Max.x - this.Min.x, this.Max.y - this.Min.y} }
 
-ImRect_GetWidth :: proc(this : ImRect) -> f32 { return this.Max.x - this.Min.x }
+GetWidth :: proc(this : ImRect) -> f32 { return this.Max.x - this.Min.x }
 
-ImRect_GetHeight :: proc(this : ImRect) -> f32 { return this.Max.y - this.Min.y }
+GetHeight :: proc(this : ImRect) -> f32 { return this.Max.y - this.Min.y }
 
-ImRect_GetArea :: proc(this : ImRect) -> f32 { return (this.Max.x - this.Min.x) * (this.Max.y - this.Min.y) }
+GetArea :: proc(this : ImRect) -> f32 { return (this.Max.x - this.Min.x) * (this.Max.y - this.Min.y) }
 
 // Top-left
-ImRect_GetTL :: proc(this : ImRect) -> ImVec2 { return this.Min }
+GetTL :: proc(this : ImRect) -> ImVec2 { return this.Min }
 
 // Top-right
-ImRect_GetTR :: proc(this : ImRect) -> ImVec2 { return ImVec2{this.Max.x, this.Min.y} }
+GetTR :: proc(this : ImRect) -> ImVec2 { return ImVec2{this.Max.x, this.Min.y} }
 
 // Bottom-left
-ImRect_GetBL :: proc(this : ImRect) -> ImVec2 { return ImVec2{this.Min.x, this.Max.y} }
+GetBL :: proc(this : ImRect) -> ImVec2 { return ImVec2{this.Min.x, this.Max.y} }
 
 // Bottom-right
-ImRect_GetBR :: proc(this : ImRect) -> ImVec2 { return this.Max }
+GetBR :: proc(this : ImRect) -> ImVec2 { return this.Max }
 
 ImRect_Contains_0 :: proc(this : ImRect, p : ImVec2) -> bool { return p.x >= this.Min.x && p.y >= this.Min.y && p.x < this.Max.x && p.y < this.Max.y }
 
 ImRect_Contains_1 :: proc(this : ImRect, r : ImRect) -> bool { return r.Min.x >= this.Min.x && r.Min.y >= this.Min.y && r.Max.x <= this.Max.x && r.Max.y <= this.Max.y }
 
-ImRect_ContainsWithPad :: proc(this : ImRect, p : ImVec2, pad : ImVec2) -> bool { return p.x >= this.Min.x - pad.x && p.y >= this.Min.y - pad.y && p.x < this.Max.x + pad.x && p.y < this.Max.y + pad.y }
+ContainsWithPad :: proc(this : ImRect, p : ImVec2, pad : ImVec2) -> bool { return p.x >= this.Min.x - pad.x && p.y >= this.Min.y - pad.y && p.x < this.Max.x + pad.x && p.y < this.Max.y + pad.y }
 
-ImRect_Overlaps :: proc(this : ImRect, r : ImRect) -> bool { return r.Min.y < this.Max.y && r.Max.y > this.Min.y && r.Min.x < this.Max.x && r.Max.x > this.Min.x }
+Overlaps :: proc(this : ImRect, r : ImRect) -> bool { return r.Min.y < this.Max.y && r.Max.y > this.Min.y && r.Min.x < this.Max.x && r.Max.x > this.Min.x }
 
 ImRect_Add_0 :: proc(this : ^ImRect, p : ImVec2)
 {
@@ -4419,29 +4419,29 @@ ImRect_Expand_1 :: proc(this : ^ImRect, amount : ImVec2)
 	this.Min.x -= amount.x; this.Min.y -= amount.y; this.Max.x += amount.x; this.Max.y += amount.y
 }
 
-ImRect_Translate :: proc(this : ^ImRect, d : ImVec2)
+Translate :: proc(this : ^ImRect, d : ImVec2)
 {
 	this.Min.x += d.x; this.Min.y += d.y; this.Max.x += d.x; this.Max.y += d.y
 }
 
-ImRect_TranslateX :: proc(this : ^ImRect, dx : f32)
+TranslateX :: proc(this : ^ImRect, dx : f32)
 {
 	this.Min.x += dx; this.Max.x += dx
 }
 
-ImRect_TranslateY :: proc(this : ^ImRect, dy : f32)
+TranslateY :: proc(this : ^ImRect, dy : f32)
 {
 	this.Min.y += dy; this.Max.y += dy
 }
 
 // Simple version, may lead to an inverted rectangle, which is fine for Contains/Overlaps test but not for display.
-ImRect_ClipWith :: proc(this : ^ImRect, r : ImRect)
+ClipWith :: proc(this : ^ImRect, r : ImRect)
 {
 	this.Min = ImMax(this.Min, r.Min); this.Max = ImMin(this.Max, r.Max)
 }
 
 // Full version, ensure both points are fully clipped.
-ImRect_ClipWithFull :: proc(this : ^ImRect, r : ImRect)
+ClipWithFull :: proc(this : ^ImRect, r : ImRect)
 {
 	this.Min = ImClamp(this.Min, r.Min, r.Max); this.Max = ImClamp(this.Max, r.Min, r.Max)
 }
@@ -4451,9 +4451,9 @@ ImRect_Floor :: proc(this : ^ImRect)
 	this.Min.x = IM_TRUNC(this.Min.x); this.Min.y = IM_TRUNC(this.Min.y); this.Max.x = IM_TRUNC(this.Max.x); this.Max.y = IM_TRUNC(this.Max.y)
 }
 
-ImRect_IsInverted :: proc(this : ImRect) -> bool { return this.Min.x > this.Max.x || this.Min.y > this.Max.y }
+IsInverted :: proc(this : ImRect) -> bool { return this.Min.x > this.Max.x || this.Min.y > this.Max.y }
 
-ImRect_ToVec4 :: proc(this : ImRect) -> ImVec4 { return ImVec4{this.Min.x, this.Min.y, this.Max.x, this.Max.y} }
+ToVec4 :: proc(this : ImRect) -> ImVec4 { return ImVec4{this.Min.x, this.Min.y, this.Max.x, this.Max.y} }
 
 // Helper: ImBitArray
 IM_BITARRAY_TESTBIT :: #force_inline proc "contextless" (_ARRAY : [^]$T0, #any_int _N : u32) -> bool
@@ -4547,7 +4547,7 @@ ImBitVector_deinit :: proc(this : ^ImBitVector)
 	deinit(&this.Storage)
 }
 
-ImBitVector_Create :: proc(this : ^ImBitVector, sz : i32)
+Create :: proc(this : ^ImBitVector, sz : i32)
 {
 	resize(&this.Storage, (sz + 31) >> 5); memset(this.Storage.Data, 0, cast(int) this.Storage.Size * size_of(this.Storage.Data[0]))
 }
@@ -4630,21 +4630,21 @@ ImSpanAllocator_Reserve :: #force_inline proc(this : ^ImSpanAllocator($CHUNKS), 
 	IM_ASSERT(n == this.CurrIdx && n < CHUNKS); this.CurrOff = IM_MEMALIGN(this.CurrOff, a); this.Offsets[n] = this.CurrOff; this.Sizes[n] = cast(i32) sz; post_incr(&this.CurrIdx); this.CurrOff += cast(i32) sz
 }
 
-ImSpanAllocator_GetArenaSizeInBytes :: #force_inline proc(this : ^ImSpanAllocator($CHUNKS)) -> i32 { return this.CurrOff }
+GetArenaSizeInBytes :: #force_inline proc(this : ^ImSpanAllocator($CHUNKS)) -> i32 { return this.CurrOff }
 
-ImSpanAllocator_SetArenaBasePtr :: #force_inline proc(this : ^ImSpanAllocator($CHUNKS), base_ptr : rawptr) { this.BasePtr = cast(^u8) base_ptr }
+SetArenaBasePtr :: #force_inline proc(this : ^ImSpanAllocator($CHUNKS), base_ptr : rawptr) { this.BasePtr = cast(^u8) base_ptr }
 
-ImSpanAllocator_GetSpanPtrBegin :: #force_inline proc(this : ^ImSpanAllocator($CHUNKS), n : i32) -> rawptr
+GetSpanPtrBegin :: #force_inline proc(this : ^ImSpanAllocator($CHUNKS), n : i32) -> rawptr
 {
 	IM_ASSERT(n >= 0 && n < CHUNKS && this.CurrIdx == CHUNKS); return cast(rawptr) (this.BasePtr[this.Offsets[n]:])
 }
 
-ImSpanAllocator_GetSpanPtrEnd :: #force_inline proc(this : ^ImSpanAllocator($CHUNKS), n : i32) -> rawptr
+GetSpanPtrEnd :: #force_inline proc(this : ^ImSpanAllocator($CHUNKS), n : i32) -> rawptr
 {
 	IM_ASSERT(n >= 0 && n < CHUNKS && this.CurrIdx == CHUNKS); return cast(rawptr) (this.BasePtr[this.Offsets[n] + this.Sizes[n]:])
 }
 
-ImSpanAllocator_GetSpan :: #force_inline proc(this : ^ImSpanAllocator($CHUNKS), n : i32, span : ^ImSpan($T)) { set(span, cast(^T) ImSpanAllocator_GetSpanPtrBegin(this, n), cast(^T) ImSpanAllocator_GetSpanPtrEnd(this, n)) }
+GetSpan :: #force_inline proc(this : ^ImSpanAllocator($CHUNKS), n : i32, span : ^ImSpan($T)) { set(span, cast(^T) GetSpanPtrBegin(this, n), cast(^T) GetSpanPtrEnd(this, n)) }
 
 // Helper: ImPool<>
 // Basic keyed storage for contiguous instances, slow/amortized insertion, O(1) indexable, O(Log N) queries by ID over a dense/hot buffer,
@@ -4671,19 +4671,19 @@ ImPool_init :: proc(this : ^ImPool($T))
 	this.AliveCount = 0; this.FreeIdx = this.AliveCount
 }
 
-ImPool_GetByKey :: proc(this : ^ImPool($T), key : ImGuiID) -> ^T
+GetByKey :: proc(this : ^ImPool($T), key : ImGuiID) -> ^T
 {
 	idx : i32 = GetInt(&this.Map, key, -1); return (idx != -1) ? &this.Buf.Data[idx] : nil
 }
 
-ImPool_GetByIndex :: proc(this : ^ImPool($T), n : ImPoolIdx) -> ^T { return &this.Buf.Data[n] }
+GetByIndex :: proc(this : ^ImPool($T), n : ImPoolIdx) -> ^T { return &this.Buf.Data[n] }
 
-ImPool_GetIndex :: proc(this : ^ImPool($T), p : ^T) -> ImPoolIdx
+GetIndex :: proc(this : ^ImPool($T), p : ^T) -> ImPoolIdx
 {
 	IM_ASSERT(p >= this.Buf.Data && p < this.Buf.Data[this.Buf.Size:]); return cast(ImPoolIdx) mem.ptr_sub(p, cast(^T) this.Buf.Data)
 }
 
-ImPool_GetOrAddByKey :: proc(this : ^ImPool($T), key : ImGuiID) -> ^T
+GetOrAddByKey :: proc(this : ^ImPool($T), key : ImGuiID) -> ^T
 {
 	p_idx : ^i32 = GetIntRef(&this.Map, key, -1); if p_idx^ != -1 { return &this.Buf.Data[p_idx^] }; p_idx^ = this.FreeIdx; return Add(this)
 }
@@ -4715,7 +4715,7 @@ ImPool_Add :: proc(this : ^ImPool($T)) -> ^T
 	return &this.Buf.Data[idx]
 }
 
-ImPool_Remove_0 :: proc(this : ^ImPool($T), key : ImGuiID, p : ^T) { ImPool_Remove_1(this, key, ImPool_GetIndex(this, p)) }
+ImPool_Remove_0 :: proc(this : ^ImPool($T), key : ImGuiID, p : ^T) { ImPool_Remove_1(this, key, GetIndex(this, p)) }
 
 ImPool_Remove_1 :: proc(this : ^ImPool($T), key : ImGuiID, idx : ImPoolIdx)
 {
@@ -4734,16 +4734,16 @@ ImPool_Reserve :: proc(this : ^ImPool($T), capacity : i32)
 // To iterate a ImPool: for (int n = 0; n < pool.GetMapSize(); n++) if (T* t = pool.TryGetMapData(n)) { ... }
 // Can be avoided if you know .Remove() has never been called on the pool, or AliveCount == GetMapSize()
 // Number of active/alive items in the pool (for display purpose)
-ImPool_GetAliveCount :: proc(this : ^ImPool($T)) -> i32 { return this.AliveCount }
+GetAliveCount :: proc(this : ^ImPool($T)) -> i32 { return this.AliveCount }
 
 ImPool_GetBufSize :: proc(this : ^ImPool($T)) -> i32 { return this.Buf.Size }
 
 // It is the map we need iterate to find valid items, since we don't have "alive" storage anywhere
-ImPool_GetMapSize :: proc(this : ^ImPool($T)) -> i32 { return this.Map.Data.Size }
+GetMapSize :: proc(this : ^ImPool($T)) -> i32 { return this.Map.Data.Size }
 
-ImPool_TryGetMapData :: proc(this : ^ImPool($T), n : ImPoolIdx) -> ^T
+TryGetMapData :: proc(this : ^ImPool($T), n : ImPoolIdx) -> ^T
 {
-	idx : i32 = this.Map.Data.Data[n].val_i; if idx == -1 { return nil }; return ImPool_GetByIndex(this, idx)
+	idx : i32 = this.Map.Data.Data[n].val_i; if idx == -1 { return nil }; return GetByIndex(this, idx)
 }
 
 // Helper: ImChunkStream<>
@@ -4763,7 +4763,7 @@ ImChunkStream_empty :: proc(this : ^ImChunkStream($T)) -> bool { return this.Buf
 
 ImChunkStream_size :: proc(this : ^ImChunkStream($T)) -> i32 { return this.Buf.Size }
 
-ImChunkStream_alloc_chunk :: proc(this : ^ImChunkStream($T), sz : uint) -> ^T
+alloc_chunk :: proc(this : ^ImChunkStream($T), sz : uint) -> ^T
 {
 	HDR_SZ :: 4
 	sz := IM_MEMALIGN(HDR_SZ + sz, 4)
@@ -4780,7 +4780,7 @@ ImChunkStream_begin :: proc(this : ^ImChunkStream($T)) -> ^T
 	return cast(^T) cast(rawptr) (&this.Buf.Data[HDR_SZ])
 }
 
-ImChunkStream_next_chunk :: proc(this : ^ImChunkStream($T), p : ^T) -> ^T
+next_chunk :: proc(this : ^ImChunkStream($T), p : ^T) -> ^T
 {
 	HDR_SZ : uint : 4
 	IM_ASSERT(p >= begin(this) && p < end(this));
@@ -4790,16 +4790,16 @@ ImChunkStream_next_chunk :: proc(this : ^ImChunkStream($T), p : ^T) -> ^T
 	return p
 }
 
-ImChunkStream_chunk_size :: proc(this : ^ImChunkStream($T), p : ^T) -> i32 { return (cast([^]i32) p)[-1] }
+chunk_size :: proc(this : ^ImChunkStream($T), p : ^T) -> i32 { return (cast([^]i32) p)[-1] }
 
 ImChunkStream_end :: proc(this : ^ImChunkStream($T)) -> ^T { return cast(^T) &this.Buf.Data[this.Buf.Size] }
 
-ImChunkStream_offset_from_ptr :: proc(this : ^ImChunkStream($T), p : ^T) -> i32
+offset_from_ptr :: proc(this : ^ImChunkStream($T), p : ^T) -> i32
 {
 	IM_ASSERT(p >= begin(this) && p < end(this)); off : int = mem.ptr_sub(cast(^u8) p, cast(^u8)this.Buf.Data); return cast(i32) off
 }
 
-ImChunkStream_ptr_from_offset :: proc(this : ^ImChunkStream($T), off : i32) -> ^T
+ptr_from_offset :: proc(this : ^ImChunkStream($T), off : i32) -> ^T
 {
 	IM_ASSERT(off >= 4 && off < this.Buf.Size); return cast(^T) &this.Buf.Data[off]
 }
@@ -4824,9 +4824,9 @@ ImGuiTextIndex_clear :: proc(this : ^ImGuiTextIndex)
 
 ImGuiTextIndex_size :: proc(this : ^ImGuiTextIndex) -> i32 { return this.LineOffsets.Size }
 
-ImGuiTextIndex_get_line_begin :: proc(this : ^ImGuiTextIndex, base : [^]u8, n : i32) -> [^]u8 { return base[this.LineOffsets.Data[n]:] }
+get_line_begin :: proc(this : ^ImGuiTextIndex, base : [^]u8, n : i32) -> [^]u8 { return base[this.LineOffsets.Data[n]:] }
 
-ImGuiTextIndex_get_line_end :: proc(this : ^ImGuiTextIndex, base : [^]u8, n : i32) -> ^u8 { return &base[(n + 1 < this.LineOffsets.Size ? (this.LineOffsets.Data[n + 1] - 1) : this.EndOffset)] }
+get_line_end :: proc(this : ^ImGuiTextIndex, base : [^]u8, n : i32) -> ^u8 { return &base[(n + 1 < this.LineOffsets.Size ? (this.LineOffsets.Data[n + 1] - 1) : this.EndOffset)] }
 
 ImGuiTextIndex_init :: proc(this : ^ImGuiTextIndex) {
 	init(&this.LineOffsets)
@@ -4925,7 +4925,7 @@ ImGuiDataVarInfo :: struct {
 	Offset : ImU32, // Offset in parent structure
 }
 
-ImGuiDataVarInfo_GetVarPtr :: proc(this : ^ImGuiDataVarInfo, parent : rawptr) -> rawptr { return cast(rawptr) &(cast([^]u8) parent)[this.Offset] }
+GetVarPtr :: proc(this : ^ImGuiDataVarInfo, parent : rawptr) -> rawptr { return cast(rawptr) &(cast([^]u8) parent)[this.Offset] }
 
 ImGuiDataTypeStorage :: struct {
 	Data : [8]ImU8, // Opaque storage to fit any data up to ImGuiDataType_COUNT
@@ -5242,6 +5242,8 @@ IMSTB_TEXTEDIT_GETWIDTH_NEWLINE :: (-1.0)
 IMSTB_TEXTEDIT_UNDOSTATECOUNT :: 99
 IMSTB_TEXTEDIT_UNDOCHARCOUNT :: 999
 ImStbTexteditState :: ImStb_STB_TexteditState
+
+ImStbTexteditState_init :: #force_inline proc "contextless" (p : ^ImStbTexteditState) { p^ = {} }
 
 // Internal state of the currently focused/edited text input box
 // Internal state of the currently focused/edited text input box
@@ -5695,7 +5697,7 @@ ImGuiListClipperData_deinit :: proc(this : ^ImGuiListClipperData) { deinit(&this
 
 ImGuiListClipperData_init :: proc(this : ^ImGuiListClipperData) { this^ = {} }
 
-ImGuiListClipperData_Reset :: proc(this : ^ImGuiListClipperData, clipper : ^ImGuiListClipper)
+Reset :: proc(this : ^ImGuiListClipperData, clipper : ^ImGuiListClipper)
 {
 	this.ListClipper = clipper; this.ItemsFrozen = 0; this.StepNo = this.ItemsFrozen; resize(&this.Ranges, 0)
 }
@@ -5990,6 +5992,8 @@ ImGuiMultiSelectState_init :: proc(this : ^ImGuiMultiSelectState)
 	this.Window = nil; this.ID = 0; this.LastSelectionSize = 0; this.LastFrameActive = this.LastSelectionSize; this.NavIdSelected = -1; this.RangeSelected = this.NavIdSelected; this.NavIdItem = ImGuiSelectionUserData_Invalid; this.RangeSrcItem = this.NavIdItem
 }
 
+ImGuiMultiSelectState_deinit :: #force_inline proc "contextless" (_ : ^ImGuiMultiSelectState) { }
+
 //-----------------------------------------------------------------------------
 // [SECTION] Docking support
 //-----------------------------------------------------------------------------
@@ -6094,34 +6098,34 @@ ImGuiDockNode :: struct {
 	},
 }
 
-ImGuiDockNode_IsRootNode :: proc(this : ^ImGuiDockNode) -> bool { return this.ParentNode == nil }
+IsRootNode :: proc(this : ^ImGuiDockNode) -> bool { return this.ParentNode == nil }
 
-ImGuiDockNode_IsDockSpace :: proc(this : ^ImGuiDockNode) -> bool { return (this.MergedFlags & cast(ImGuiDockNodeFlags) ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_DockSpace) != {} }
+IsDockSpace :: proc(this : ^ImGuiDockNode) -> bool { return (this.MergedFlags & cast(ImGuiDockNodeFlags) ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_DockSpace) != {} }
 
-ImGuiDockNode_IsFloatingNode :: proc(this : ^ImGuiDockNode) -> bool { return this.ParentNode == nil && (this.MergedFlags & cast(ImGuiDockNodeFlags) ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_DockSpace) == {} }
+IsFloatingNode :: proc(this : ^ImGuiDockNode) -> bool { return this.ParentNode == nil && (this.MergedFlags & cast(ImGuiDockNodeFlags) ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_DockSpace) == {} }
 
-ImGuiDockNode_IsCentralNode :: proc(this : ^ImGuiDockNode) -> bool { return (this.MergedFlags & cast(ImGuiDockNodeFlags) ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_CentralNode) != {} }
+IsCentralNode :: proc(this : ^ImGuiDockNode) -> bool { return (this.MergedFlags & cast(ImGuiDockNodeFlags) ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_CentralNode) != {} }
 
 // Hidden tab bar can be shown back by clicking the small triangle
-ImGuiDockNode_IsHiddenTabBar :: proc(this : ^ImGuiDockNode) -> bool { return (this.MergedFlags & cast(ImGuiDockNodeFlags) ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_HiddenTabBar) != {} }
+IsHiddenTabBar :: proc(this : ^ImGuiDockNode) -> bool { return (this.MergedFlags & cast(ImGuiDockNodeFlags) ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_HiddenTabBar) != {} }
 
 // Never show a tab bar
-ImGuiDockNode_IsNoTabBar :: proc(this : ^ImGuiDockNode) -> bool { return (this.MergedFlags & cast(ImGuiDockNodeFlags) ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_NoTabBar) != {} }
+IsNoTabBar :: proc(this : ^ImGuiDockNode) -> bool { return (this.MergedFlags & cast(ImGuiDockNodeFlags) ImGuiDockNodeFlagsPrivate_.ImGuiDockNodeFlags_NoTabBar) != {} }
 
-ImGuiDockNode_IsSplitNode :: proc(this : ^ImGuiDockNode) -> bool { return this.ChildNodes[0] != nil }
+IsSplitNode :: proc(this : ^ImGuiDockNode) -> bool { return this.ChildNodes[0] != nil }
 
-ImGuiDockNode_IsLeafNode :: proc(this : ^ImGuiDockNode) -> bool { return this.ChildNodes[0] == nil }
+IsLeafNode :: proc(this : ^ImGuiDockNode) -> bool { return this.ChildNodes[0] == nil }
 
-ImGuiDockNode_IsEmpty :: proc(this : ^ImGuiDockNode) -> bool { return this.ChildNodes[0] == nil && this.Windows.Size == 0 }
+IsEmpty :: proc(this : ^ImGuiDockNode) -> bool { return this.ChildNodes[0] == nil && this.Windows.Size == 0 }
 
 ImGuiDockNode_Rect :: proc(this : ^ImGuiDockNode) -> ImRect { return ImRect{{this.Pos.x, this.Pos.y}, {this.Pos.x + this.Size.x, this.Pos.y + this.Size.y} }}
 
-ImGuiDockNode_SetLocalFlags :: proc(this : ^ImGuiDockNode, flags : ImGuiDockNodeFlags)
+SetLocalFlags :: proc(this : ^ImGuiDockNode, flags : ImGuiDockNodeFlags)
 {
 	this.LocalFlags = flags; UpdateMergedFlags(this)
 }
 
-ImGuiDockNode_UpdateMergedFlags :: proc(this : ^ImGuiDockNode) { this.MergedFlags = this.SharedFlags | this.LocalFlags | this.LocalFlagsInWindows }
+UpdateMergedFlags :: proc(this : ^ImGuiDockNode) { this.MergedFlags = this.SharedFlags | this.LocalFlags | this.LocalFlagsInWindows }
 
 // List of colors that are stored at the time of Begin() into Docked Windows.
 // We currently store the packed colors in a simple array window->DockStyle.Colors[].
@@ -6220,7 +6224,7 @@ ImGuiViewportP_init :: proc(this : ^ImGuiViewportP)
 	this.Window = nil; this.Idx = -1; this.LastFocusedStampCount = -1; this.BgFgDrawListsLastFrame[1] = this.LastFocusedStampCount; this.BgFgDrawListsLastFrame[0] = this.BgFgDrawListsLastFrame[1]; this.LastFrameActive = this.BgFgDrawListsLastFrame[0]; this.LastNameHash = 0; this.LastAlpha = 1.0; this.Alpha = this.LastAlpha; this.LastFocusedHadNavWindow = false; this.PlatformMonitor = -1; this.BgFgDrawLists[1] = nil; this.BgFgDrawLists[0] = this.BgFgDrawLists[1]; this.LastRendererSize = ImVec2{FLT_MAX, FLT_MAX}; this.LastPlatformSize = this.LastRendererSize; this.LastPlatformPos = this.LastPlatformSize
 }
 
-ImGuiViewportP_ClearRequestFlags :: proc(this : ^ImGuiViewportP) { this.PlatformRequestResize = false; this.PlatformRequestMove = this.PlatformRequestResize; this.PlatformRequestClose = this.PlatformRequestMove }
+ClearRequestFlags :: proc(this : ^ImGuiViewportP) { this.PlatformRequestResize = false; this.PlatformRequestMove = this.PlatformRequestResize; this.PlatformRequestClose = this.PlatformRequestMove }
 
 // Calculate work rect pos/size given a set of offset (we have 1 pair of offset for rect locked from last frame data, and 1 pair for currently building rect)
 ImGuiViewportP_CalcWorkRectPos :: proc(this : ^ImGuiViewportP, inset_min : ImVec2) -> ImVec2 { return ImVec2{this.Pos.x + inset_min.x, this.Pos.y + inset_min.y} }
@@ -6228,17 +6232,17 @@ ImGuiViewportP_CalcWorkRectPos :: proc(this : ^ImGuiViewportP, inset_min : ImVec
 ImGuiViewportP_CalcWorkRectSize :: proc(this : ^ImGuiViewportP, inset_min : ImVec2, inset_max : ImVec2) -> ImVec2 { return ImVec2{ImMax(f32(0.0), this.Size.x - inset_min.x - inset_max.x), ImMax(f32(0.0), this.Size.y - inset_min.y - inset_max.y)} }
 
 // Update public fields
-ImGuiViewportP_UpdateWorkRect :: proc(this : ^ImGuiViewportP)
+UpdateWorkRect :: proc(this : ^ImGuiViewportP)
 {
 	this.WorkPos = ImGuiViewportP_CalcWorkRectPos(this, this.WorkInsetMin); this.WorkSize = ImGuiViewportP_CalcWorkRectSize(this, this.WorkInsetMin, this.WorkInsetMax)
 }
 
 // Helpers to retrieve ImRect (we don't need to store BuildWorkRect as every access tend to change it, hence the code asymmetry)
-ImGuiViewportP_GetMainRect :: proc(this : ^ImGuiViewportP) -> ImRect { return ImRect{{this.Pos.x, this.Pos.y}, {this.Pos.x + this.Size.x, this.Pos.y + this.Size.y}} }
+GetMainRect :: proc(this : ^ImGuiViewportP) -> ImRect { return ImRect{{this.Pos.x, this.Pos.y}, {this.Pos.x + this.Size.x, this.Pos.y + this.Size.y}} }
 
-ImGuiViewportP_GetWorkRect :: proc(this : ^ImGuiViewportP) -> ImRect { return ImRect{{this.WorkPos.x, this.WorkPos.y}, {this.WorkPos.x + this.WorkSize.x, this.WorkPos.y + this.WorkSize.y}} }
+GetWorkRect :: proc(this : ^ImGuiViewportP) -> ImRect { return ImRect{{this.WorkPos.x, this.WorkPos.y}, {this.WorkPos.x + this.WorkSize.x, this.WorkPos.y + this.WorkSize.y}} }
 
-ImGuiViewportP_GetBuildWorkRect :: proc(this : ^ImGuiViewportP) -> ImRect
+GetBuildWorkRect :: proc(this : ^ImGuiViewportP) -> ImRect
 {
 	pos : ImVec2 = ImGuiViewportP_CalcWorkRectPos(this, this.BuildWorkInsetMin); size : ImVec2 = ImGuiViewportP_CalcWorkRectSize(this, this.BuildWorkInsetMin, this.BuildWorkInsetMax); return ImRect{{pos.x, pos.y}, {pos.x + size.x, pos.y + size.y}}
 }
@@ -6271,7 +6275,7 @@ ImGuiWindowSettings_init :: proc(this : ^ImGuiWindowSettings)
 	this^ = {}; this.DockOrder = -1
 }
 
-ImGuiWindowSettings_GetName :: proc(this : ^ImGuiWindowSettings) -> [^]u8 { return cast([^]u8) mem.ptr_offset(this, 1) }
+GetName :: proc(this : ^ImGuiWindowSettings) -> [^]u8 { return cast([^]u8) mem.ptr_offset(this, 1) }
 
 // Storage for one type registered in the .ini file
 ImGuiSettingsHandler :: struct {
@@ -7113,14 +7117,14 @@ ImGuiWindow :: struct {
 // We don't use g.FontSize because the window may be != g.CurrentWindow.
 ImGuiWindow_Rect :: proc(this : ^ImGuiWindow) -> ImRect { return ImRect{{this.Pos.x, this.Pos.y}, {this.Pos.x + this.Size.x, this.Pos.y + this.Size.y}} }
 
-ImGuiWindow_CalcFontSize :: proc(this : ^ImGuiWindow) -> f32
+CalcFontSize :: proc(this : ^ImGuiWindow) -> f32
 {
 	g : ^ImGuiContext = this.Ctx; scale : f32 = g.FontBaseSize * this.FontWindowScale * this.FontDpiScale; if this.ParentWindow != nil { scale *= this.ParentWindow.FontWindowScale }; return scale
 }
 
-ImGuiWindow_TitleBarRect :: proc(this : ^ImGuiWindow) -> ImRect { return ImRect{this.Pos, ImVec2{this.Pos.x + this.SizeFull.x, this.Pos.y + this.TitleBarHeight}} }
+TitleBarRect :: proc(this : ^ImGuiWindow) -> ImRect { return ImRect{this.Pos, ImVec2{this.Pos.x + this.SizeFull.x, this.Pos.y + this.TitleBarHeight}} }
 
-ImGuiWindow_MenuBarRect :: proc(this : ^ImGuiWindow) -> ImRect
+MenuBarRect :: proc(this : ^ImGuiWindow) -> ImRect
 {
 	y1 : f32 = this.Pos.y + this.TitleBarHeight; return ImRect{{this.Pos.x, y1}, {this.Pos.x + this.SizeFull.x, y1 + this.MenuBarHeight}}
 }
@@ -7528,7 +7532,7 @@ ImGuiTableSettings :: struct {
 
 ImGuiTableSettings_init :: proc(this : ^ImGuiTableSettings) { this^ = {} }
 
-ImGuiTableSettings_GetColumnSettings :: proc(this : ^ImGuiTableSettings) -> [^]ImGuiTableColumnSettings { return cast([^]ImGuiTableColumnSettings) mem.ptr_offset(this, 1) }
+GetColumnSettings :: proc(this : ^ImGuiTableSettings) -> [^]ImGuiTableColumnSettings { return cast([^]ImGuiTableColumnSettings) mem.ptr_offset(this, 1) }
 
 //-----------------------------------------------------------------------------
 // [SECTION] ImGui internal API
@@ -8024,7 +8028,7 @@ ImGuiIO_init :: proc(this : ^ImGuiIO)
 // - with glfw you can get those from the callback set in glfwSetCharCallback()
 // - on Windows you can get those using ToAscii+keyboard state, or via the WM_CHAR message
 // FIXME: Should in theory be called "AddCharacterEvent()" to be consistent with new API
-ImGuiIO_AddInputCharacter :: proc(this : ^ImGuiIO, c : u32)
+AddInputCharacter :: proc(this : ^ImGuiIO, c : u32)
 {
 	IM_ASSERT(this.Ctx != nil)
 	g : ^ImGuiContext = this.Ctx
@@ -8041,13 +8045,13 @@ ImGuiIO_AddInputCharacter :: proc(this : ^ImGuiIO, c : u32)
 // Queue a new character input from a UTF-16 character, it can be a surrogate
 // UTF16 strings use surrogate pairs to encode codepoints >= 0x10000, so
 // we should save the high surrogate.
-ImGuiIO_AddInputCharacterUTF16 :: proc(this : ^ImGuiIO, c : ImWchar16)
+AddInputCharacterUTF16 :: proc(this : ^ImGuiIO, c : ImWchar16)
 {
 	if (c == 0 && this.InputQueueSurrogate == 0) || !this.AppAcceptingEvents { return }
 
 	if (c & 0xFC00) == 0xD800 {
 		// High surrogate, must save
-		if this.InputQueueSurrogate != 0 { ImGuiIO_AddInputCharacter(this, IM_UNICODE_CODEPOINT_INVALID) }
+		if this.InputQueueSurrogate != 0 { AddInputCharacter(this, IM_UNICODE_CODEPOINT_INVALID) }
 		this.InputQueueSurrogate = c
 		return
 	}
@@ -8056,7 +8060,7 @@ ImGuiIO_AddInputCharacterUTF16 :: proc(this : ^ImGuiIO, c : ImWchar16)
 	if this.InputQueueSurrogate != 0 {
 		if (c & 0xFC00) != 0xDC00 {
 			// Invalid low surrogate
-			ImGuiIO_AddInputCharacter(this, IM_UNICODE_CODEPOINT_INVALID)
+			AddInputCharacter(this, IM_UNICODE_CODEPOINT_INVALID)
 		}
 		else {
 			when IM_UNICODE_CODEPOINT_MAX == 0xFFFF {
@@ -8068,7 +8072,7 @@ ImGuiIO_AddInputCharacterUTF16 :: proc(this : ^ImGuiIO, c : ImWchar16)
 
 		this.InputQueueSurrogate = 0
 	}
-	ImGuiIO_AddInputCharacter(this, cast(u32) cp)
+	AddInputCharacter(this, cast(u32) cp)
 }
 
 // Queue a new characters input from a UTF-8 string
@@ -8079,7 +8083,7 @@ ImGuiIO_AddInputCharactersUTF8 :: proc(this : ^ImGuiIO, utf8_chars : [^]u8)
 	for utf8_chars[0] != 0 {
 		c : u32 = 0
 		utf8_chars = utf8_chars[ImTextCharFromUtf8(&c, utf8_chars, nil):]
-		ImGuiIO_AddInputCharacter(this, c)
+		AddInputCharacter(this, c)
 	}
 }
 
@@ -8094,7 +8098,7 @@ ImGuiIO_ClearEventsQueue :: proc(this : ^ImGuiIO)
 
 // Clear current keyboard/gamepad state + current frame text input buffer. Equivalent to releasing all keys/buttons.
 // Clear current keyboard/gamepad state + current frame text input buffer. Equivalent to releasing all keys/buttons.
-ImGuiIO_ClearInputKeys :: proc(this : ^ImGuiIO)
+ClearInputKeys :: proc(this : ^ImGuiIO)
 {
 	g : ^ImGuiContext = this.Ctx
 	for key := ImGuiKey.ImGuiKey_NamedKey_BEGIN; key < ImGuiKey.ImGuiKey_NamedKey_END; key += ImGuiKey(1) {
@@ -8111,7 +8115,7 @@ ImGuiIO_ClearInputKeys :: proc(this : ^ImGuiIO)
 }
 
 // Clear current mouse state.
-ImGuiIO_ClearInputMouse :: proc(this : ^ImGuiIO)
+ClearInputMouse :: proc(this : ^ImGuiIO)
 {
 	for key : ImGuiKey = ImGuiKey_Mouse_BEGIN; key < ImGuiKey_Mouse_END; key += ImGuiKey(1) {
 		key_data : ^ImGuiKeyData = &this.KeysData[key - ImGuiKey.ImGuiKey_NamedKey_BEGIN]
@@ -8151,7 +8155,7 @@ FindLatestInputEvent :: proc(ctx : ^ImGuiContext, type : ImGuiInputEventType, ar
 // - float analog_value: 0.0f..1.0f
 // IMPORTANT: THIS FUNCTION AND OTHER "ADD" GRABS THE CONTEXT FROM OUR INSTANCE.
 // WE NEED TO ENSURE THAT ALL FUNCTION CALLS ARE FULFILLING THIS, WHICH IS WHY GetKeyData() HAS AN EXPLICIT CONTEXT.
-ImGuiIO_AddKeyAnalogEvent :: proc(this : ^ImGuiIO, key : ImGuiKey, down : bool, analog_value : f32)
+AddKeyAnalogEvent :: proc(this : ^ImGuiIO, key : ImGuiKey, down : bool, analog_value : f32)
 {
 	//if (e->Down) { IMGUI_DEBUG_LOG_IO(g, "AddKeyEvent() Key='%s' %d, NativeKeycode = %d, NativeScancode = %d\n", ImGui::GetKeyName(e->Key), e->Down, e->NativeKeycode, e->NativeScancode); }
 	IM_ASSERT(this.Ctx != nil)
@@ -8195,17 +8199,17 @@ ImGuiIO_AddKeyAnalogEvent :: proc(this : ^ImGuiIO, key : ImGuiKey, down : bool, 
 
 // Input Functions
 // Queue a new key down/up event. Key should be "translated" (as in, generally ImGuiKey_A matches the key end-user would use to emit an 'A' character)
-ImGuiIO_AddKeyEvent :: proc(this : ^ImGuiIO, key : ImGuiKey, down : bool)
+AddKeyEvent :: proc(this : ^ImGuiIO, key : ImGuiKey, down : bool)
 {
 	if !this.AppAcceptingEvents { return }
-	ImGuiIO_AddKeyAnalogEvent(this, key, down, down ? 1.0 : 0.0)
+	AddKeyAnalogEvent(this, key, down, down ? 1.0 : 0.0)
 }
 
 // [Optional] Specify index for legacy <1.87 IsKeyXXX() functions with native indices + specify native keycode, scancode.
 // [Optional] Call after AddKeyEvent().
 // Specify native keycode, scancode + Specify index for legacy <1.87 IsKeyXXX() functions with native indices.
 // If you are writing a backend in 2022 or don't use IsKeyXXX() with native values that are not ImGuiKey values, you can avoid calling this.
-ImGuiIO_SetKeyEventNativeData :: proc(this : ^ImGuiIO, key : ImGuiKey, native_keycode : i32, native_scancode : i32, native_legacy_index : i32 = -1)
+SetKeyEventNativeData :: proc(this : ^ImGuiIO, key : ImGuiKey, native_keycode : i32, native_scancode : i32, native_legacy_index : i32 = -1)
 {
 	if key == ImGuiKey.ImGuiKey_None { return }
 	IM_ASSERT(IsNamedKey(key)); // >= 512
@@ -8225,7 +8229,7 @@ ImGuiIO_SetAppAcceptingEvents :: proc(this : ^ImGuiIO, accepting_events : bool)
 
 // Queue a mouse position update. Use -FLT_MAX,-FLT_MAX to signify no mouse (e.g. app not focused and not hovered)
 // Queue a mouse move event
-ImGuiIO_AddMousePosEvent :: proc(this : ^ImGuiIO, x : f32, y : f32)
+AddMousePosEvent :: proc(this : ^ImGuiIO, x : f32, y : f32)
 {
 	IM_ASSERT(this.Ctx != nil)
 	g : ^ImGuiContext = this.Ctx
@@ -8250,7 +8254,7 @@ ImGuiIO_AddMousePosEvent :: proc(this : ^ImGuiIO, x : f32, y : f32)
 }
 
 // Queue a mouse button change
-ImGuiIO_AddMouseButtonEvent :: proc(this : ^ImGuiIO, mouse_button : ImGuiMouseButton, down : bool)
+AddMouseButtonEvent :: proc(this : ^ImGuiIO, mouse_button : ImGuiMouseButton, down : bool)
 {
 	IM_ASSERT(this.Ctx != nil)
 	g : ^ImGuiContext = this.Ctx
@@ -8278,7 +8282,7 @@ ImGuiIO_AddMouseButtonEvent :: proc(this : ^ImGuiIO, mouse_button : ImGuiMouseBu
 		if latest_super_event != nil ? latest_super_event.Key.Down : g.IO.KeySuper {
 			IMGUI_DEBUG_LOG_IO(g, "[io] Super+Left Click aliased into Right Click\n")
 			this.MouseCtrlLeftAsRightClick = true
-			ImGuiIO_AddMouseButtonEvent(this, ImGuiMouseButton(1), true); // This is just quicker to write that passing through, as we need to filter duplicate again.
+			AddMouseButtonEvent(this, ImGuiMouseButton(1), true); // This is just quicker to write that passing through, as we need to filter duplicate again.
 			return
 		}
 	}
@@ -8295,7 +8299,7 @@ ImGuiIO_AddMouseButtonEvent :: proc(this : ^ImGuiIO, mouse_button : ImGuiMouseBu
 
 // Queue a mouse wheel update. wheel_y<0: scroll down, wheel_y>0: scroll up, wheel_x<0: scroll right, wheel_x>0: scroll left.
 // Queue a mouse wheel event (some mouse/API may only have a Y component)
-ImGuiIO_AddMouseWheelEvent :: proc(this : ^ImGuiIO, wheel_x : f32, wheel_y : f32)
+AddMouseWheelEvent :: proc(this : ^ImGuiIO, wheel_x : f32, wheel_y : f32)
 {
 	IM_ASSERT(this.Ctx != nil)
 	g : ^ImGuiContext = this.Ctx
@@ -8316,7 +8320,7 @@ ImGuiIO_AddMouseWheelEvent :: proc(this : ^ImGuiIO, wheel_x : f32, wheel_y : f32
 // Queue a mouse source change (Mouse/TouchScreen/Pen)
 // This is not a real event, the data is latched in order to be stored in actual Mouse events.
 // This is so that duplicate events (e.g. Windows sending extraneous WM_MOUSEMOVE) gets filtered and are not leading to actual source changes.
-ImGuiIO_AddMouseSourceEvent :: proc(this : ^ImGuiIO, source : ImGuiMouseSource)
+AddMouseSourceEvent :: proc(this : ^ImGuiIO, source : ImGuiMouseSource)
 {
 	IM_ASSERT(this.Ctx != nil)
 	g : ^ImGuiContext = this.Ctx
@@ -8324,7 +8328,7 @@ ImGuiIO_AddMouseSourceEvent :: proc(this : ^ImGuiIO, source : ImGuiMouseSource)
 }
 
 // Queue a mouse hovered viewport. Requires backend to set ImGuiBackendFlags_HasMouseHoveredViewport to call this (for multi-viewport support).
-ImGuiIO_AddMouseViewportEvent :: proc(this : ^ImGuiIO, viewport_id : ImGuiID)
+AddMouseViewportEvent :: proc(this : ^ImGuiIO, viewport_id : ImGuiID)
 {
 	IM_ASSERT(this.Ctx != nil)
 	g : ^ImGuiContext = this.Ctx
@@ -8344,7 +8348,7 @@ ImGuiIO_AddMouseViewportEvent :: proc(this : ^ImGuiIO, viewport_id : ImGuiID)
 }
 
 // Queue a gain/loss of focus for the application (generally based on OS/platform focus of your window)
-ImGuiIO_AddFocusEvent :: proc(this : ^ImGuiIO, focused : bool)
+AddFocusEvent :: proc(this : ^ImGuiIO, focused : bool)
 {
 	IM_ASSERT(this.Ctx != nil)
 	g : ^ImGuiContext = this.Ctx
@@ -9305,12 +9309,12 @@ PairComparerByID :: proc(lhs, rhs : ImGuiStoragePair) -> slice.Ordering
 
 // Advanced: for quicker full rebuild of a storage (instead of an incremental one), you may add all your contents and then sort once.
 // For quicker full rebuild of a storage (instead of an incremental one), you may add all your contents and then sort once.
-ImGuiStorage_BuildSortByKey :: proc(this : ^ImGuiStorage)
+BuildSortByKey :: proc(this : ^ImGuiStorage)
 {
 	ImQsort(this.Data.Data[:this.Data.Size], PairComparerByID)
 }
 
-ImGuiStorage_GetInt :: proc(this : ^ImGuiStorage, key : ImGuiID, default_val : i32 = 0) -> i32
+GetInt :: proc(this : ^ImGuiStorage, key : ImGuiID, default_val : i32 = 0) -> i32
 {
 	it : ^ImGuiStoragePair = ImLowerBound(transmute(^ImGuiStoragePair) this.Data.Data, transmute(^ImGuiStoragePair) &this.Data.Data[this.Data.Size], key)
 	if it == &this.Data.Data[this.Data.Size] || it.key != key { return default_val }
@@ -9319,7 +9323,7 @@ ImGuiStorage_GetInt :: proc(this : ^ImGuiStorage, key : ImGuiID, default_val : i
 
 ImGuiStorage_GetBool :: proc(this : ^ImGuiStorage, key : ImGuiID, default_val : bool = false) -> bool
 {
-	return ImGuiStorage_GetInt(this, key, default_val ? 1 : 0) != 0
+	return GetInt(this, key, default_val ? 1 : 0) != 0
 }
 
 ImGuiStorage_GetFloat :: proc(this : ^ImGuiStorage, key : ImGuiID, default_val : f32 = 0.0) -> f32
@@ -9330,7 +9334,7 @@ ImGuiStorage_GetFloat :: proc(this : ^ImGuiStorage, key : ImGuiID, default_val :
 }
 
 // default_val is NULL
-ImGuiStorage_GetVoidPtr :: proc(this : ^ImGuiStorage, key : ImGuiID) -> rawptr
+GetVoidPtr :: proc(this : ^ImGuiStorage, key : ImGuiID) -> rawptr
 {
 	it : ^ImGuiStoragePair = ImLowerBound(transmute(^ImGuiStoragePair) this.Data.Data, transmute(^ImGuiStoragePair) &this.Data.Data[this.Data.Size], key)
 	if it == &this.Data.Data[this.Data.Size] || it.key != key { return nil }
@@ -9342,7 +9346,7 @@ ImGuiStorage_GetVoidPtr :: proc(this : ^ImGuiStorage, key : ImGuiID) -> rawptr
 // - A typical use case where this is convenient for quick hacking (e.g. add storage during a live Edit&Continue session if you can't modify existing struct)
 //      float* pvar = ImGui::GetFloatRef(key); ImGui::SliderFloat("var", pvar, 0, 100.0f); some_var += *pvar;
 // References are only valid until a new value is added to the storage. Calling a Set***() function or a Get***Ref() function invalidates the pointer.
-ImGuiStorage_GetIntRef :: proc(this : ^ImGuiStorage, key : ImGuiID, default_val : i32 = 0) -> ^i32
+GetIntRef :: proc(this : ^ImGuiStorage, key : ImGuiID, default_val : i32 = 0) -> ^i32
 {
 	it : ^ImGuiStoragePair = ImLowerBound(this.Data.Data, &this.Data.Data[this.Data.Size], key)
 	if it == &this.Data.Data[this.Data.Size] || it.key != key { it = insert(&this.Data, it, ImGuiStoragePair{key = key, val_i = default_val}) }
@@ -9351,7 +9355,7 @@ ImGuiStorage_GetIntRef :: proc(this : ^ImGuiStorage, key : ImGuiID, default_val 
 
 ImGuiStorage_GetBoolRef :: proc(this : ^ImGuiStorage, key : ImGuiID, default_val : bool = false) -> ^bool
 {
-	return cast(^bool) ImGuiStorage_GetIntRef(this, key, default_val ? 1 : 0)
+	return cast(^bool) GetIntRef(this, key, default_val ? 1 : 0)
 }
 
 ImGuiStorage_GetFloatRef :: proc(this : ^ImGuiStorage, key : ImGuiID, default_val : f32 = 0.0) -> ^f32
@@ -9361,7 +9365,7 @@ ImGuiStorage_GetFloatRef :: proc(this : ^ImGuiStorage, key : ImGuiID, default_va
 	return &it.val_f
 }
 
-ImGuiStorage_GetVoidPtrRef :: proc(this : ^ImGuiStorage, key : ImGuiID, default_val : rawptr = nil) -> ^rawptr
+GetVoidPtrRef :: proc(this : ^ImGuiStorage, key : ImGuiID, default_val : rawptr = nil) -> ^rawptr
 {
 	it : ^ImGuiStoragePair = ImLowerBound(this.Data.Data, &this.Data.Data[this.Data.Size], key)
 	if it == &this.Data.Data[this.Data.Size] || it.key != key { it = insert(&this.Data, it, ImGuiStoragePair{key = key, val_p = default_val}) }
@@ -9369,7 +9373,7 @@ ImGuiStorage_GetVoidPtrRef :: proc(this : ^ImGuiStorage, key : ImGuiID, default_
 }
 
 // FIXME-OPT: Need a way to reuse the result of lower_bound when doing GetInt()/SetInt() - not too bad because it only happens on explicit interaction (maximum one a frame)
-ImGuiStorage_SetInt :: proc(this : ^ImGuiStorage, key : ImGuiID, val : i32)
+SetInt :: proc(this : ^ImGuiStorage, key : ImGuiID, val : i32)
 {
 	it : ^ImGuiStoragePair = ImLowerBound(this.Data.Data, &this.Data.Data[this.Data.Size], key)
 	if it == &this.Data.Data[this.Data.Size] || it.key != key { insert(&this.Data, it, ImGuiStoragePair{key = key, val_i = val}) }
@@ -9378,7 +9382,7 @@ ImGuiStorage_SetInt :: proc(this : ^ImGuiStorage, key : ImGuiID, val : i32)
 
 ImGuiStorage_SetBool :: proc(this : ^ImGuiStorage, key : ImGuiID, val : bool)
 {
-	ImGuiStorage_SetInt(this, key, val ? 1 : 0)
+	SetInt(this, key, val ? 1 : 0)
 }
 
 ImGuiStorage_SetFloat :: proc(this : ^ImGuiStorage, key : ImGuiID, val : f32)
@@ -9388,7 +9392,7 @@ ImGuiStorage_SetFloat :: proc(this : ^ImGuiStorage, key : ImGuiID, val : f32)
 	else { it.val_f = val }
 }
 
-ImGuiStorage_SetVoidPtr :: proc(this : ^ImGuiStorage, key : ImGuiID, val : rawptr)
+SetVoidPtr :: proc(this : ^ImGuiStorage, key : ImGuiID, val : rawptr)
 {
 	it : ^ImGuiStoragePair = ImLowerBound(this.Data.Data, &this.Data.Data[this.Data.Size], key)
 	if it == &this.Data.Data[this.Data.Size] || it.key != key { insert(&this.Data, it, ImGuiStoragePair{key = key, val_p = val}) }
@@ -9427,7 +9431,7 @@ ImGuiTextFilter_Draw :: proc(this : ^ImGuiTextFilter, label : string = "Filter (
 	return value_changed
 }
 
-ImGuiTextFilter_ImGuiTextRange_split :: proc(this : ^ImGuiTextFilter_ImGuiTextRange, separator : u8, out : ^ImVector(ImGuiTextFilter_ImGuiTextRange))
+split :: proc(this : ^ImGuiTextFilter_ImGuiTextRange, separator : u8, out : ^ImVector(ImGuiTextFilter_ImGuiTextRange))
 {
 	resize(out, 0)
 	wb : [^]u8 = this.b
@@ -9510,13 +9514,13 @@ ImGuiTextBuffer_append :: proc(this : ^ImGuiTextBuffer, str : [^]u8, str_end : ^
 	this.Buf.Data[write_off - 1 + len] = 0
 }
 
-ImGuiTextBuffer_appendf :: proc(this : ^ImGuiTextBuffer, fmt : string, args : ..any)
+appendf :: proc(this : ^ImGuiTextBuffer, fmt : string, args : ..any)
 {
-	ImGuiTextBuffer_appendfv(this, fmt, args)
+	appendfv(this, fmt, args)
 }
 
 // Helper: Text buffer for logging/accumulating text
-ImGuiTextBuffer_appendfv :: proc(this : ^ImGuiTextBuffer, fmt : string, args : []any)
+appendfv :: proc(this : ^ImGuiTextBuffer, fmt : string, args : []any)
 {
 	args_copy := args
 
@@ -9652,7 +9656,7 @@ ImGuiListClipper_End :: proc(this : ^ImGuiListClipper)
 		// In theory here we should assert that we are already at the right position, but it seems saner to just seek at the end and not assert/crash the user.
 		g : ^ImGuiContext = this.Ctx
 		IMGUI_DEBUG_LOG_CLIPPER(g, "Clipper: End() in '%s'\n", g.CurrentWindow.Name)
-		if this.ItemsCount >= 0 && this.ItemsCount < INT_MAX && this.DisplayStart >= 0 { ImGuiListClipper_SeekCursorForItem(this, this.ItemsCount) }
+		if this.ItemsCount >= 0 && this.ItemsCount < INT_MAX && this.DisplayStart >= 0 { SeekCursorForItem(this, this.ItemsCount) }
 
 		// Restore temporary buffer and fix back pointers which may be invalidated when nesting
 		IM_ASSERT(data.ListClipper == this)
@@ -9667,7 +9671,7 @@ ImGuiListClipper_End :: proc(this : ^ImGuiListClipper)
 }
 
 // item_end is exclusive e.g. use (42, 42+1) to make item 42 never clipped.
-ImGuiListClipper_IncludeItemsByIndex :: proc(this : ^ImGuiListClipper, item_begin : i32, item_end : i32)
+IncludeItemsByIndex :: proc(this : ^ImGuiListClipper, item_begin : i32, item_end : i32)
 {
 	data : ^ImGuiListClipperData = cast(^ImGuiListClipperData) this.TempData
 	IM_ASSERT(this.DisplayStart < 0); // Only allowed after Begin() and if there has not been a specified range yet.
@@ -9680,7 +9684,7 @@ ImGuiListClipper_IncludeItemsByIndex :: proc(this : ^ImGuiListClipper, item_begi
 // - In this case, after all steps are done, you'll want to call SeekCursorForItem(item_count).
 // This is already called while stepping.
 // The ONLY reason you may want to call this is if you passed INT_MAX to ImGuiListClipper::Begin() because you couldn't step item count beforehand.
-ImGuiListClipper_SeekCursorForItem :: proc(this : ^ImGuiListClipper, item_n : i32)
+SeekCursorForItem :: proc(this : ^ImGuiListClipper, item_n : i32)
 {
 	// - Perform the add and multiply with double to allow seeking through larger ranges.
 	// - StartPosY starts from ItemsFrozen, by adding SeekOffsetY we generally cancel that out (SeekOffsetY == LossynessOffset - ItemsFrozen * ItemsHeight).
@@ -9825,7 +9829,7 @@ ImGuiListClipper_StepInternal :: proc(clipper : ^ImGuiListClipper) -> bool
 }
 
 // Call until it returns false. The DisplayStart/DisplayEnd fields will be set and you can process/draw those items.
-ImGuiListClipper_Step :: proc(this : ^ImGuiListClipper) -> bool
+Step :: proc(this : ^ImGuiListClipper) -> bool
 {
 	g : ^ImGuiContext = this.Ctx
 	need_items_height : bool = (this.ItemsHeight <= 0.0)
@@ -15331,7 +15335,7 @@ ImGuiWindow_GetID_2 :: proc(this : ^ImGuiWindow, n : i32) -> ImGuiID
 
 // This is only used in rare/specific situations to manufacture an ID out of nowhere.
 // FIXME: Consider instead storing last non-zero ID + count of successive zero-ID, and combine those?
-ImGuiWindow_GetIDFromPos :: proc(this : ^ImGuiWindow, p_abs : ImVec2) -> ImGuiID
+GetIDFromPos :: proc(this : ^ImGuiWindow, p_abs : ImVec2) -> ImGuiID
 {
 	seed : ImGuiID = back(&this.IDStack)^
 	p_rel : ImVec2 = WindowPosAbsToRel(this, p_abs)
@@ -15339,8 +15343,7 @@ ImGuiWindow_GetIDFromPos :: proc(this : ^ImGuiWindow, p_abs : ImVec2) -> ImGuiID
 	return id
 }
 
-// "
-ImGuiWindow_GetIDFromRectangle :: proc(this : ^ImGuiWindow, r_abs : ImRect) -> ImGuiID
+GetIDFromRectangle :: proc(this : ^ImGuiWindow, r_abs : ImRect) -> ImGuiID
 {
 	seed : ImGuiID = back(&this.IDStack)^
 	r_rel : ImRect = WindowRectAbsToRel(this, r_abs)
@@ -28145,7 +28148,7 @@ ImDrawListSharedData_init :: proc(this : ^ImDrawListSharedData)
 	this.ArcFastRadiusCutoff = IM_DRAWLIST_CIRCLE_AUTO_SEGMENT_CALC_R(IM_DRAWLIST_ARCFAST_SAMPLE_MAX, this.CircleSegmentMaxError)
 }
 
-ImDrawListSharedData_SetCircleTessellationMaxError :: proc(this : ^ImDrawListSharedData, max_error : f32)
+SetCircleTessellationMaxError :: proc(this : ^ImDrawListSharedData, max_error : f32)
 {
 	if this.CircleSegmentMaxError == max_error { return }
 
@@ -28175,7 +28178,7 @@ ImDrawList_deinit :: proc(this : ^ImDrawList)
 	deinit(&this._ClipRectStack)
 	deinit(&this._TextureIdStack)
 	deinit(&this._CallbacksDataBuf)
-	ImDrawList__ClearFreeMemory(this)
+	_ClearFreeMemory(this)
 }
 
 // Obsolete names
@@ -28213,7 +28216,7 @@ ImDrawList__ResetForNewFrame :: proc(this : ^ImDrawList)
 	this._FringeScale = 1.0
 }
 
-ImDrawList__ClearFreeMemory :: proc(this : ^ImDrawList)
+_ClearFreeMemory :: proc(this : ^ImDrawList)
 {
 	clear(&this.CmdBuffer)
 	clear(&this.IdxBuffer)
@@ -28242,7 +28245,7 @@ ImDrawList_CloneOutput :: proc(this : ^ImDrawList) -> ^ImDrawList
 
 // Advanced: Miscellaneous
 // This is useful if you need to forcefully create a new draw call (to allow for dependent rendering / blending). Otherwise primitives are merged into the same draw-call as much as possible
-ImDrawList_AddDrawCmd :: proc(this : ^ImDrawList)
+AddDrawCmd :: proc(this : ^ImDrawList)
 {
 	draw_cmd : ImDrawCmd
 	draw_cmd.ClipRect = this._CmdHeader.ClipRect; // Same as calling ImDrawCmd_HeaderCopy()
@@ -28256,7 +28259,7 @@ ImDrawList_AddDrawCmd :: proc(this : ^ImDrawList)
 
 // Pop trailing draw command (used before merging or presenting to user)
 // Note that this leaves the ImDrawList in a state unfit for further commands, as most code assume that CmdBuffer.Size > 0 && CmdBuffer.back().UserCallback == NULL
-ImDrawList__PopUnusedDrawCmd :: proc(this : ^ImDrawList)
+_PopUnusedDrawCmd :: proc(this : ^ImDrawList)
 {
 	for this.CmdBuffer.Size > 0 {
 		curr_cmd : ^ImDrawCmd = &this.CmdBuffer.Data[this.CmdBuffer.Size - 1]
@@ -28283,7 +28286,7 @@ ImDrawList_AddCallback :: proc(this : ^ImDrawList, callback : ImDrawCallback, us
 	curr_cmd : ^ImDrawCmd = &this.CmdBuffer.Data[this.CmdBuffer.Size - 1]
 	IM_ASSERT(curr_cmd.UserCallback == nil)
 	if curr_cmd.ElemCount != 0 {
-		ImDrawList_AddDrawCmd(this)
+		AddDrawCmd(this)
 		curr_cmd = &this.CmdBuffer.Data[this.CmdBuffer.Size - 1]
 	}
 
@@ -28305,7 +28308,7 @@ ImDrawList_AddCallback :: proc(this : ^ImDrawList, callback : ImDrawCallback, us
 		memcpy(this._CallbacksDataBuf.Data[cast(uint) curr_cmd.UserCallbackDataOffset:], userdata, cast(int)userdata_size)
 	}
 
-	ImDrawList_AddDrawCmd(this); // Force a new command after us (see comment below)
+	AddDrawCmd(this); // Force a new command after us (see comment below)
 }
 
 // Compare ClipRect, TextureId and VtxOffset with a single memcmp()
@@ -28327,7 +28330,7 @@ ImDrawCmd_AreSequentialIdxOffset :: #force_inline proc "contextless" (CMD_0 : $T
 
 
 // Try to merge two last draw commands
-ImDrawList__TryMergeDrawCmds :: proc(this : ^ImDrawList)
+_TryMergeDrawCmds :: proc(this : ^ImDrawList)
 {
 	IM_ASSERT_PARANOID(this.CmdBuffer.Size > 0)
 	curr_cmd : ^ImDrawCmd = &this.CmdBuffer.Data[this.CmdBuffer.Size - 1]
@@ -28346,7 +28349,7 @@ ImDrawList__OnChangedClipRect :: proc(this : ^ImDrawList)
 	IM_ASSERT_PARANOID(this.CmdBuffer.Size > 0)
 	curr_cmd : ^ImDrawCmd = &this.CmdBuffer.Data[this.CmdBuffer.Size - 1]
 	if curr_cmd.ElemCount != 0 && memcmp(&curr_cmd.ClipRect, &this._CmdHeader.ClipRect, size_of(ImVec4)) != 0 {
-		ImDrawList_AddDrawCmd(this)
+		AddDrawCmd(this)
 		return
 	}
 	IM_ASSERT(curr_cmd.UserCallback == nil)
@@ -28366,7 +28369,7 @@ ImDrawList__OnChangedTextureID :: proc(this : ^ImDrawList)
 	IM_ASSERT_PARANOID(this.CmdBuffer.Size > 0)
 	curr_cmd : ^ImDrawCmd = &this.CmdBuffer.Data[this.CmdBuffer.Size - 1]
 	if curr_cmd.ElemCount != 0 && curr_cmd.TextureId != this._CmdHeader.TextureId {
-		ImDrawList_AddDrawCmd(this)
+		AddDrawCmd(this)
 		return
 	}
 	IM_ASSERT(curr_cmd.UserCallback == nil)
@@ -28388,14 +28391,14 @@ ImDrawList__OnChangedVtxOffset :: proc(this : ^ImDrawList)
 	curr_cmd : ^ImDrawCmd = &this.CmdBuffer.Data[this.CmdBuffer.Size - 1]
 	//IM_ASSERT(curr_cmd->VtxOffset != _CmdHeader.VtxOffset); // See #3349
 	if curr_cmd.ElemCount != 0 {
-		ImDrawList_AddDrawCmd(this)
+		AddDrawCmd(this)
 		return
 	}
 	IM_ASSERT(curr_cmd.UserCallback == nil)
 	curr_cmd.VtxOffset = this._CmdHeader.VtxOffset
 }
 
-ImDrawList__CalcCircleAutoSegmentCount :: proc(this : ^ImDrawList, radius : f32) -> i32
+_CalcCircleAutoSegmentCount :: proc(this : ^ImDrawList, radius : f32) -> i32
 {
 	// Automatic segment count
 	radius_idx : i32 = cast(i32) (radius + 0.999999); // ceil to never reduce accuracy
@@ -28426,7 +28429,7 @@ ImDrawList_PushClipRect :: proc(this : ^ImDrawList, cr_min : ImVec2, cr_max : Im
 	ImDrawList__OnChangedClipRect(this)
 }
 
-ImDrawList_PushClipRectFullScreen :: proc(this : ^ImDrawList)
+PushClipRectFullScreen :: proc(this : ^ImDrawList)
 {
 	ImDrawList_PushClipRect(this, ImVec2{this._Data.ClipRectFullscreen.x, this._Data.ClipRectFullscreen.y}, ImVec2{this._Data.ClipRectFullscreen.z, this._Data.ClipRectFullscreen.w})
 }
@@ -28438,14 +28441,14 @@ ImDrawList_PopClipRect :: proc(this : ^ImDrawList)
 	ImDrawList__OnChangedClipRect(this)
 }
 
-ImDrawList_PushTextureID :: proc(this : ^ImDrawList, texture_id : ImTextureID)
+PushTextureID :: proc(this : ^ImDrawList, texture_id : ImTextureID)
 {
 	push_back(&this._TextureIdStack, texture_id)
 	this._CmdHeader.TextureId = texture_id
 	ImDrawList__OnChangedTextureID(this)
 }
 
-ImDrawList_PopTextureID :: proc(this : ^ImDrawList)
+PopTextureID :: proc(this : ^ImDrawList)
 {
 	pop_back(&this._TextureIdStack)
 	this._CmdHeader.TextureId = (this._TextureIdStack.Size == 0) ? cast(ImTextureID) 0 : this._TextureIdStack.Data[this._TextureIdStack.Size - 1]
@@ -28453,7 +28456,7 @@ ImDrawList_PopTextureID :: proc(this : ^ImDrawList)
 }
 
 // This is used by ImGui::PushFont()/PopFont(). It works because we never use _TextureIdStack[] elsewhere than in PushTextureID()/PopTextureID().
-ImDrawList__SetTextureID :: proc(this : ^ImDrawList, texture_id : ImTextureID)
+_SetTextureID :: proc(this : ^ImDrawList, texture_id : ImTextureID)
 {
 	if this._CmdHeader.TextureId == texture_id { return }
 	this._CmdHeader.TextureId = texture_id
@@ -28466,7 +28469,7 @@ ImDrawList__SetTextureID :: proc(this : ^ImDrawList, texture_id : ImTextureID)
 // Reserve space for a number of vertices and indices.
 // You must finish filling your reserved data before calling PrimReserve() again, as it may reallocate or
 // submit the intermediate results. PrimUnreserve() can be used to release unused allocations.
-ImDrawList_PrimReserve :: proc(this : ^ImDrawList, idx_count : i32, vtx_count : i32)
+PrimReserve :: proc(this : ^ImDrawList, idx_count : i32, vtx_count : i32)
 {
 	// Large mesh support (when enabled)
 	IM_ASSERT_PARANOID(idx_count >= 0 && vtx_count >= 0)
@@ -28491,7 +28494,7 @@ ImDrawList_PrimReserve :: proc(this : ^ImDrawList, idx_count : i32, vtx_count : 
 }
 
 // Release the number of reserved vertices/indices from the end of the last reservation made with PrimReserve().
-ImDrawList_PrimUnreserve :: proc(this : ^ImDrawList, idx_count : i32, vtx_count : i32)
+PrimUnreserve :: proc(this : ^ImDrawList, idx_count : i32, vtx_count : i32)
 {
 	IM_ASSERT_PARANOID(idx_count >= 0 && vtx_count >= 0)
 
@@ -28503,7 +28506,7 @@ ImDrawList_PrimUnreserve :: proc(this : ^ImDrawList, idx_count : i32, vtx_count 
 
 // Axis aligned rectangle (composed of two triangles)
 // Fully unrolled with inline call to keep our debug builds decently fast.
-ImDrawList_PrimRect :: proc(this : ^ImDrawList, a : ImVec2, c : ImVec2, col : ImU32)
+PrimRect :: proc(this : ^ImDrawList, a : ImVec2, c : ImVec2, col : ImU32)
 {
 	b := ImVec2{c.x, a.y}; d := ImVec2{a.x, c.y}; uv : ImVec2 = this._Data.TexUvWhitePixel
 	idx : ImDrawIdx = cast(ImDrawIdx) this._VtxCurrentIdx
@@ -28518,7 +28521,7 @@ ImDrawList_PrimRect :: proc(this : ^ImDrawList, a : ImVec2, c : ImVec2, col : Im
 	this._IdxWritePtr = this._IdxWritePtr[6:]
 }
 
-ImDrawList_PrimRectUV :: proc(this : ^ImDrawList, a : ImVec2, c : ImVec2, uv_a : ImVec2, uv_c : ImVec2, col : ImU32)
+PrimRectUV :: proc(this : ^ImDrawList, a : ImVec2, c : ImVec2, uv_a : ImVec2, uv_c : ImVec2, col : ImU32)
 {
 	b := ImVec2{ c.x, a.y }; d := ImVec2{a.x, c.y}; uv_b := ImVec2{uv_c.x, uv_a.y}; uv_d := ImVec2 { uv_a.x, uv_c.y }
 	idx : ImDrawIdx = cast(ImDrawIdx) this._VtxCurrentIdx
@@ -28578,7 +28581,7 @@ IM_FIXNORMAL2F :: #force_inline proc "contextless" (VX : ^f32, VY : ^f32)
 // - Concave polygon fill is more expensive than convex one: it has O(N^2) complexity. Provided as a convenience fo user but not used by main library.
 // TODO: Thickness anti-aliased lines cap are missing their AA fringe.
 // We avoid using the ImVec2 math operators here to reduce cost to a minimum for debug/non-inlined builds.
-ImDrawList_AddPolyline :: proc(this : ^ImDrawList, points : []ImVec2, col : ImU32, flags : ImDrawFlags, thickness : f32)
+AddPolyline :: proc(this : ^ImDrawList, points : []ImVec2, col : ImU32, flags : ImDrawFlags, thickness : f32)
 {
 	points_count := cast(i32)len(points)
 	if points_count < 2 || (col & IM_COL32_A_MASK) == 0 { return }
@@ -28610,7 +28613,7 @@ ImDrawList_AddPolyline :: proc(this : ^ImDrawList, points : []ImVec2, col : ImU3
 
 		idx_count : i32 = use_texture ? (count * 6) : (thick_line ? count * 18 : count * 12)
 		vtx_count : i32 = use_texture ? (points_count * 2) : (thick_line ? points_count * 4 : points_count * 3)
-		ImDrawList_PrimReserve(this, idx_count, vtx_count)
+		PrimReserve(this, idx_count, vtx_count)
 
 		// Temporary buffer
 		// The first <points_count> items are normals at each line point, then after that there are either 2 or 4 temp points for each line point
@@ -28792,7 +28795,7 @@ ImDrawList_AddPolyline :: proc(this : ^ImDrawList, points : []ImVec2, col : ImU3
 		// [PATH 4] Non texture-based, Non anti-aliased lines
 		idx_count : i32 = count * 6
 		vtx_count : i32 = count * 4; // FIXME-OPT: Not sharing edges
-		ImDrawList_PrimReserve(this, idx_count, vtx_count)
+		PrimReserve(this, idx_count, vtx_count)
 
 		for i1 : i32 = 0; i1 < count; i1 += 1 {
 			i2 : i32 = (i1 + 1) == points_count ? 0 : i1 + 1
@@ -28833,7 +28836,7 @@ ImDrawList_AddConvexPolyFilled :: proc(this : ^ImDrawList, points : [^]ImVec2, p
 		col_trans : ImU32 = col & ~ImU32(IM_COL32_A_MASK)
 		idx_count : i32 = (points_count - 2) * 3 + points_count * 6
 		vtx_count : i32 = (points_count * 2)
-		ImDrawList_PrimReserve(this, idx_count, vtx_count)
+		PrimReserve(this, idx_count, vtx_count)
 
 		// Add indexes for fill
 		vtx_inner_idx : u32 = this._VtxCurrentIdx
@@ -28883,7 +28886,7 @@ ImDrawList_AddConvexPolyFilled :: proc(this : ^ImDrawList, points : [^]ImVec2, p
 		// Non Anti-aliased Fill
 		idx_count : i32 = (points_count - 2) * 3
 		vtx_count : i32 = points_count
-		ImDrawList_PrimReserve(this, idx_count, vtx_count)
+		PrimReserve(this, idx_count, vtx_count)
 		for i : i32 = 0; i < vtx_count; i += 1 {
 			this._VtxWritePtr[0].pos = points[i]; this._VtxWritePtr[0].uv = uv; this._VtxWritePtr[0].col = col
 			post_incr(&this._VtxWritePtr)
@@ -28898,7 +28901,7 @@ ImDrawList_AddConvexPolyFilled :: proc(this : ^ImDrawList, points : [^]ImVec2, p
 	}
 }
 
-ImDrawList__PathArcToFastEx :: proc(this : ^ImDrawList, center : ImVec2, radius : f32, a_min_sample : i32, a_max_sample : i32, a_step : i32)
+_PathArcToFastEx :: proc(this : ^ImDrawList, center : ImVec2, radius : f32, a_min_sample : i32, a_max_sample : i32, a_step : i32)
 {
 	if radius < 0.5 {
 		push_back(&this._Path, center)
@@ -28907,7 +28910,7 @@ ImDrawList__PathArcToFastEx :: proc(this : ^ImDrawList, center : ImVec2, radius 
 
 	a_step := a_step
 	// Calculate arc auto segment step size
-	if a_step <= 0 { a_step = IM_DRAWLIST_ARCFAST_SAMPLE_MAX / ImDrawList__CalcCircleAutoSegmentCount(this, radius) }
+	if a_step <= 0 { a_step = IM_DRAWLIST_ARCFAST_SAMPLE_MAX / _CalcCircleAutoSegmentCount(this, radius) }
 
 	// Make sure we never do steps larger than one quarter of the circle
 	a_step = ImClamp(a_step, 1, IM_DRAWLIST_ARCFAST_TABLE_SIZE / 4)
@@ -28994,16 +28997,16 @@ ImDrawList__PathArcToN :: proc(this : ^ImDrawList, center : ImVec2, radius : f32
 
 // Use precomputed angles for a 12 steps circle
 // 0: East, 3: South, 6: West, 9: North, 12: East
-ImDrawList_PathArcToFast :: proc(this : ^ImDrawList, center : ImVec2, radius : f32, a_min_of_12 : i32, a_max_of_12 : i32)
+PathArcToFast :: proc(this : ^ImDrawList, center : ImVec2, radius : f32, a_min_of_12 : i32, a_max_of_12 : i32)
 {
 	if radius < 0.5 {
 		push_back(&this._Path, center)
 		return
 	}
-	ImDrawList__PathArcToFastEx(this, center, radius, a_min_of_12 * IM_DRAWLIST_ARCFAST_SAMPLE_MAX / 12, a_max_of_12 * IM_DRAWLIST_ARCFAST_SAMPLE_MAX / 12, 0)
+	_PathArcToFastEx(this, center, radius, a_min_of_12 * IM_DRAWLIST_ARCFAST_SAMPLE_MAX / 12, a_max_of_12 * IM_DRAWLIST_ARCFAST_SAMPLE_MAX / 12, 0)
 }
 
-ImDrawList_PathArcTo :: proc(this : ^ImDrawList, center : ImVec2, radius : f32, a_min : f32, a_max : f32, num_segments : i32 = 0)
+PathArcTo :: proc(this : ^ImDrawList, center : ImVec2, radius : f32, a_min : f32, a_max : f32, num_segments : i32 = 0)
 {
 	if radius < 0.5 {
 		push_back(&this._Path, center)
@@ -29035,12 +29038,12 @@ ImDrawList_PathArcTo :: proc(this : ^ImDrawList, center : ImVec2, radius : f32, 
 
 		reserve(&this._Path, this._Path.Size + (a_mid_samples + 1 + (a_emit_start ? 1 : 0) + (a_emit_end ? 1 : 0)))
 		if a_emit_start { push_back(&this._Path, ImVec2{center.x + ImCos(a_min) * radius, center.y + ImSin(a_min) * radius}) }
-		if a_mid_samples > 0 { ImDrawList__PathArcToFastEx(this, center, radius, a_min_sample, a_max_sample, 0) }
+		if a_mid_samples > 0 { _PathArcToFastEx(this, center, radius, a_min_sample, a_max_sample, 0) }
 		if a_emit_end { push_back(&this._Path, ImVec2{center.x + ImCos(a_max) * radius, center.y + ImSin(a_max) * radius}) }
 	}
 	else {
 		arc_length : f32 = ImAbs(a_max - a_min)
-		circle_segment_count : i32 = ImDrawList__CalcCircleAutoSegmentCount(this, radius)
+		circle_segment_count : i32 = _CalcCircleAutoSegmentCount(this, radius)
 		arc_segment_count : i32 = ImMax(cast(i32) ImCeil(f32(circle_segment_count) * arc_length / (IM_PI * 2.0)), cast(i32) (2.0 * IM_PI / arc_length))
 		ImDrawList__PathArcToN(this, center, radius, a_min, a_max, arc_segment_count)
 	}
@@ -29052,7 +29055,7 @@ ImDrawList_PathEllipticalArcTo :: proc(this : ^ImDrawList, center : ImVec2, radi
 	num_segments := num_segments
 	if num_segments <= 0 {
 		// A bit pessimistic, maybe there's a better computation to do here.
-		num_segments = ImDrawList__CalcCircleAutoSegmentCount(this, ImMax(radius.x, radius.y))
+		num_segments = _CalcCircleAutoSegmentCount(this, ImMax(radius.x, radius.y))
 	}
 
 	reserve(&this._Path, this._Path.Size + (num_segments + 1))
@@ -29181,7 +29184,7 @@ FixRectCornerFlags :: #force_inline proc(flags : ImDrawFlags) -> ImDrawFlags
 	return flags
 }
 
-ImDrawList_PathRect :: proc(this : ^ImDrawList, a : ImVec2, b : ImVec2, rounding : f32 = 0.0, flags : ImDrawFlags = {})
+PathRect :: proc(this : ^ImDrawList, a : ImVec2, b : ImVec2, rounding : f32 = 0.0, flags : ImDrawFlags = {})
 {
 	flags := flags
 	rounding := rounding
@@ -29191,20 +29194,20 @@ ImDrawList_PathRect :: proc(this : ^ImDrawList, a : ImVec2, b : ImVec2, rounding
 		rounding = ImMin(rounding, ImFabs(b.y - a.y) * (((flags & ImDrawFlags_.ImDrawFlags_RoundCornersLeft) == ImDrawFlags_.ImDrawFlags_RoundCornersLeft) || ((flags & ImDrawFlags_.ImDrawFlags_RoundCornersRight) == ImDrawFlags_.ImDrawFlags_RoundCornersRight) ? 0.5 : 1.0) - 1.0)
 	}
 	if rounding < 0.5 || (flags & ImDrawFlags_.ImDrawFlags_RoundCornersMask_) == ImDrawFlags_.ImDrawFlags_RoundCornersNone {
-		ImDrawList_PathLineTo(this, a)
-		ImDrawList_PathLineTo(this, ImVec2{b.x, a.y})
-		ImDrawList_PathLineTo(this, b)
-		ImDrawList_PathLineTo(this, ImVec2{a.x, b.y})
+		PathLineTo(this, a)
+		PathLineTo(this, ImVec2{b.x, a.y})
+		PathLineTo(this, b)
+		PathLineTo(this, ImVec2{a.x, b.y})
 	}
 	else {
 		rounding_tl : f32 = (flags & ImDrawFlags_.ImDrawFlags_RoundCornersTopLeft) != {} ? rounding : 0.0
 		rounding_tr : f32 = (flags & ImDrawFlags_.ImDrawFlags_RoundCornersTopRight) != {} ? rounding : 0.0
 		rounding_br : f32 = (flags & ImDrawFlags_.ImDrawFlags_RoundCornersBottomRight) != {} ? rounding : 0.0
 		rounding_bl : f32 = (flags & ImDrawFlags_.ImDrawFlags_RoundCornersBottomLeft) != {} ? rounding : 0.0
-		ImDrawList_PathArcToFast(this, ImVec2{a.x + rounding_tl, a.y + rounding_tl}, rounding_tl, 6, 9)
-		ImDrawList_PathArcToFast(this, ImVec2{b.x - rounding_tr, a.y + rounding_tr}, rounding_tr, 9, 12)
-		ImDrawList_PathArcToFast(this, ImVec2{b.x - rounding_br, b.y - rounding_br}, rounding_br, 0, 3)
-		ImDrawList_PathArcToFast(this, ImVec2{a.x + rounding_bl, b.y - rounding_bl}, rounding_bl, 3, 6)
+		PathArcToFast(this, ImVec2{a.x + rounding_tl, a.y + rounding_tl}, rounding_tl, 6, 9)
+		PathArcToFast(this, ImVec2{b.x - rounding_tr, a.y + rounding_tr}, rounding_tr, 9, 12)
+		PathArcToFast(this, ImVec2{b.x - rounding_br, b.y - rounding_br}, rounding_br, 0, 3)
+		PathArcToFast(this, ImVec2{a.x + rounding_bl, b.y - rounding_bl}, rounding_bl, 3, 6)
 	}
 }
 
@@ -29215,106 +29218,106 @@ ImDrawList_PathRect :: proc(this : ^ImDrawList, a : ImVec2, b : ImVec2, rounding
 //   In older versions (until Dear ImGui 1.77) the AddCircle functions defaulted to num_segments == 12.
 //   In future versions we will use textures to provide cheaper and higher-quality circles.
 //   Use AddNgon() and AddNgonFilled() functions if you need to guarantee a specific number of sides.
-ImDrawList_AddLine :: proc(this : ^ImDrawList, p1 : ImVec2, p2 : ImVec2, col : ImU32, thickness : f32 = 1.0)
+AddLine :: proc(this : ^ImDrawList, p1 : ImVec2, p2 : ImVec2, col : ImU32, thickness : f32 = 1.0)
 {
 	if (col & IM_COL32_A_MASK) == 0 { return }
-	ImDrawList_PathLineTo(this, p1 + ImVec2{0.5, 0.5})
-	ImDrawList_PathLineTo(this, p2 + ImVec2{0.5, 0.5})
-	ImDrawList_PathStroke(this, col, {}, thickness)
+	PathLineTo(this, p1 + ImVec2{0.5, 0.5})
+	PathLineTo(this, p2 + ImVec2{0.5, 0.5})
+	PathStroke(this, col, {}, thickness)
 }
 
 // a: upper-left, b: lower-right (== upper-left + size)
 // p_min = upper-left, p_max = lower-right
 // Note we don't render 1 pixels sized rectangles properly.
-ImDrawList_AddRect :: proc(this : ^ImDrawList, p_min : ImVec2, p_max : ImVec2, col : ImU32, rounding : f32 = 0.0, flags : ImDrawFlags = {}, thickness : f32 = 1.0)
+AddRect :: proc(this : ^ImDrawList, p_min : ImVec2, p_max : ImVec2, col : ImU32, rounding : f32 = 0.0, flags : ImDrawFlags = {}, thickness : f32 = 1.0)
 {
 	if (col & IM_COL32_A_MASK) == 0 { return }
-	if (this.Flags & ImDrawListFlags_.ImDrawListFlags_AntiAliasedLines) != {} { ImDrawList_PathRect(this, p_min + ImVec2{0.50, 0.50}, p_max - ImVec2{0.50, 0.50}, rounding, flags) }
+	if (this.Flags & ImDrawListFlags_.ImDrawListFlags_AntiAliasedLines) != {} { PathRect(this, p_min + ImVec2{0.50, 0.50}, p_max - ImVec2{0.50, 0.50}, rounding, flags) }
 	else {
 		// Better looking lower-right corner and rounded non-AA shapes.
-		ImDrawList_PathRect(this, p_min + ImVec2{0.50, 0.50}, p_max - ImVec2{0.49, 0.49}, rounding, flags)
+		PathRect(this, p_min + ImVec2{0.50, 0.50}, p_max - ImVec2{0.49, 0.49}, rounding, flags)
 	}
-	ImDrawList_PathStroke(this, col, ImDrawFlags_.ImDrawFlags_Closed, thickness)
+	PathStroke(this, col, ImDrawFlags_.ImDrawFlags_Closed, thickness)
 }
 
 // a: upper-left, b: lower-right (== upper-left + size)
-ImDrawList_AddRectFilled :: proc(this : ^ImDrawList, p_min : ImVec2, p_max : ImVec2, col : ImU32, rounding : f32 = 0.0, flags : ImDrawFlags = {})
+AddRectFilled :: proc(this : ^ImDrawList, p_min : ImVec2, p_max : ImVec2, col : ImU32, rounding : f32 = 0.0, flags : ImDrawFlags = {})
 {
 	if (col & IM_COL32_A_MASK) == 0 { return }
 	if rounding < 0.5 || (flags & ImDrawFlags_.ImDrawFlags_RoundCornersMask_) == ImDrawFlags_.ImDrawFlags_RoundCornersNone {
-		ImDrawList_PrimReserve(this, 6, 4)
-		ImDrawList_PrimRect(this, p_min, p_max, col)
+		PrimReserve(this, 6, 4)
+		PrimRect(this, p_min, p_max, col)
 	}
 	else {
-		ImDrawList_PathRect(this, p_min, p_max, rounding, flags)
-		ImDrawList_PathFillConvex(this, col)
+		PathRect(this, p_min, p_max, rounding, flags)
+		PathFillConvex(this, col)
 	}
 }
 
 // p_min = upper-left, p_max = lower-right
-ImDrawList_AddRectFilledMultiColor :: proc(this : ^ImDrawList, p_min : ImVec2, p_max : ImVec2, col_upr_left : ImU32, col_upr_right : ImU32, col_bot_right : ImU32, col_bot_left : ImU32)
+AddRectFilledMultiColor :: proc(this : ^ImDrawList, p_min : ImVec2, p_max : ImVec2, col_upr_left : ImU32, col_upr_right : ImU32, col_bot_right : ImU32, col_bot_left : ImU32)
 {
 	if ((col_upr_left | col_upr_right | col_bot_right | col_bot_left) & IM_COL32_A_MASK) == 0 { return }
 
 	uv : ImVec2 = this._Data.TexUvWhitePixel
-	ImDrawList_PrimReserve(this, 6, 4)
-	ImDrawList_PrimWriteIdx(this, cast(ImDrawIdx) (this._VtxCurrentIdx)); ImDrawList_PrimWriteIdx(this, cast(ImDrawIdx) (this._VtxCurrentIdx + 1)); ImDrawList_PrimWriteIdx(this, cast(ImDrawIdx) (this._VtxCurrentIdx + 2))
-	ImDrawList_PrimWriteIdx(this, cast(ImDrawIdx) (this._VtxCurrentIdx)); ImDrawList_PrimWriteIdx(this, cast(ImDrawIdx) (this._VtxCurrentIdx + 2)); ImDrawList_PrimWriteIdx(this, cast(ImDrawIdx) (this._VtxCurrentIdx + 3))
-	ImDrawList_PrimWriteVtx(this, p_min, uv, col_upr_left)
-	ImDrawList_PrimWriteVtx(this, ImVec2{p_max.x, p_min.y}, uv, col_upr_right)
-	ImDrawList_PrimWriteVtx(this, p_max, uv, col_bot_right)
-	ImDrawList_PrimWriteVtx(this, ImVec2{p_min.x, p_max.y}, uv, col_bot_left)
+	PrimReserve(this, 6, 4)
+	PrimWriteIdx(this, cast(ImDrawIdx) (this._VtxCurrentIdx)); PrimWriteIdx(this, cast(ImDrawIdx) (this._VtxCurrentIdx + 1)); PrimWriteIdx(this, cast(ImDrawIdx) (this._VtxCurrentIdx + 2))
+	PrimWriteIdx(this, cast(ImDrawIdx) (this._VtxCurrentIdx)); PrimWriteIdx(this, cast(ImDrawIdx) (this._VtxCurrentIdx + 2)); PrimWriteIdx(this, cast(ImDrawIdx) (this._VtxCurrentIdx + 3))
+	PrimWriteVtx(this, p_min, uv, col_upr_left)
+	PrimWriteVtx(this, ImVec2{p_max.x, p_min.y}, uv, col_upr_right)
+	PrimWriteVtx(this, p_max, uv, col_bot_right)
+	PrimWriteVtx(this, ImVec2{p_min.x, p_max.y}, uv, col_bot_left)
 }
 
 ImDrawList_AddQuad :: proc(this : ^ImDrawList, p1 : ImVec2, p2 : ImVec2, p3 : ImVec2, p4 : ImVec2, col : ImU32, thickness : f32 = 1.0)
 {
 	if (col & IM_COL32_A_MASK) == 0 { return }
 
-	ImDrawList_PathLineTo(this, p1)
-	ImDrawList_PathLineTo(this, p2)
-	ImDrawList_PathLineTo(this, p3)
-	ImDrawList_PathLineTo(this, p4)
-	ImDrawList_PathStroke(this, col, ImDrawFlags_.ImDrawFlags_Closed, thickness)
+	PathLineTo(this, p1)
+	PathLineTo(this, p2)
+	PathLineTo(this, p3)
+	PathLineTo(this, p4)
+	PathStroke(this, col, ImDrawFlags_.ImDrawFlags_Closed, thickness)
 }
 
-ImDrawList_AddQuadFilled :: proc(this : ^ImDrawList, p1 : ImVec2, p2 : ImVec2, p3 : ImVec2, p4 : ImVec2, col : ImU32)
+AddQuadFilled :: proc(this : ^ImDrawList, p1 : ImVec2, p2 : ImVec2, p3 : ImVec2, p4 : ImVec2, col : ImU32)
 {
 	if (col & IM_COL32_A_MASK) == 0 { return }
 
-	ImDrawList_PathLineTo(this, p1)
-	ImDrawList_PathLineTo(this, p2)
-	ImDrawList_PathLineTo(this, p3)
-	ImDrawList_PathLineTo(this, p4)
-	ImDrawList_PathFillConvex(this, col)
+	PathLineTo(this, p1)
+	PathLineTo(this, p2)
+	PathLineTo(this, p3)
+	PathLineTo(this, p4)
+	PathFillConvex(this, col)
 }
 
-ImDrawList_AddTriangle :: proc(this : ^ImDrawList, p1 : ImVec2, p2 : ImVec2, p3 : ImVec2, col : ImU32, thickness : f32 = 1.0)
+AddTriangle :: proc(this : ^ImDrawList, p1 : ImVec2, p2 : ImVec2, p3 : ImVec2, col : ImU32, thickness : f32 = 1.0)
 {
 	if (col & IM_COL32_A_MASK) == 0 { return }
 
-	ImDrawList_PathLineTo(this, p1)
-	ImDrawList_PathLineTo(this, p2)
-	ImDrawList_PathLineTo(this, p3)
-	ImDrawList_PathStroke(this, col, ImDrawFlags_.ImDrawFlags_Closed, thickness)
+	PathLineTo(this, p1)
+	PathLineTo(this, p2)
+	PathLineTo(this, p3)
+	PathStroke(this, col, ImDrawFlags_.ImDrawFlags_Closed, thickness)
 }
 
-ImDrawList_AddTriangleFilled :: proc(this : ^ImDrawList, p1 : ImVec2, p2 : ImVec2, p3 : ImVec2, col : ImU32)
+AddTriangleFilled :: proc(this : ^ImDrawList, p1 : ImVec2, p2 : ImVec2, p3 : ImVec2, col : ImU32)
 {
 	if (col & IM_COL32_A_MASK) == 0 { return }
 
-	ImDrawList_PathLineTo(this, p1)
-	ImDrawList_PathLineTo(this, p2)
-	ImDrawList_PathLineTo(this, p3)
-	ImDrawList_PathFillConvex(this, col)
+	PathLineTo(this, p1)
+	PathLineTo(this, p2)
+	PathLineTo(this, p3)
+	PathFillConvex(this, col)
 }
 
-ImDrawList_AddCircle :: proc(this : ^ImDrawList, center : ImVec2, radius : f32, col : ImU32, num_segments : i32 = 0, thickness : f32 = 1.0)
+AddCircle :: proc(this : ^ImDrawList, center : ImVec2, radius : f32, col : ImU32, num_segments : i32 = 0, thickness : f32 = 1.0)
 {
 	if (col & IM_COL32_A_MASK) == 0 || radius < 0.5 { return }
 
 	if num_segments <= 0 {
 		// Use arc with automatic segment count
-		ImDrawList__PathArcToFastEx(this, center, radius - 0.5, 0, IM_DRAWLIST_ARCFAST_SAMPLE_MAX, 0)
+		_PathArcToFastEx(this, center, radius - 0.5, 0, IM_DRAWLIST_ARCFAST_SAMPLE_MAX, 0)
 		post_decr(&this._Path.Size)
 	}
 	else {
@@ -29323,19 +29326,19 @@ ImDrawList_AddCircle :: proc(this : ^ImDrawList, center : ImVec2, radius : f32, 
 
 		// Because we are filling a closed shape we remove 1 from the count of segments/points
 		a_max : f32 = (IM_PI * 2.0) * (cast(f32) num_segments - 1.0) / cast(f32) num_segments
-		ImDrawList_PathArcTo(this, center, radius - 0.5, 0.0, a_max, num_segments - 1)
+		PathArcTo(this, center, radius - 0.5, 0.0, a_max, num_segments - 1)
 	}
 
-	ImDrawList_PathStroke(this, col, ImDrawFlags_.ImDrawFlags_Closed, thickness)
+	PathStroke(this, col, ImDrawFlags_.ImDrawFlags_Closed, thickness)
 }
 
-ImDrawList_AddCircleFilled :: proc(this : ^ImDrawList, center : ImVec2, radius : f32, col : ImU32, num_segments : i32 = 0)
+AddCircleFilled :: proc(this : ^ImDrawList, center : ImVec2, radius : f32, col : ImU32, num_segments : i32 = 0)
 {
 	if (col & IM_COL32_A_MASK) == 0 || radius < 0.5 { return }
 
 	if num_segments <= 0 {
 		// Use arc with automatic segment count
-		ImDrawList__PathArcToFastEx(this, center, radius, 0, IM_DRAWLIST_ARCFAST_SAMPLE_MAX, 0)
+		_PathArcToFastEx(this, center, radius, 0, IM_DRAWLIST_ARCFAST_SAMPLE_MAX, 0)
 		post_decr(&this._Path.Size)
 	}
 	else {
@@ -29344,10 +29347,10 @@ ImDrawList_AddCircleFilled :: proc(this : ^ImDrawList, center : ImVec2, radius :
 
 		// Because we are filling a closed shape we remove 1 from the count of segments/points
 		a_max : f32 = (IM_PI * 2.0) * (cast(f32) num_segments - 1.0) / cast(f32) num_segments
-		ImDrawList_PathArcTo(this, center, radius, 0.0, a_max, num_segments - 1)
+		PathArcTo(this, center, radius, 0.0, a_max, num_segments - 1)
 	}
 
-	ImDrawList_PathFillConvex(this, col)
+	PathFillConvex(this, col)
 }
 
 // Guaranteed to honor 'num_segments'
@@ -29357,8 +29360,8 @@ ImDrawList_AddNgon :: proc(this : ^ImDrawList, center : ImVec2, radius : f32, co
 
 	// Because we are filling a closed shape we remove 1 from the count of segments/points
 	a_max : f32 = (IM_PI * 2.0) * (cast(f32) num_segments - 1.0) / cast(f32) num_segments
-	ImDrawList_PathArcTo(this, center, radius - 0.5, 0.0, a_max, num_segments - 1)
-	ImDrawList_PathStroke(this, col, ImDrawFlags_.ImDrawFlags_Closed, thickness)
+	PathArcTo(this, center, radius - 0.5, 0.0, a_max, num_segments - 1)
+	PathStroke(this, col, ImDrawFlags_.ImDrawFlags_Closed, thickness)
 }
 
 // Guaranteed to honor 'num_segments'
@@ -29368,8 +29371,8 @@ ImDrawList_AddNgonFilled :: proc(this : ^ImDrawList, center : ImVec2, radius : f
 
 	// Because we are filling a closed shape we remove 1 from the count of segments/points
 	a_max : f32 = (IM_PI * 2.0) * (cast(f32) num_segments - 1.0) / cast(f32) num_segments
-	ImDrawList_PathArcTo(this, center, radius, 0.0, a_max, num_segments - 1)
-	ImDrawList_PathFillConvex(this, col)
+	PathArcTo(this, center, radius, 0.0, a_max, num_segments - 1)
+	PathFillConvex(this, col)
 }
 
 // Ellipse
@@ -29380,13 +29383,13 @@ ImDrawList_AddEllipse :: proc(this : ^ImDrawList, center : ImVec2, radius : ImVe
 	num_segments := num_segments
 	if num_segments <= 0 {
 		// A bit pessimistic, maybe there's a better computation to do here.
-		num_segments = ImDrawList__CalcCircleAutoSegmentCount(this, ImMax(radius.x, radius.y))
+		num_segments = _CalcCircleAutoSegmentCount(this, ImMax(radius.x, radius.y))
 	}
 
 	// Because we are filling a closed shape we remove 1 from the count of segments/points
 	a_max : f32 = IM_PI * 2.0 * (cast(f32) num_segments - 1.0) / cast(f32) num_segments
 	ImDrawList_PathEllipticalArcTo(this, center, radius, rot, 0.0, a_max, num_segments - 1)
-	ImDrawList_PathStroke(this, col, ImDrawFlags(1), thickness)
+	PathStroke(this, col, ImDrawFlags(1), thickness)
 }
 
 ImDrawList_AddEllipseFilled :: proc(this : ^ImDrawList, center : ImVec2, radius : ImVec2, col : ImU32, rot : f32 = 0.0, num_segments : i32 = 0)
@@ -29396,13 +29399,13 @@ ImDrawList_AddEllipseFilled :: proc(this : ^ImDrawList, center : ImVec2, radius 
 	num_segments := num_segments
 	if num_segments <= 0 {
 		// A bit pessimistic, maybe there's a better computation to do here.
-		num_segments = ImDrawList__CalcCircleAutoSegmentCount(this, ImMax(radius.x, radius.y))
+		num_segments = _CalcCircleAutoSegmentCount(this, ImMax(radius.x, radius.y))
 	}
 
 	// Because we are filling a closed shape we remove 1 from the count of segments/points
 	a_max : f32 = IM_PI * 2.0 * (cast(f32) num_segments - 1.0) / cast(f32) num_segments
 	ImDrawList_PathEllipticalArcTo(this, center, radius, rot, 0.0, a_max, num_segments - 1)
-	ImDrawList_PathFillConvex(this, col)
+	PathFillConvex(this, col)
 }
 
 // Cubic Bezier (4 control points)
@@ -29411,9 +29414,9 @@ ImDrawList_AddBezierCubic :: proc(this : ^ImDrawList, p1 : ImVec2, p2 : ImVec2, 
 {
 	if (col & IM_COL32_A_MASK) == 0 { return }
 
-	ImDrawList_PathLineTo(this, p1)
+	PathLineTo(this, p1)
 	ImDrawList_PathBezierCubicCurveTo(this, p2, p3, p4, num_segments)
-	ImDrawList_PathStroke(this, col, {}, thickness)
+	PathStroke(this, col, {}, thickness)
 }
 
 // Quadratic Bezier (3 control points)
@@ -29422,9 +29425,9 @@ ImDrawList_AddBezierQuadratic :: proc(this : ^ImDrawList, p1 : ImVec2, p2 : ImVe
 {
 	if (col & IM_COL32_A_MASK) == 0 { return }
 
-	ImDrawList_PathLineTo(this, p1)
+	PathLineTo(this, p1)
 	ImDrawList_PathBezierQuadraticCurveTo(this, p2, p3, num_segments)
-	ImDrawList_PathStroke(this, col, {}, thickness)
+	PathStroke(this, col, {}, thickness)
 }
 
 ImDrawList_AddText_0 :: proc(this : ^ImDrawList, font : ^ImFont, font_size : f32, pos : ImVec2, col : ImU32, text : string, wrap_width : f32 = 0, cpu_fine_clip_rect : ^ImVec4 = nil)
@@ -29459,52 +29462,52 @@ ImDrawList_AddText_1 :: proc(this : ^ImDrawList, pos : ImVec2, col : ImU32, text
 // - Read FAQ to understand what ImTextureID is.
 // - "p_min" and "p_max" represent the upper-left and lower-right corners of the rectangle.
 // - "uv_min" and "uv_max" represent the normalized texture coordinates to use for those corners. Using (0,0)->(1,1) texture coordinates will generally display the entire texture.
-ImDrawList_AddImage :: proc(this : ^ImDrawList, user_texture_id : ImTextureID, p_min : ImVec2, p_max : ImVec2, uv_min : ImVec2 = {0, 0}, uv_max : ImVec2 = {1, 1}, col : ImU32 = IM_COL32_WHITE)
+AddImage :: proc(this : ^ImDrawList, user_texture_id : ImTextureID, p_min : ImVec2, p_max : ImVec2, uv_min : ImVec2 = {0, 0}, uv_max : ImVec2 = {1, 1}, col : ImU32 = IM_COL32_WHITE)
 {
 	if (col & IM_COL32_A_MASK) == 0 { return }
 
 	push_texture_id : bool = user_texture_id != this._CmdHeader.TextureId
-	if push_texture_id { ImDrawList_PushTextureID(this, user_texture_id) }
+	if push_texture_id { PushTextureID(this, user_texture_id) }
 
-	ImDrawList_PrimReserve(this, 6, 4)
-	ImDrawList_PrimRectUV(this, p_min, p_max, uv_min, uv_max, col)
+	PrimReserve(this, 6, 4)
+	PrimRectUV(this, p_min, p_max, uv_min, uv_max, col)
 
-	if push_texture_id { ImDrawList_PopTextureID(this) }
+	if push_texture_id { PopTextureID(this) }
 }
 
-ImDrawList_AddImageQuad :: proc(this : ^ImDrawList, user_texture_id : ImTextureID, p1 : ImVec2, p2 : ImVec2, p3 : ImVec2, p4 : ImVec2, uv1 : ImVec2 = {0, 0}, uv2 : ImVec2 = {1, 0}, uv3 : ImVec2 = {1, 1}, uv4 : ImVec2 = {0, 1}, col : ImU32 = IM_COL32_WHITE)
+AddImageQuad :: proc(this : ^ImDrawList, user_texture_id : ImTextureID, p1 : ImVec2, p2 : ImVec2, p3 : ImVec2, p4 : ImVec2, uv1 : ImVec2 = {0, 0}, uv2 : ImVec2 = {1, 0}, uv3 : ImVec2 = {1, 1}, uv4 : ImVec2 = {0, 1}, col : ImU32 = IM_COL32_WHITE)
 {
 	if (col & IM_COL32_A_MASK) == 0 { return }
 
 	push_texture_id : bool = user_texture_id != this._CmdHeader.TextureId
-	if push_texture_id { ImDrawList_PushTextureID(this, user_texture_id) }
+	if push_texture_id { PushTextureID(this, user_texture_id) }
 
-	ImDrawList_PrimReserve(this, 6, 4)
+	PrimReserve(this, 6, 4)
 	ImDrawList_PrimQuadUV(this, p1, p2, p3, p4, uv1, uv2, uv3, uv4, col)
 
-	if push_texture_id { ImDrawList_PopTextureID(this) }
+	if push_texture_id { PopTextureID(this) }
 }
 
-ImDrawList_AddImageRounded :: proc(this : ^ImDrawList, user_texture_id : ImTextureID, p_min : ImVec2, p_max : ImVec2, uv_min : ImVec2, uv_max : ImVec2, col : ImU32, rounding : f32, flags : ImDrawFlags = {})
+AddImageRounded :: proc(this : ^ImDrawList, user_texture_id : ImTextureID, p_min : ImVec2, p_max : ImVec2, uv_min : ImVec2, uv_max : ImVec2, col : ImU32, rounding : f32, flags : ImDrawFlags = {})
 {
 	if (col & IM_COL32_A_MASK) == 0 { return }
 
 	flags := FixRectCornerFlags(flags)
 	if rounding < 0.5 || (flags & ImDrawFlags_.ImDrawFlags_RoundCornersMask_) == ImDrawFlags_.ImDrawFlags_RoundCornersNone {
-		ImDrawList_AddImage(this, user_texture_id, p_min, p_max, uv_min, uv_max, col)
+		AddImage(this, user_texture_id, p_min, p_max, uv_min, uv_max, col)
 		return
 	}
 
 	push_texture_id : bool = user_texture_id != this._CmdHeader.TextureId
-	if push_texture_id { ImDrawList_PushTextureID(this, user_texture_id) }
+	if push_texture_id { PushTextureID(this, user_texture_id) }
 
 	vert_start_idx : i32 = this.VtxBuffer.Size
-	ImDrawList_PathRect(this, p_min, p_max, rounding, flags)
-	ImDrawList_PathFillConvex(this, col)
+	PathRect(this, p_min, p_max, rounding, flags)
+	PathFillConvex(this, col)
 	vert_end_idx : i32 = this.VtxBuffer.Size
 	ShadeVertsLinearUV(this, vert_start_idx, vert_end_idx, p_min, p_max, uv_min, uv_max, true)
 
-	if push_texture_id { ImDrawList_PopTextureID(this) }
+	if push_texture_id { PopTextureID(this) }
 }
 
 //-----------------------------------------------------------------------------
@@ -29532,7 +29535,7 @@ ImTriangulatorNode :: struct {
 	Prev : ^ImTriangulatorNode,
 }
 
-ImTriangulatorNode_Unlink :: proc(this : ^ImTriangulatorNode)
+Unlink :: proc(this : ^ImTriangulatorNode)
 {
 	this.Next.Prev = this.Prev; this.Prev.Next = this.Next
 }
@@ -29577,7 +29580,7 @@ ImTriangulator_init :: proc(this : ^ImTriangulator)
 // Distribute storage for nodes, ears and reflexes.
 // FIXME-OPT: if everything is convex, we could report it to caller and let it switch to an convex renderer
 // (this would require first building reflexes to bail to convex if empty, without even building nodes)
-ImTriangulator_Init :: proc(this : ^ImTriangulator, points : []ImVec2, scratch_buffer : rawptr)
+Init :: proc(this : ^ImTriangulator, points : []ImVec2, scratch_buffer : rawptr)
 {
 	IM_ASSERT(scratch_buffer != nil && len(points) >= 3)
 	this._TrianglesLeft = ImTriangulator_EstimateTriangleCount(len(points))
@@ -29626,7 +29629,7 @@ ImTriangulator_BuildEars :: proc(this : ^ImTriangulator)
 }
 
 // Return relative indexes for next triangle
-ImTriangulator_GetNextTriangle :: proc(this : ^ImTriangulator, out_triangle : ^[3]u32)
+GetNextTriangle :: proc(this : ^ImTriangulator, out_triangle : ^[3]u32)
 {
 	if this._Ears.Size == 0 {
 		ImTriangulator_FlipNodeList(this)
@@ -29732,7 +29735,7 @@ ImDrawList_AddConcavePolyFilled :: proc(this : ^ImDrawList, points : []ImVec2, c
 		col_trans : ImU32 = col & ~ImU32(IM_COL32_A_MASK)
 		idx_count : i32 = (points_count - 2) * 3 + points_count * 6
 		vtx_count : i32 = (points_count * 2)
-		ImDrawList_PrimReserve(this, idx_count, vtx_count)
+		PrimReserve(this, idx_count, vtx_count)
 
 		// Add indexes for fill
 		vtx_inner_idx : u32 = this._VtxCurrentIdx
@@ -29790,7 +29793,7 @@ ImDrawList_AddConcavePolyFilled :: proc(this : ^ImDrawList, points : []ImVec2, c
 		// Non Anti-aliased Fill
 		idx_count : i32 = (points_count - 2) * 3
 		vtx_count : i32 = points_count
-		ImDrawList_PrimReserve(this, idx_count, vtx_count)
+		PrimReserve(this, idx_count, vtx_count)
 		for i : i32 = 0; i < vtx_count; i += 1 {
 			this._VtxWritePtr[0].pos = points[i]; this._VtxWritePtr[0].uv = uv; this._VtxWritePtr[0].col = col
 			post_incr(&this._VtxWritePtr)
@@ -29830,7 +29833,7 @@ ImDrawListSplitter_ClearFreeMemory :: proc(this : ^ImDrawListSplitter)
 	clear(&this._Channels)
 }
 
-ImDrawListSplitter_Split :: proc(this : ^ImDrawListSplitter, draw_list : ^ImDrawList, channels_count : i32)
+Split :: proc(this : ^ImDrawListSplitter, draw_list : ^ImDrawList, channels_count : i32)
 {
 	IM_UNUSED(draw_list)
 	IM_ASSERT(this._Current == 0 && this._Count <= 1, "Nested channel splitting is not supported. Please use separate instances of ImDrawListSplitter.")
@@ -29856,12 +29859,12 @@ ImDrawListSplitter_Split :: proc(this : ^ImDrawListSplitter, draw_list : ^ImDraw
 	}
 }
 
-ImDrawListSplitter_Merge :: proc(this : ^ImDrawListSplitter, draw_list : ^ImDrawList)
+Merge :: proc(this : ^ImDrawListSplitter, draw_list : ^ImDrawList)
 {
 	// Note that we never use or rely on _Channels.Size because it is merely a buffer that we never shrink back to 0 to keep all sub-buffers ready for use.
 	if this._Count <= 1 { return }
 
-	ImDrawListSplitter_SetCurrentChannel(this, draw_list, 0)
+	SetCurrentChannel(this, draw_list, 0)
 	_PopUnusedDrawCmd(draw_list)
 
 	// Calculate our final buffer sizes. Also fix the incorrect IdxOffset values in each command.
@@ -29924,7 +29927,7 @@ ImDrawListSplitter_Merge :: proc(this : ^ImDrawListSplitter, draw_list : ^ImDraw
 	this._Count = 1
 }
 
-ImDrawListSplitter_SetCurrentChannel :: proc(this : ^ImDrawListSplitter, draw_list : ^ImDrawList, idx : i32)
+SetCurrentChannel :: proc(this : ^ImDrawListSplitter, draw_list : ^ImDrawList, idx : i32)
 {
 	IM_ASSERT(idx >= 0 && idx < this._Count)
 	if this._Current == idx { return }
@@ -30205,7 +30208,7 @@ ImFontAtlas_deinit :: proc(this : ^ImFontAtlas)
 }
 
 // Clear input data (all ImFontConfig structures including sizes, TTF data, glyph ranges, etc.) = all the data used to build the texture and fonts.
-ImFontAtlas_ClearInputData :: proc(this : ^ImFontAtlas)
+ClearInputData :: proc(this : ^ImFontAtlas)
 {
 	IM_ASSERT(!this.Locked, "Cannot modify a locked ImFontAtlas between NewFrame() and EndFrame/Render()!")
 	for &font_cfg in this.ConfigData.Data[:this.ConfigData.Size] {
@@ -30230,7 +30233,7 @@ ImFontAtlas_ClearInputData :: proc(this : ^ImFontAtlas)
 }
 
 // Clear output texture data (CPU side). Saves RAM once the texture has been copied to graphics memory.
-ImFontAtlas_ClearTexData :: proc(this : ^ImFontAtlas)
+ClearTexData :: proc(this : ^ImFontAtlas)
 {
 	IM_ASSERT(!this.Locked, "Cannot modify a locked ImFontAtlas between NewFrame() and EndFrame/Render()!")
 	if this.TexPixelsAlpha8 != nil { IM_FREE(this.TexPixelsAlpha8) }
@@ -30242,7 +30245,7 @@ ImFontAtlas_ClearTexData :: proc(this : ^ImFontAtlas)
 }
 
 // Clear output font data (glyphs storage, UV coordinates).
-ImFontAtlas_ClearFonts :: proc(this : ^ImFontAtlas)
+ClearFonts :: proc(this : ^ImFontAtlas)
 {
 	IM_ASSERT(!this.Locked, "Cannot modify a locked ImFontAtlas between NewFrame() and EndFrame/Render()!")
 	clear_delete(&this.Fonts)
@@ -30252,16 +30255,16 @@ ImFontAtlas_ClearFonts :: proc(this : ^ImFontAtlas)
 // Clear all input and output.
 ImFontAtlas_Clear :: proc(this : ^ImFontAtlas)
 {
-	ImFontAtlas_ClearInputData(this)
-	ImFontAtlas_ClearTexData(this)
-	ImFontAtlas_ClearFonts(this)
+	ClearInputData(this)
+	ClearTexData(this)
+	ClearFonts(this)
 }
 
 // 1 byte per-pixel
-ImFontAtlas_GetTexDataAsAlpha8 :: proc(this : ^ImFontAtlas, out_pixels : ^^u8, out_width : ^i32, out_height : ^i32, out_bytes_per_pixel : ^i32 = nil)
+GetTexDataAsAlpha8 :: proc(this : ^ImFontAtlas, out_pixels : ^^u8, out_width : ^i32, out_height : ^i32, out_bytes_per_pixel : ^i32 = nil)
 {
 	// Build atlas on demand
-	if this.TexPixelsAlpha8 == nil { ImFontAtlas_Build(this) }
+	if this.TexPixelsAlpha8 == nil { Build(this) }
 
 	out_pixels^ = this.TexPixelsAlpha8
 	if out_width != nil { out_width^ = this.TexWidth }
@@ -30270,13 +30273,13 @@ ImFontAtlas_GetTexDataAsAlpha8 :: proc(this : ^ImFontAtlas, out_pixels : ^^u8, o
 }
 
 // 4 bytes-per-pixel
-ImFontAtlas_GetTexDataAsRGBA32 :: proc(this : ^ImFontAtlas, out_pixels : ^^u8, out_width : ^i32, out_height : ^i32, out_bytes_per_pixel : ^i32 = nil)
+GetTexDataAsRGBA32 :: proc(this : ^ImFontAtlas, out_pixels : ^^u8, out_width : ^i32, out_height : ^i32, out_bytes_per_pixel : ^i32 = nil)
 {
 	// Convert to RGBA32 format on demand
 	// Although it is likely to be the most commonly used format, our font rendering is 1 channel / 8 bpp
 	if this.TexPixelsRGBA32 == nil {
 		pixels : ^u8 = nil
-		ImFontAtlas_GetTexDataAsAlpha8(this, &pixels, nil, nil)
+		GetTexDataAsAlpha8(this, &pixels, nil, nil)
 		if pixels != nil {
 			this.TexPixelsRGBA32 = cast(^u32) IM_ALLOC(cast(uint) this.TexWidth * cast(uint) this.TexHeight * 4)
 			src : ^u8 = pixels
@@ -30326,7 +30329,7 @@ ImFontAtlas_AddFont :: proc(this : ^ImFontAtlas, font_cfg : ^ImFontConfig) -> ^I
 
 	// Invalidate texture
 	this.TexReady = false
-	ImFontAtlas_ClearTexData(this)
+	ClearTexData(this)
 	return new_font_cfg.DstFont
 }
 
@@ -30343,7 +30346,7 @@ Decode85 :: proc(src : [^]u8, dst : [^]u8)
 }
 
 // Load embedded ProggyClean.ttf at size 13, disable oversampling
-ImFontAtlas_AddFontDefault :: proc(this : ^ImFontAtlas, font_cfg_template : ^ImFontConfig = nil) -> ^ImFont
+AddFontDefault :: proc(this : ^ImFontAtlas, font_cfg_template : ^ImFontConfig = nil) -> ^ImFont
 {
 	when ! IMGUI_DISABLE_DEFAULT_FONT { /* @gen ifndef */
 	font_cfg : ImFontConfig
@@ -30359,8 +30362,8 @@ ImFontAtlas_AddFontDefault :: proc(this : ^ImFontAtlas, font_cfg_template : ^ImF
 
 	ttf_compressed_size : i32 = 0
 	ttf_compressed : ^u8 = GetDefaultCompressedFontDataTTF(&ttf_compressed_size)
-	glyph_ranges : ^ImWchar = font_cfg.GlyphRanges != nil ? font_cfg.GlyphRanges : ImFontAtlas_GetGlyphRangesDefault(this)
-	font : ^ImFont = ImFontAtlas_AddFontFromMemoryCompressedTTF(this, ttf_compressed, ttf_compressed_size, font_cfg.SizePixels, &font_cfg, glyph_ranges)
+	glyph_ranges : ^ImWchar = font_cfg.GlyphRanges != nil ? font_cfg.GlyphRanges : GetGlyphRangesDefault(this)
+	font : ^ImFont = AddFontFromMemoryCompressedTTF(this, ttf_compressed, ttf_compressed_size, font_cfg.SizePixels, &font_cfg, glyph_ranges)
 	return font
 	} else { // preproc else
 	IM_ASSERT(false, "AddFontDefault() disabled in this build.")
@@ -30369,7 +30372,7 @@ ImFontAtlas_AddFontDefault :: proc(this : ^ImFontAtlas, font_cfg_template : ^ImF
 	} // preproc endif// #ifndef IMGUI_DISABLE_DEFAULT_FONT
 }
 
-ImFontAtlas_AddFontFromFileTTF :: proc(this : ^ImFontAtlas, filename : string, size_pixels : f32, font_cfg_template : ^ImFontConfig = nil, glyph_ranges : ^ImWchar = nil) -> ^ImFont
+AddFontFromFileTTF :: proc(this : ^ImFontAtlas, filename : string, size_pixels : f32, font_cfg_template : ^ImFontConfig = nil, glyph_ranges : ^ImWchar = nil) -> ^ImFont
 {
 	IM_ASSERT(!this.Locked, "Cannot modify a locked ImFontAtlas between NewFrame() and EndFrame/Render()!")
 	data_size : uint = 0
@@ -30387,12 +30390,12 @@ ImFontAtlas_AddFontFromFileTTF :: proc(this : ^ImFontAtlas, filename : string, s
 
 		ImFormatString(font_cfg.Name[:], "%s, %.0fpx", p, size_pixels)
 	}
-	return ImFontAtlas_AddFontFromMemoryTTF(this, data, cast(i32) data_size, size_pixels, &font_cfg, glyph_ranges)
+	return AddFontFromMemoryTTF(this, data, cast(i32) data_size, size_pixels, &font_cfg, glyph_ranges)
 }
 
 // Note: Transfer ownership of 'ttf_data' to ImFontAtlas! Will be deleted after destruction of the atlas. Set font_cfg->FontDataOwnedByAtlas=false to keep ownership of your data and it won't be freed.
 // NB: Transfer ownership of 'ttf_data' to ImFontAtlas, unless font_cfg_template->FontDataOwnedByAtlas == false. Owned TTF buffer will be deleted after Build().
-ImFontAtlas_AddFontFromMemoryTTF :: proc(this : ^ImFontAtlas, font_data : rawptr, font_data_size : i32, size_pixels : f32, font_cfg_template : ^ImFontConfig = nil, glyph_ranges : ^ImWchar = nil) -> ^ImFont
+AddFontFromMemoryTTF :: proc(this : ^ImFontAtlas, font_data : rawptr, font_data_size : i32, size_pixels : f32, font_cfg_template : ^ImFontConfig = nil, glyph_ranges : ^ImWchar = nil) -> ^ImFont
 {
 	IM_ASSERT(!this.Locked, "Cannot modify a locked ImFontAtlas between NewFrame() and EndFrame/Render()!")
 	font_cfg : ImFontConfig
@@ -30407,7 +30410,7 @@ ImFontAtlas_AddFontFromMemoryTTF :: proc(this : ^ImFontAtlas, font_data : rawptr
 }
 
 // 'compressed_font_data' still owned by caller. Compress with binary_to_compressed_c.cpp.
-ImFontAtlas_AddFontFromMemoryCompressedTTF :: proc(this : ^ImFontAtlas, compressed_ttf_data : rawptr, compressed_ttf_size : i32, size_pixels : f32, font_cfg_template : ^ImFontConfig = nil, glyph_ranges : ^ImWchar = nil) -> ^ImFont
+AddFontFromMemoryCompressedTTF :: proc(this : ^ImFontAtlas, compressed_ttf_data : rawptr, compressed_ttf_size : i32, size_pixels : f32, font_cfg_template : ^ImFontConfig = nil, glyph_ranges : ^ImWchar = nil) -> ^ImFont
 {
 	buf_decompressed_size : u32 = stb_decompress_length(cast(^u8) compressed_ttf_data)
 	buf_decompressed_data : ^u8 = cast(^u8) IM_ALLOC(buf_decompressed_size)
@@ -30417,16 +30420,16 @@ ImFontAtlas_AddFontFromMemoryCompressedTTF :: proc(this : ^ImFontAtlas, compress
 	if(font_cfg_template != nil) { font_cfg = font_cfg_template^ } else { init(&font_cfg) }
 	IM_ASSERT(font_cfg.FontData == nil)
 	font_cfg.FontDataOwnedByAtlas = true
-	return ImFontAtlas_AddFontFromMemoryTTF(this, buf_decompressed_data, cast(i32) buf_decompressed_size, size_pixels, &font_cfg, glyph_ranges)
+	return AddFontFromMemoryTTF(this, buf_decompressed_data, cast(i32) buf_decompressed_size, size_pixels, &font_cfg, glyph_ranges)
 }
 
 // 'compressed_font_data_base85' still owned by caller. Compress with binary_to_compressed_c.cpp with -base85 parameter.
-ImFontAtlas_AddFontFromMemoryCompressedBase85TTF :: proc(this : ^ImFontAtlas, compressed_ttf_data_base85 : ^u8, size_pixels : f32, font_cfg : ^ImFontConfig = nil, glyph_ranges : ^ImWchar = nil) -> ^ImFont
+AddFontFromMemoryCompressedBase85TTF :: proc(this : ^ImFontAtlas, compressed_ttf_data_base85 : ^u8, size_pixels : f32, font_cfg : ^ImFontConfig = nil, glyph_ranges : ^ImWchar = nil) -> ^ImFont
 {
 	compressed_ttf_size : i32 = ((cast(i32) strlen(compressed_ttf_data_base85) + 4) / 5) * 4
 	compressed_ttf : rawptr = IM_ALLOC(cast(uint) compressed_ttf_size)
 	Decode85(cast(^u8) compressed_ttf_data_base85, cast(^u8) compressed_ttf)
-	font : ^ImFont = ImFontAtlas_AddFontFromMemoryCompressedTTF(this, compressed_ttf, compressed_ttf_size, size_pixels, font_cfg, glyph_ranges)
+	font : ^ImFont = AddFontFromMemoryCompressedTTF(this, compressed_ttf, compressed_ttf_size, size_pixels, font_cfg, glyph_ranges)
 	IM_FREE(compressed_ttf)
 	return font
 }
@@ -30442,7 +30445,7 @@ ImFontAtlas_AddFontFromMemoryCompressedBase85TTF :: proc(this : ^ImFontAtlas, co
 //   so you can render e.g. custom colorful icons and use them as regular glyphs.
 // - Read docs/FONTS.md for more details about using colorful icons.
 // - Note: this API may be redesigned later in order to support multi-monitor varying DPI settings.
-ImFontAtlas_AddCustomRectRegular :: proc(this : ^ImFontAtlas, width : i32, height : i32) -> i32
+AddCustomRectRegular :: proc(this : ^ImFontAtlas, width : i32, height : i32) -> i32
 {
 	IM_ASSERT(width > 0 && width <= 0xFFFF)
 	IM_ASSERT(height > 0 && height <= 0xFFFF)
@@ -30474,7 +30477,7 @@ ImFontAtlas_AddCustomRectFontGlyph :: proc(this : ^ImFontAtlas, font : ^ImFont, 
 }
 
 // [Internal]
-ImFontAtlas_CalcCustomRectUV :: proc(this : ^ImFontAtlas, rect : ImFontAtlasCustomRect, out_uv_min : ^ImVec2, out_uv_max : ^ImVec2)
+CalcCustomRectUV :: proc(this : ^ImFontAtlas, rect : ImFontAtlasCustomRect, out_uv_min : ^ImVec2, out_uv_max : ^ImVec2)
 {
 	IM_ASSERT(this.TexWidth > 0 && this.TexHeight > 0); // Font atlas needs to be built before we can calculate UV coordinates
 	IM_ASSERT(IsPacked(rect)); // Make sure the rectangle has been packed
@@ -30482,13 +30485,13 @@ ImFontAtlas_CalcCustomRectUV :: proc(this : ^ImFontAtlas, rect : ImFontAtlasCust
 	out_uv_max^ = ImVec2{cast(f32) (rect.X + rect.Width) * this.TexUvScale.x, cast(f32) (rect.Y + rect.Height) * this.TexUvScale.y}
 }
 
-ImFontAtlas_GetMouseCursorTexData :: proc(this : ^ImFontAtlas, cursor_type : ImGuiMouseCursor, out_offset : ^ImVec2, out_size : ^ImVec2, out_uv_border : ^[2]ImVec2, out_uv_fill : ^[2]ImVec2) -> bool
+GetMouseCursorTexData :: proc(this : ^ImFontAtlas, cursor_type : ImGuiMouseCursor, out_offset : ^ImVec2, out_size : ^ImVec2, out_uv_border : ^[2]ImVec2, out_uv_fill : ^[2]ImVec2) -> bool
 {
 	if cursor_type <= ImGuiMouseCursor_.ImGuiMouseCursor_None || cursor_type >= ImGuiMouseCursor_.ImGuiMouseCursor_COUNT { return false }
 	if (this.Flags & ImFontAtlasFlags_.ImFontAtlasFlags_NoMouseCursors) != {} { return false }
 
 	IM_ASSERT(this.PackIdMouseCursors != -1)
-	r : ^ImFontAtlasCustomRect = ImFontAtlas_GetCustomRectByIndex(this, this.PackIdMouseCursors)
+	r : ^ImFontAtlasCustomRect = GetCustomRectByIndex(this, this.PackIdMouseCursors)
 	pos : ImVec2 = FONT_ATLAS_DEFAULT_TEX_CURSOR_DATA[cursor_type][0] + ImVec2{cast(f32) r.X, cast(f32) r.Y}
 	size : ImVec2 = FONT_ATLAS_DEFAULT_TEX_CURSOR_DATA[cursor_type][1]
 	out_size^ = size
@@ -30507,12 +30510,12 @@ ImFontAtlas_GetMouseCursorTexData :: proc(this : ^ImFontAtlas, cursor_type : ImG
 // Building in RGBA32 format is provided for convenience and compatibility, but note that unless you manually manipulate or copy color data into
 // the texture (e.g. when using the AddCustomRect*** api), then the RGB pixels emitted will always be white (~75% of memory/bandwidth waste.
 // Build pixels data. This is called automatically for you by the GetTexData*** functions.
-ImFontAtlas_Build :: proc(this : ^ImFontAtlas) -> bool
+Build :: proc(this : ^ImFontAtlas) -> bool
 {
 	IM_ASSERT(!this.Locked, "Cannot modify a locked ImFontAtlas between NewFrame() and EndFrame/Render()!")
 
 	// Default font is none are specified
-	if this.ConfigData.Size == 0 { ImFontAtlas_AddFontDefault(this) }
+	if this.ConfigData.Size == 0 { AddFontDefault(this) }
 
 	// Select builder
 	// - Note that we do not reassign to atlas->FontBuilderIO, since it is likely to point to static data which
@@ -31093,7 +31096,7 @@ ImFontAtlasBuildFinish :: proc(atlas : ^ImFontAtlas)
 //-----------------------------------------------------------------------------
 
 // Retrieve list of range (2 int per range, values are inclusive)
-ImFontAtlas_GetGlyphRangesDefault :: proc(this : ^ImFontAtlas) -> [^]ImWchar
+GetGlyphRangesDefault :: proc(this : ^ImFontAtlas) -> [^]ImWchar
 {
 	@(static) ranges := [?]ImWchar {
 		0x0020, 0x00FF, // Basic Latin + Latin Supplement
@@ -31423,13 +31426,13 @@ ImFont_init :: proc(this : ^ImFont)
 
 ImFont_deinit :: proc(this : ^ImFont)
 {
-	ImFont_ClearOutputData(this)
+	ClearOutputData(this)
 	deinit(&this.IndexAdvanceX)
 	deinit(&this.IndexLookup)
 	deinit(&this.Glyphs)
 }
 
-ImFont_ClearOutputData :: proc(this : ^ImFont)
+ClearOutputData :: proc(this : ^ImFont)
 {
 	this.FontSize = 0.0
 	this.FallbackAdvanceX = 0.0
@@ -31451,7 +31454,7 @@ FindFirstExistingGlyph :: proc(font : ^ImFont, candidate_chars : []ImWchar) -> I
 }
 
 // [Internal] Don't use!
-ImFont_BuildLookupTable :: proc(this : ^ImFont)
+BuildLookupTable :: proc(this : ^ImFont)
 {
 	max_codepoint : i32 = 0
 	for i : i32 = 0; i != this.Glyphs.Size; i += 1 { max_codepoint = ImMax(max_codepoint, cast(i32) this.Glyphs.Data[i].Codepoint) }
@@ -31476,13 +31479,13 @@ ImFont_BuildLookupTable :: proc(this : ^ImFont)
 
 	// Create a glyph to handle TAB
 	// FIXME: Needs proper TAB handling but it needs to be contextualized (or we could arbitrary say that each string starts at "column 0" ?)
-	if ImFont_FindGlyph(this, cast(ImWchar) ' ') != nil {
+	if FindGlyph(this, cast(ImWchar) ' ') != nil {
 		if back(&this.Glyphs).Codepoint != '\t' {
 			// So we can call this function multiple times (FIXME: Flaky)
 			resize(&this.Glyphs, this.Glyphs.Size + 1)
 		}
 		tab_glyph : ^ImFontGlyph = back(&this.Glyphs)
-		tab_glyph^ = ImFont_FindGlyph(this, cast(ImWchar) ' ')^
+		tab_glyph^ = FindGlyph(this, cast(ImWchar) ' ')^
 		tab_glyph.Codepoint = '\t'
 		tab_glyph.AdvanceX *= IM_TABSIZE
 		this.IndexAdvanceX.Data[cast(i32) tab_glyph.Codepoint] = cast(f32) tab_glyph.AdvanceX
@@ -31495,10 +31498,10 @@ ImFont_BuildLookupTable :: proc(this : ^ImFont)
 
 	// Setup Fallback character
 	fallback_chars := [?]ImWchar { IM_UNICODE_CODEPOINT_INVALID, '?', ' '}
-	this.FallbackGlyph = ImFont_FindGlyphNoFallback(this, this.FallbackChar)
+	this.FallbackGlyph = FindGlyphNoFallback(this, this.FallbackChar)
 	if this.FallbackGlyph == nil {
 		this.FallbackChar = FindFirstExistingGlyph(this, fallback_chars[:])
-		this.FallbackGlyph = ImFont_FindGlyphNoFallback(this, this.FallbackChar)
+		this.FallbackGlyph = FindGlyphNoFallback(this, this.FallbackChar)
 		if this.FallbackGlyph == nil {
 			this.FallbackGlyph = back(&this.Glyphs)
 			this.FallbackChar = cast(ImWchar) this.FallbackGlyph.Codepoint
@@ -31516,10 +31519,10 @@ ImFont_BuildLookupTable :: proc(this : ^ImFont)
 	dot_char : ImWchar = FindFirstExistingGlyph(this, dots_chars[:])
 	if this.EllipsisChar != {} {
 		this.EllipsisCharCount = 1
-		this.EllipsisCharStep = ImFont_FindGlyph(this, this.EllipsisChar).X1; this.EllipsisWidth = this.EllipsisCharStep
+		this.EllipsisCharStep = FindGlyph(this, this.EllipsisChar).X1; this.EllipsisWidth = this.EllipsisCharStep
 	}
 	else if dot_char != {} {
-		dot_glyph : ^ImFontGlyph = ImFont_FindGlyph(this, dot_char)
+		dot_glyph : ^ImFontGlyph = FindGlyph(this, dot_char)
 		this.EllipsisChar = dot_char
 		this.EllipsisCharCount = 3
 		this.EllipsisCharStep = cast(f32) cast(i32) (dot_glyph.X1 - dot_glyph.X0) + 1.0
@@ -31529,7 +31532,7 @@ ImFont_BuildLookupTable :: proc(this : ^ImFont)
 
 // API is designed this way to avoid exposing the 4K page size
 // e.g. use with IsGlyphRangeUnused(0, 255)
-ImFont_IsGlyphRangeUnused :: proc(this : ^ImFont, c_begin : u32, c_last : u32) -> bool
+IsGlyphRangeUnused :: proc(this : ^ImFont, c_begin : u32, c_last : u32) -> bool
 {
 	page_begin : u32 = (c_begin / 4096)
 	page_last : u32 = (c_last / 4096)
@@ -31540,7 +31543,7 @@ ImFont_IsGlyphRangeUnused :: proc(this : ^ImFont, c_begin : u32, c_last : u32) -
 
 ImFont_SetGlyphVisible :: proc(this : ^ImFont, c : ImWchar, visible : bool)
 {
-	if glyph : ^ImFontGlyph = cast(^ImFontGlyph) cast(rawptr) ImFont_FindGlyph(this, cast(ImWchar) c); glyph != nil { glyph.Visible = visible ? 1 : 0 }
+	if glyph : ^ImFontGlyph = cast(^ImFontGlyph) cast(rawptr) FindGlyph(this, cast(ImWchar) c); glyph != nil { glyph.Visible = visible ? 1 : 0 }
 }
 
 ImFont_GrowIndex :: proc(this : ^ImFont, new_size : i32)
@@ -31554,7 +31557,7 @@ ImFont_GrowIndex :: proc(this : ^ImFont, new_size : i32)
 // x0/y0/x1/y1 are offset from the character upper-left layout position, in pixels. Therefore x0/y0 are often fairly close to zero.
 // Not to be mistaken with texture coordinates, which are held by u0/v0/u1/v1 in normalized format (0.0..1.0 on each texture axis).
 // 'cfg' is not necessarily == 'this->ConfigData' because multiple source fonts+configs can be used to build one target font.
-ImFont_AddGlyph :: proc(this : ^ImFont, cfg : ^ImFontConfig, codepoint : ImWchar, x0 : f32, y0 : f32, x1 : f32, y1 : f32, u0 : f32, v0 : f32, u1 : f32, v1 : f32, advance_x : f32)
+AddGlyph :: proc(this : ^ImFont, cfg : ^ImFontConfig, codepoint : ImWchar, x0 : f32, y0 : f32, x1 : f32, y1 : f32, u0 : f32, v0 : f32, u1 : f32, v1 : f32, advance_x : f32)
 {
 
 	advance_x, x0, x1 := advance_x, x0, x1
@@ -31620,7 +31623,7 @@ ImFont_AddRemapChar :: proc(this : ^ImFont, dst : ImWchar, src : ImWchar, overwr
 }
 
 // Find glyph, return fallback if missing
-ImFont_FindGlyph :: proc(this : ^ImFont, c : ImWchar) -> ^ImFontGlyph
+FindGlyph :: proc(this : ^ImFont, c : ImWchar) -> ^ImFontGlyph
 {
 	if cast(uint) c >= cast(uint) this.IndexLookup.Size { return this.FallbackGlyph }
 	i : ImWchar = this.IndexLookup.Data[c]
@@ -31628,7 +31631,7 @@ ImFont_FindGlyph :: proc(this : ^ImFont, c : ImWchar) -> ^ImFontGlyph
 	return &this.Glyphs.Data[i]
 }
 
-ImFont_FindGlyphNoFallback :: proc(this : ^ImFont, c : ImWchar) -> ^ImFontGlyph
+FindGlyphNoFallback :: proc(this : ^ImFont, c : ImWchar) -> ^ImFontGlyph
 {
 	if cast(uint) c >= cast(uint) this.IndexLookup.Size { return nil }
 	i : ImWchar = this.IndexLookup.Data[c]
@@ -31742,7 +31745,7 @@ ImFont_CalcWordWrapPositionA :: proc(this : ^ImFont, scale : f32, text : [^]u8, 
 // 'max_width' stops rendering after a certain width (could be turned into a 2d size). FLT_MAX to disable.
 // 'wrap_width' enable automatic word-wrapping across multiple lines to fit into given width. 0.0f to disable.
 // utf8
-ImFont_CalcTextSizeA :: proc(this : ^ImFont, size : f32, max_width : f32, wrap_width : f32, text_begin : [^]u8, text_end : ^u8 = nil, remaining : ^int = nil) -> ImVec2
+CalcTextSizeA :: proc(this : ^ImFont, size : f32, max_width : f32, wrap_width : f32, text_begin : [^]u8, text_end : ^u8 = nil, remaining : ^int = nil) -> ImVec2
 {
 	text_end := text_end
 	if text_end == nil {
@@ -31810,10 +31813,10 @@ ImFont_CalcTextSizeA :: proc(this : ^ImFont, size : f32, max_width : f32, wrap_w
 }
 
 // Note: as with every ImDrawList drawing function, this expects that the font atlas texture is bound.
-ImFont_RenderChar :: proc(this : ^ImFont, draw_list : ^ImDrawList, size : f32, pos : ImVec2, col : ImU32, c : ImWchar)
+RenderChar :: proc(this : ^ImFont, draw_list : ^ImDrawList, size : f32, pos : ImVec2, col : ImU32, c : ImWchar)
 {
 	col := col
-	glyph : ^ImFontGlyph = ImFont_FindGlyph(this, c)
+	glyph : ^ImFontGlyph = FindGlyph(this, c)
 	if glyph == nil || glyph.Visible == 0 { return }
 	if glyph.Colored != 0 { col |= ~ImU32(IM_COL32_A_MASK) }
 	scale : f32 = (size >= 0.0) ? (size / this.FontSize) : 1.0
@@ -31877,7 +31880,7 @@ ImFont_RenderText :: proc(this : ^ImFont, draw_list : ^ImDrawList, size : f32, p
 	vtx_count_max : i32 = cast(i32) mem.ptr_sub(text_end, s) * 4
 	idx_count_max : i32 = cast(i32) mem.ptr_sub(text_end, s) * 6
 	idx_expected_size : i32 = draw_list.IdxBuffer.Size + idx_count_max
-	ImDrawList_PrimReserve(draw_list, idx_count_max, vtx_count_max)
+	PrimReserve(draw_list, idx_count_max, vtx_count_max)
 	vtx_write : [^]ImDrawVert = draw_list._VtxWritePtr
 	idx_write : [^]ImDrawIdx = draw_list._IdxWritePtr
 	vtx_index : u32 = draw_list._VtxCurrentIdx
@@ -31921,7 +31924,7 @@ ImFont_RenderText :: proc(this : ^ImFont, draw_list : ^ImDrawList, size : f32, p
 			if c == '\r' { continue }
 		}
 
-		glyph : ^ImFontGlyph = ImFont_FindGlyph(this, cast(ImWchar) c)
+		glyph : ^ImFontGlyph = FindGlyph(this, cast(ImWchar) c)
 		if glyph == nil { continue }
 
 		char_width : f32 = glyph.AdvanceX * scale
@@ -32046,7 +32049,7 @@ RenderArrow :: proc(draw_list : ^ImDrawList, pos : ImVec2, col : ImU32, dir : Im
 RenderBullet :: proc(draw_list : ^ImDrawList, pos : ImVec2, col : ImU32)
 {
 	// FIXME-OPT: This should be baked in font.
-	ImDrawList_AddCircleFilled(draw_list, pos, draw_list._Data.FontSize * 0.20, col, 8)
+	AddCircleFilled(draw_list, pos, draw_list._Data.FontSize * 0.20, col, 8)
 }
 
 RenderCheckMark :: proc(draw_list : ^ImDrawList, pos : ImVec2, col : ImU32, sz : f32)
@@ -36539,6 +36542,8 @@ ImStb_STB_TexteditState :: struct {
 	undostate : ImStb_StbUndoState,
 }
 
+ImStb_STB_TexteditState_deinit :: #force_inline proc(this : ^ImStb_STB_TexteditState) { }
+
 
 ////////////////////////////////////////////////////////////////////////
 //
@@ -36570,7 +36575,7 @@ ImStb_StbTexteditRow :: struct {
 //
 
 // traverse the layout to locate the nearest character to a display position
-ImStb_stb_text_locate_coord :: proc(str : ^IMSTB_TEXTEDIT_STRING, x : f32, y : f32) -> i32
+stb_text_locate_coord :: proc(str : ^IMSTB_TEXTEDIT_STRING, x : f32, y : f32) -> i32
 {
 	r : ImStb_StbTexteditRow
 	n : i32 = ImStb_STB_TEXTEDIT_STRINGLEN(str)
@@ -36623,7 +36628,7 @@ ImStb_stb_text_locate_coord :: proc(str : ^IMSTB_TEXTEDIT_STRING, x : f32, y : f
 
 // API click: on mouse down, move the cursor to the clicked location, and reset the selection
 // API click: on mouse down, move the cursor to the clicked location, and reset the selection
-ImStb_stb_textedit_click :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_TexteditState, x : f32, y : f32)
+stb_textedit_click :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_TexteditState, x : f32, y : f32)
 {
 	y := y
 	// In single-line mode, just always make y = 0. This lets the drag keep working if the mouse
@@ -36634,7 +36639,7 @@ ImStb_stb_textedit_click :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_ST
 		y = r.ymin
 	}
 
-	state.cursor = ImStb_stb_text_locate_coord(str, x, y)
+	state.cursor = stb_text_locate_coord(str, x, y)
 	state.select_start = state.cursor
 	state.select_end = state.cursor
 	state.has_preferred_x = 0
@@ -36642,7 +36647,7 @@ ImStb_stb_textedit_click :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_ST
 
 // API drag: on mouse drag, move the cursor and selection endpoint to the clicked location
 // API drag: on mouse drag, move the cursor and selection endpoint to the clicked location
-ImStb_stb_textedit_drag :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_TexteditState, x : f32, y : f32)
+stb_textedit_drag :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_TexteditState, x : f32, y : f32)
 {
 	p : i32 = 0
 	y := y
@@ -36657,7 +36662,7 @@ ImStb_stb_textedit_drag :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB
 
 	if state.select_start == state.select_end { state.select_start = state.cursor }
 
-	p = ImStb_stb_text_locate_coord(str, x, y)
+	p = stb_text_locate_coord(str, x, y)
 	state.select_end = p; state.cursor = state.select_end
 }
 
@@ -36672,7 +36677,7 @@ ImStb_StbFindState :: struct {
 // case we get a move-up event (for page up, we'll have to rescan)
 // find the x/y location of a character, and remember info about the previous row in
 // case we get a move-up event (for page up, we'll have to rescan)
-ImStb_stb_textedit_find_charpos :: proc(find : ^ImStb_StbFindState, str : ^IMSTB_TEXTEDIT_STRING, n : i32, single_line : bool)
+stb_textedit_find_charpos :: proc(find : ^ImStb_StbFindState, str : ^IMSTB_TEXTEDIT_STRING, n : i32, single_line : bool)
 {
 	r : ImStb_StbTexteditRow
 	prev_start : i32 = 0
@@ -36729,7 +36734,7 @@ STB_TEXT_HAS_SELECTION :: #force_inline proc "contextless" (s : $T0) -> bool
 
 // make the selection/cursor state valid if client altered the string
 // make the selection/cursor state valid if client altered the string
-ImStb_stb_textedit_clamp :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_TexteditState)
+stb_textedit_clamp :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_TexteditState)
 {
 	n : i32 = ImStb_STB_TEXTEDIT_STRINGLEN(str)
 	if STB_TEXT_HAS_SELECTION(state) {
@@ -36743,25 +36748,25 @@ ImStb_stb_textedit_clamp :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_ST
 
 // delete characters while updating undo
 // delete characters while updating undo
-ImStb_stb_textedit_delete :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_TexteditState, where_ : i32, len : i32)
+stb_textedit_delete :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_TexteditState, where_ : i32, len : i32)
 {
-	ImStb_stb_text_makeundo_delete(str, state, where_, len)
+	stb_text_makeundo_delete(str, state, where_, len)
 	ImStb_STB_TEXTEDIT_DELETECHARS(str, where_, len)
 	state.has_preferred_x = 0
 }
 
 // delete the section
 // delete the section
-ImStb_stb_textedit_delete_selection :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_TexteditState)
+stb_textedit_delete_selection :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_TexteditState)
 {
-	ImStb_stb_textedit_clamp(str, state)
+	stb_textedit_clamp(str, state)
 	if STB_TEXT_HAS_SELECTION(state) {
 		if state.select_start < state.select_end {
-			ImStb_stb_textedit_delete(str, state, state.select_start, state.select_end - state.select_start)
+			stb_textedit_delete(str, state, state.select_start, state.select_end - state.select_start)
 			state.cursor = state.select_start; state.select_end = state.cursor
 		}
 		else {
-			ImStb_stb_textedit_delete(str, state, state.select_end, state.select_start - state.select_end)
+			stb_textedit_delete(str, state, state.select_end, state.select_start - state.select_end)
 			state.cursor = state.select_end; state.select_start = state.cursor
 		}
 		state.has_preferred_x = 0
@@ -36770,7 +36775,7 @@ ImStb_stb_textedit_delete_selection :: proc(str : ^IMSTB_TEXTEDIT_STRING, state 
 
 // canoncialize the selection so start <= end
 // canoncialize the selection so start <= end
-ImStb_stb_textedit_sortselection :: proc(state : ^ImStb_STB_TexteditState)
+stb_textedit_sortselection :: proc(state : ^ImStb_STB_TexteditState)
 {
 	if state.select_end < state.select_start {
 		temp : i32 = state.select_end
@@ -36781,10 +36786,10 @@ ImStb_stb_textedit_sortselection :: proc(state : ^ImStb_STB_TexteditState)
 
 // move cursor to first character of selection
 // move cursor to first character of selection
-ImStb_stb_textedit_move_to_first :: proc(state : ^ImStb_STB_TexteditState)
+stb_textedit_move_to_first :: proc(state : ^ImStb_STB_TexteditState)
 {
 	if STB_TEXT_HAS_SELECTION(state) {
-		ImStb_stb_textedit_sortselection(state)
+		stb_textedit_sortselection(state)
 		state.cursor = state.select_start
 		state.select_end = state.select_start
 		state.has_preferred_x = 0
@@ -36793,11 +36798,11 @@ ImStb_stb_textedit_move_to_first :: proc(state : ^ImStb_STB_TexteditState)
 
 // move cursor to last character of selection
 // move cursor to last character of selection
-ImStb_stb_textedit_move_to_last :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_TexteditState)
+stb_textedit_move_to_last :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_TexteditState)
 {
 	if STB_TEXT_HAS_SELECTION(state) {
-		ImStb_stb_textedit_sortselection(state)
-		ImStb_stb_textedit_clamp(str, state)
+		stb_textedit_sortselection(state)
+		stb_textedit_clamp(str, state)
 		state.cursor = state.select_end
 		state.select_start = state.select_end
 		state.has_preferred_x = 0
@@ -36819,17 +36824,17 @@ ImStb_is_word_boundary :: proc(str : ^IMSTB_TEXTEDIT_STRING, idx : i32) -> i32
 }
 
 // update selection and cursor to match each other
-ImStb_stb_textedit_prep_selection_at_cursor :: proc(state : ^ImStb_STB_TexteditState)
+stb_textedit_prep_selection_at_cursor :: proc(state : ^ImStb_STB_TexteditState)
 {
 	if !STB_TEXT_HAS_SELECTION(state) { state.select_end = state.cursor; state.select_start = state.select_end }
 	else { state.cursor = state.select_end }
 }
 
 // API cut: delete selection
-ImStb_stb_textedit_cut :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_TexteditState) -> i32
+stb_textedit_cut :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_TexteditState) -> i32
 {
 	if STB_TEXT_HAS_SELECTION(state) {
-		ImStb_stb_textedit_delete_selection(str, state); // implicitly clamps
+		stb_textedit_delete_selection(str, state); // implicitly clamps
 		state.has_preferred_x = 0
 		return 1
 	}
@@ -36837,14 +36842,14 @@ ImStb_stb_textedit_cut :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_
 }
 
 // API paste: replace existing selection with passed-in text
-ImStb_stb_textedit_paste_internal :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_TexteditState, text : []IMSTB_TEXTEDIT_CHARTYPE) -> i32
+stb_textedit_paste_internal :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_TexteditState, text : []IMSTB_TEXTEDIT_CHARTYPE) -> i32
 {
 	// if there's a selection, the paste should delete it
-	ImStb_stb_textedit_clamp(str, state)
-	ImStb_stb_textedit_delete_selection(str, state)
+	stb_textedit_clamp(str, state)
+	stb_textedit_delete_selection(str, state)
 	// try to insert the characters
 	if ImStb_STB_TEXTEDIT_INSERTCHARS(str, state.cursor, text) {
-		ImStb_stb_text_makeundo_insert(state, state.cursor, cast(i32)len(text))
+		stb_text_makeundo_insert(state, state.cursor, cast(i32)len(text))
 		state.cursor += cast(i32)len(text)
 		state.has_preferred_x = 0
 		return 1
@@ -36857,13 +36862,13 @@ STB_TEXTEDIT_KEYTYPE :: i32
 
 // [DEAR IMGUI] Added stb_textedit_text(), extracted out and called by stb_textedit_key() for backward compatibility.
 // [DEAR IMGUI] Added stb_textedit_text(), extracted out and called by stb_textedit_key() for backward compatibility.
-ImStb_stb_textedit_text :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_TexteditState, text : []IMSTB_TEXTEDIT_CHARTYPE)
+stb_textedit_text :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_TexteditState, text : []IMSTB_TEXTEDIT_CHARTYPE)
 {
 	// can't add newline in single-line mode
 	if text[0] == '\n' && state.single_line { return }
 
 	if state.insert_mode && !STB_TEXT_HAS_SELECTION(state) && state.cursor < ImStb_STB_TEXTEDIT_STRINGLEN(str) {
-		ImStb_stb_text_makeundo_replace(str, state, state.cursor, 1, 1)
+		stb_text_makeundo_replace(str, state, state.cursor, 1, 1)
 		ImStb_STB_TEXTEDIT_DELETECHARS(str, state.cursor, 1)
 		if ImStb_STB_TEXTEDIT_INSERTCHARS(str, state.cursor, text) {
 			state.cursor += cast(i32)len(text)
@@ -36871,9 +36876,9 @@ ImStb_stb_textedit_text :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB
 		}
 	}
 	else {
-		ImStb_stb_textedit_delete_selection(str, state); // implicitly clamps
+		stb_textedit_delete_selection(str, state); // implicitly clamps
 		if ImStb_STB_TEXTEDIT_INSERTCHARS(str, state.cursor, text) {
-			ImStb_stb_text_makeundo_insert(state, state.cursor, cast(i32)len(text))
+			stb_text_makeundo_insert(state, state.cursor, cast(i32)len(text))
 			state.cursor += cast(i32)len(text)
 			state.has_preferred_x = 0
 		}
@@ -36882,7 +36887,7 @@ ImStb_stb_textedit_text :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB
 
 // API key: process a keyboard input
 // API key: process a keyboard input
-ImStb_stb_textedit_key :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_TexteditState, key : STB_TEXTEDIT_KEYTYPE)
+stb_textedit_key :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_TexteditState, key : STB_TEXTEDIT_KEYTYPE)
 {
 	retry: for {
 
@@ -36892,7 +36897,7 @@ ImStb_stb_textedit_key :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_
 				// c : i32 = STB_TEXTEDIT_KEYTOTEXT(key)
 				// if c > 0 {
 				// 	ch : IMSTB_TEXTEDIT_CHARTYPE = cast(IMSTB_TEXTEDIT_CHARTYPE) c
-				// 	ImStb_stb_textedit_text(str, state, &ch, 1)
+				// 	stb_textedit_text(str, state, &ch, 1)
 				// }
 				// } // preproc endif
 				break
@@ -36907,20 +36912,20 @@ ImStb_stb_textedit_key :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_
 
 
 			case STB_TEXTEDIT_K_UNDO:
-				ImStb_stb_text_undo(str, state)
+				stb_text_undo(str, state)
 				state.has_preferred_x = 0
 				break
 
 
 			case STB_TEXTEDIT_K_REDO:
-				ImStb_stb_text_redo(str, state)
+				stb_text_redo(str, state)
 				state.has_preferred_x = 0
 				break
 
 
 			case STB_TEXTEDIT_K_LEFT:
 				// if currently there's a selection, move cursor to start of selection
-				if STB_TEXT_HAS_SELECTION(state) { ImStb_stb_textedit_move_to_first(state) }
+				if STB_TEXT_HAS_SELECTION(state) { stb_textedit_move_to_first(state) }
 				else if state.cursor > 0 { state.cursor = IMSTB_TEXTEDIT_GETPREVCHARINDEX(str, state.cursor) }
 				state.has_preferred_x = 0
 				break
@@ -36928,16 +36933,16 @@ ImStb_stb_textedit_key :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_
 
 			case STB_TEXTEDIT_K_RIGHT:
 				// if currently there's a selection, move cursor to end of selection
-				if STB_TEXT_HAS_SELECTION(state) { ImStb_stb_textedit_move_to_last(str, state) }
+				if STB_TEXT_HAS_SELECTION(state) { stb_textedit_move_to_last(str, state) }
 				else { state.cursor = IMSTB_TEXTEDIT_GETNEXTCHARINDEX(str, state.cursor) }
-				ImStb_stb_textedit_clamp(str, state)
+				stb_textedit_clamp(str, state)
 				state.has_preferred_x = 0
 				break
 
 
 			case STB_TEXTEDIT_K_LEFT | STB_TEXTEDIT_K_SHIFT:
-				ImStb_stb_textedit_clamp(str, state)
-				ImStb_stb_textedit_prep_selection_at_cursor(state)
+				stb_textedit_clamp(str, state)
+				stb_textedit_prep_selection_at_cursor(state)
 				// move selection left
 				if state.select_end > 0 { state.select_end = IMSTB_TEXTEDIT_GETPREVCHARINDEX(str, state.select_end) }
 				state.cursor = state.select_end
@@ -36947,10 +36952,10 @@ ImStb_stb_textedit_key :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_
 				
 			case STB_TEXTEDIT_K_WORDLEFT:
 			//when STB_TEXTEDIT_MOVEWORDLEFT { /* @gen ifdef */
-				if STB_TEXT_HAS_SELECTION(state) { ImStb_stb_textedit_move_to_first(state) }
+				if STB_TEXT_HAS_SELECTION(state) { stb_textedit_move_to_first(state) }
 				else {
 					state.cursor = STB_TEXTEDIT_MOVEWORDLEFT(str, state.cursor)
-					ImStb_stb_textedit_clamp(str, state)
+					stb_textedit_clamp(str, state)
 				}
 				break
 			//}
@@ -36958,42 +36963,42 @@ ImStb_stb_textedit_key :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_
 
 			case STB_TEXTEDIT_K_WORDLEFT | STB_TEXTEDIT_K_SHIFT:
 				//when STB_TEXTEDIT_MOVEWORDLEFT { /* @gen ifdef */
-				if !STB_TEXT_HAS_SELECTION(state) { ImStb_stb_textedit_prep_selection_at_cursor(state) }
+				if !STB_TEXT_HAS_SELECTION(state) { stb_textedit_prep_selection_at_cursor(state) }
 
 				state.cursor = STB_TEXTEDIT_MOVEWORDLEFT(str, state.cursor)
 				state.select_end = state.cursor
 
-				ImStb_stb_textedit_clamp(str, state)
+				stb_textedit_clamp(str, state)
 				break
 				//} // preproc endif
 
 				// when STB_TEXTEDIT_MOVEWORDRIGHT { /* @gen ifdef */
 
 			case STB_TEXTEDIT_K_WORDRIGHT:
-				if STB_TEXT_HAS_SELECTION(state) { ImStb_stb_textedit_move_to_last(str, state) }
+				if STB_TEXT_HAS_SELECTION(state) { stb_textedit_move_to_last(str, state) }
 				else {
 					state.cursor = STB_TEXTEDIT_MOVEWORDRIGHT(str, state.cursor)
-					ImStb_stb_textedit_clamp(str, state)
+					stb_textedit_clamp(str, state)
 				}
 				break
 
 
 			case STB_TEXTEDIT_K_WORDRIGHT | STB_TEXTEDIT_K_SHIFT:
-				if !STB_TEXT_HAS_SELECTION(state) { ImStb_stb_textedit_prep_selection_at_cursor(state) }
+				if !STB_TEXT_HAS_SELECTION(state) { stb_textedit_prep_selection_at_cursor(state) }
 
 				state.cursor = STB_TEXTEDIT_MOVEWORDRIGHT(str, state.cursor)
 				state.select_end = state.cursor
 
-				ImStb_stb_textedit_clamp(str, state)
+				stb_textedit_clamp(str, state)
 				break
 				// } // preproc endif
 
 
 			case STB_TEXTEDIT_K_RIGHT | STB_TEXTEDIT_K_SHIFT:
-				ImStb_stb_textedit_prep_selection_at_cursor(state)
+				stb_textedit_prep_selection_at_cursor(state)
 				// move selection right
 				state.select_end = IMSTB_TEXTEDIT_GETNEXTCHARINDEX(str, state.select_end)
-				ImStb_stb_textedit_clamp(str, state)
+				stb_textedit_clamp(str, state)
 				state.cursor = state.select_end
 				state.has_preferred_x = 0
 				break
@@ -37019,12 +37024,12 @@ ImStb_stb_textedit_key :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_
 					continue retry /* @gen goto: validate direction */
 				}
 
-				if sel != false { ImStb_stb_textedit_prep_selection_at_cursor(state) }
-				else if STB_TEXT_HAS_SELECTION(state) { ImStb_stb_textedit_move_to_last(str, state) }
+				if sel != false { stb_textedit_prep_selection_at_cursor(state) }
+				else if STB_TEXT_HAS_SELECTION(state) { stb_textedit_move_to_last(str, state) }
 
 				// compute current position of cursor point
-				ImStb_stb_textedit_clamp(str, state)
-				ImStb_stb_textedit_find_charpos(&find, str, state.cursor, state.single_line)
+				stb_textedit_clamp(str, state)
+				stb_textedit_find_charpos(&find, str, state.cursor, state.single_line)
 
 				for j = 0; j < row_count; j += 1 {
 					x : f32; goal_x : f32 = state.has_preferred_x != 0 ? state.preferred_x : find.x
@@ -37050,7 +37055,7 @@ ImStb_stb_textedit_key :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_
 						state.cursor = IMSTB_TEXTEDIT_GETNEXTCHARINDEX(str, state.cursor)
 					}
 
-					ImStb_stb_textedit_clamp(str, state)
+					stb_textedit_clamp(str, state)
 
 					state.has_preferred_x = 1
 					state.preferred_x = goal_x
@@ -37086,12 +37091,12 @@ ImStb_stb_textedit_key :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_
 					continue retry /* @gen goto: validate direction */
 				}
 
-				if sel != false { ImStb_stb_textedit_prep_selection_at_cursor(state) }
-				else if STB_TEXT_HAS_SELECTION(state) { ImStb_stb_textedit_move_to_first(state) }
+				if sel != false { stb_textedit_prep_selection_at_cursor(state) }
+				else if STB_TEXT_HAS_SELECTION(state) { stb_textedit_move_to_first(state) }
 
 				// compute current position of cursor point
-				ImStb_stb_textedit_clamp(str, state)
-				ImStb_stb_textedit_find_charpos(&find, str, state.cursor, state.single_line)
+				stb_textedit_clamp(str, state)
+				stb_textedit_find_charpos(&find, str, state.cursor, state.single_line)
 
 				for j = 0; j < row_count; j += 1 {
 					x : f32; goal_x : f32 = state.has_preferred_x != 0 ? state.preferred_x : find.x
@@ -37113,7 +37118,7 @@ ImStb_stb_textedit_key :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_
 						state.cursor = IMSTB_TEXTEDIT_GETNEXTCHARINDEX(str, state.cursor)
 					}
 
-					ImStb_stb_textedit_clamp(str, state)
+					stb_textedit_clamp(str, state)
 
 					state.has_preferred_x = 1
 					state.preferred_x = goal_x
@@ -37136,10 +37141,10 @@ ImStb_stb_textedit_key :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_
 			case STB_TEXTEDIT_K_DELETE:
 				fallthrough
 			case STB_TEXTEDIT_K_DELETE | STB_TEXTEDIT_K_SHIFT:
-				if STB_TEXT_HAS_SELECTION(state) { ImStb_stb_textedit_delete_selection(str, state) }
+				if STB_TEXT_HAS_SELECTION(state) { stb_textedit_delete_selection(str, state) }
 				else {
 					n : i32 = ImStb_STB_TEXTEDIT_STRINGLEN(str)
-					if state.cursor < n { ImStb_stb_textedit_delete(str, state, state.cursor, IMSTB_TEXTEDIT_GETNEXTCHARINDEX(str, state.cursor) - state.cursor) }
+					if state.cursor < n { stb_textedit_delete(str, state, state.cursor, IMSTB_TEXTEDIT_GETNEXTCHARINDEX(str, state.cursor) - state.cursor) }
 				}
 				state.has_preferred_x = 0
 				break
@@ -37148,12 +37153,12 @@ ImStb_stb_textedit_key :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_
 			case STB_TEXTEDIT_K_BACKSPACE:
 				fallthrough
 			case STB_TEXTEDIT_K_BACKSPACE | STB_TEXTEDIT_K_SHIFT:
-				if STB_TEXT_HAS_SELECTION(state) { ImStb_stb_textedit_delete_selection(str, state) }
+				if STB_TEXT_HAS_SELECTION(state) { stb_textedit_delete_selection(str, state) }
 				else {
-					ImStb_stb_textedit_clamp(str, state)
+					stb_textedit_clamp(str, state)
 					if state.cursor > 0 {
 						prev : i32 = IMSTB_TEXTEDIT_GETPREVCHARINDEX(str, state.cursor)
-						ImStb_stb_textedit_delete(str, state, prev, state.cursor - prev)
+						stb_textedit_delete(str, state, prev, state.cursor - prev)
 						state.cursor = prev
 					}
 				}
@@ -37187,7 +37192,7 @@ ImStb_stb_textedit_key :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_
 			// 	} // preproc endif
 			// 	fallthrough
 			case STB_TEXTEDIT_K_TEXTSTART | STB_TEXTEDIT_K_SHIFT:
-				ImStb_stb_textedit_prep_selection_at_cursor(state)
+				stb_textedit_prep_selection_at_cursor(state)
 				state.select_end = 0; state.cursor = state.select_end
 				state.has_preferred_x = 0
 				break
@@ -37198,7 +37203,7 @@ ImStb_stb_textedit_key :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_
 			// 	} // preproc endif
 			// 	fallthrough
 			case STB_TEXTEDIT_K_TEXTEND | STB_TEXTEDIT_K_SHIFT:
-				ImStb_stb_textedit_prep_selection_at_cursor(state)
+				stb_textedit_prep_selection_at_cursor(state)
 				state.select_end = ImStb_STB_TEXTEDIT_STRINGLEN(str); state.cursor = state.select_end
 				state.has_preferred_x = 0
 				break
@@ -37210,8 +37215,8 @@ ImStb_stb_textedit_key :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_
 			// 	} // preproc endif
 			// 	fallthrough
 			case STB_TEXTEDIT_K_LINESTART:
-				ImStb_stb_textedit_clamp(str, state)
-				ImStb_stb_textedit_move_to_first(state)
+				stb_textedit_clamp(str, state)
+				stb_textedit_move_to_first(state)
 				if state.single_line != false { state.cursor = 0 }
 				else { for state.cursor > 0 && ImStb_STB_TEXTEDIT_GETCHAR(str, state.cursor - 1) != STB_TEXTEDIT_NEWLINE { pre_decr(&state.cursor) } }
 				state.has_preferred_x = 0
@@ -37224,8 +37229,8 @@ ImStb_stb_textedit_key :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_
 			// 	fallthrough
 			case STB_TEXTEDIT_K_LINEEND:{
 				n : i32 = ImStb_STB_TEXTEDIT_STRINGLEN(str)
-				ImStb_stb_textedit_clamp(str, state)
-				ImStb_stb_textedit_move_to_first(state)
+				stb_textedit_clamp(str, state)
+				stb_textedit_move_to_first(state)
 				if state.single_line != false { state.cursor = n }
 				else { for state.cursor < n && ImStb_STB_TEXTEDIT_GETCHAR(str, state.cursor) != STB_TEXTEDIT_NEWLINE { pre_incr(&state.cursor) } }
 				state.has_preferred_x = 0
@@ -37238,8 +37243,8 @@ ImStb_stb_textedit_key :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_
 			// 	} // preproc endif
 				fallthrough
 			case STB_TEXTEDIT_K_LINESTART | STB_TEXTEDIT_K_SHIFT:
-				ImStb_stb_textedit_clamp(str, state)
-				ImStb_stb_textedit_prep_selection_at_cursor(state)
+				stb_textedit_clamp(str, state)
+				stb_textedit_prep_selection_at_cursor(state)
 				if state.single_line != false { state.cursor = 0 }
 				else { for state.cursor > 0 && ImStb_STB_TEXTEDIT_GETCHAR(str, state.cursor - 1) != STB_TEXTEDIT_NEWLINE { pre_decr(&state.cursor) } }
 				state.select_end = state.cursor
@@ -37253,8 +37258,8 @@ ImStb_stb_textedit_key :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_
 			// 	fallthrough
 			case STB_TEXTEDIT_K_LINEEND | STB_TEXTEDIT_K_SHIFT:{
 				n : i32 = ImStb_STB_TEXTEDIT_STRINGLEN(str)
-				ImStb_stb_textedit_clamp(str, state)
-				ImStb_stb_textedit_prep_selection_at_cursor(state)
+				stb_textedit_clamp(str, state)
+				stb_textedit_prep_selection_at_cursor(state)
 				if state.single_line != false { state.cursor = n }
 				else { for state.cursor < n && ImStb_STB_TEXTEDIT_GETCHAR(str, state.cursor) != STB_TEXTEDIT_NEWLINE { pre_incr(&state.cursor) } }
 				state.select_end = state.cursor
@@ -37279,7 +37284,7 @@ ImStb_stb_textedit_key :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_
 //
 // @OPTIMIZE: the undo/redo buffer should be circular
 
-ImStb_stb_textedit_flush_redo :: proc(state : ^ImStb_StbUndoState)
+stb_textedit_flush_redo :: proc(state : ^ImStb_StbUndoState)
 {
 	state.redo_point = IMSTB_TEXTEDIT_UNDOSTATECOUNT
 	state.redo_char_point = IMSTB_TEXTEDIT_UNDOCHARCOUNT
@@ -37287,7 +37292,7 @@ ImStb_stb_textedit_flush_redo :: proc(state : ^ImStb_StbUndoState)
 
 // discard the oldest entry in the undo list
 // discard the oldest entry in the undo list
-ImStb_stb_textedit_discard_undo :: proc(state : ^ImStb_StbUndoState)
+stb_textedit_discard_undo :: proc(state : ^ImStb_StbUndoState)
 {
 	if state.undo_point > 0 {
 		// if the 0th undo state has characters, clean those up
@@ -37316,7 +37321,7 @@ ImStb_stb_textedit_discard_undo :: proc(state : ^ImStb_StbUndoState)
 // ever happens, but because undo & redo have to store the actual
 // characters in different cases, the redo character buffer can
 // fill up even though the undo buffer didn't
-ImStb_stb_textedit_discard_redo :: proc(state : ^ImStb_StbUndoState)
+stb_textedit_discard_redo :: proc(state : ^ImStb_StbUndoState)
 {
 	k : i16 = IMSTB_TEXTEDIT_UNDOSTATECOUNT - 1
 
@@ -37344,14 +37349,14 @@ ImStb_stb_textedit_discard_redo :: proc(state : ^ImStb_StbUndoState)
 	}
 }
 
-ImStb_stb_text_create_undo_record :: proc(state : ^ImStb_StbUndoState, numchars : i32) -> ^ImStb_StbUndoRecord
+stb_text_create_undo_record :: proc(state : ^ImStb_StbUndoState, numchars : i32) -> ^ImStb_StbUndoRecord
 {
 	// any time we create a new undo record, we discard redo
-	ImStb_stb_textedit_flush_redo(state)
+	stb_textedit_flush_redo(state)
 
 	// if we have no free records, we have to make room, by sliding the
 	// existing records down
-	if state.undo_point == IMSTB_TEXTEDIT_UNDOSTATECOUNT { ImStb_stb_textedit_discard_undo(state) }
+	if state.undo_point == IMSTB_TEXTEDIT_UNDOSTATECOUNT { stb_textedit_discard_undo(state) }
 
 	// if the characters to store won't possibly fit in the buffer, we can't undo
 	if numchars > IMSTB_TEXTEDIT_UNDOCHARCOUNT {
@@ -37361,14 +37366,14 @@ ImStb_stb_text_create_undo_record :: proc(state : ^ImStb_StbUndoState, numchars 
 	}
 
 	// if we don't have enough free characters in the buffer, we have to make room
-	for state.undo_char_point + numchars > IMSTB_TEXTEDIT_UNDOCHARCOUNT { ImStb_stb_textedit_discard_undo(state) }
+	for state.undo_char_point + numchars > IMSTB_TEXTEDIT_UNDOCHARCOUNT { stb_textedit_discard_undo(state) }
 
 	return &state.undo_rec[post_incr(&state.undo_point)]
 }
 
-ImStb_stb_text_createundo :: proc(state : ^ImStb_StbUndoState, pos : i32, insert_len : i32, delete_len : i32) -> [^]IMSTB_TEXTEDIT_CHARTYPE
+stb_text_createundo :: proc(state : ^ImStb_StbUndoState, pos : i32, insert_len : i32, delete_len : i32) -> [^]IMSTB_TEXTEDIT_CHARTYPE
 {
-	r : ^ImStb_StbUndoRecord = ImStb_stb_text_create_undo_record(state, insert_len)
+	r : ^ImStb_StbUndoRecord = stb_text_create_undo_record(state, insert_len)
 	if r == nil { return nil }
 
 	r.where_ = pos
@@ -37398,7 +37403,7 @@ ImStb_stb_text_createundo :: proc(state : ^ImStb_StbUndoState, pos : i32, insert
 //
 
 // forward declarations
-ImStb_stb_text_undo :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_TexteditState)
+stb_text_undo :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_TexteditState)
 {
 	s : ^ImStb_StbUndoState = &state.undostate
 	u : ImStb_StbUndoRecord; r : ^ImStb_StbUndoRecord
@@ -37436,7 +37441,7 @@ ImStb_stb_text_undo :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_Tex
 				// should never happen:
 				if s.redo_point == IMSTB_TEXTEDIT_UNDOSTATECOUNT { return }
 				// there's currently not enough room, so discard a redo record
-				ImStb_stb_textedit_discard_redo(s)
+				stb_textedit_discard_redo(s)
 			}
 
 			r = &s.undo_rec[s.redo_point - 1]
@@ -37465,7 +37470,7 @@ ImStb_stb_text_undo :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_Tex
 	post_decr(&s.redo_point)
 }
 
-ImStb_stb_text_redo :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_TexteditState)
+stb_text_redo :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_TexteditState)
 {
 	s : ^ImStb_StbUndoState = &state.undostate
 	u : ^ImStb_StbUndoRecord; r : ImStb_StbUndoRecord
@@ -37515,24 +37520,24 @@ ImStb_stb_text_redo :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_Tex
 	post_incr(&s.redo_point)
 }
 
-ImStb_stb_text_makeundo_insert :: proc(state : ^ImStb_STB_TexteditState, where_ : i32, length : i32)
+stb_text_makeundo_insert :: proc(state : ^ImStb_STB_TexteditState, where_ : i32, length : i32)
 {
-	ImStb_stb_text_createundo(&state.undostate, where_, 0, length)
+	stb_text_createundo(&state.undostate, where_, 0, length)
 }
 
-ImStb_stb_text_makeundo_delete :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_TexteditState, where_ : i32, length : i32)
+stb_text_makeundo_delete :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_TexteditState, where_ : i32, length : i32)
 {
 	i : i32
-	p : [^]IMSTB_TEXTEDIT_CHARTYPE = ImStb_stb_text_createundo(&state.undostate, where_, length, 0)
+	p : [^]IMSTB_TEXTEDIT_CHARTYPE = stb_text_createundo(&state.undostate, where_, length, 0)
 	if p != nil {
 		for i = 0; i < length; i += 1 { p[i] = ImStb_STB_TEXTEDIT_GETCHAR(str, where_ + i) }
 	}
 }
 
-ImStb_stb_text_makeundo_replace :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_TexteditState, where_ : i32, old_length : i32, new_length : i32)
+stb_text_makeundo_replace :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_TexteditState, where_ : i32, old_length : i32, new_length : i32)
 {
 	i : i32
-	p : [^]IMSTB_TEXTEDIT_CHARTYPE = ImStb_stb_text_createundo(&state.undostate, where_, old_length, new_length)
+	p : [^]IMSTB_TEXTEDIT_CHARTYPE = stb_text_createundo(&state.undostate, where_, old_length, new_length)
 	if p != nil {
 		for i = 0; i < old_length; i += 1 { p[i] = ImStb_STB_TEXTEDIT_GETCHAR(str, where_ + i) }
 	}
@@ -37540,7 +37545,7 @@ ImStb_stb_text_makeundo_replace :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^I
 
 // reset the state to default
 // reset the state to default
-ImStb_stb_textedit_clear_state :: proc(state : ^ImStb_STB_TexteditState, is_single_line : bool)
+stb_textedit_clear_state :: proc(state : ^ImStb_STB_TexteditState, is_single_line : bool)
 {
 	state.undostate.undo_point = 0
 	state.undostate.undo_char_point = 0
@@ -37558,14 +37563,14 @@ ImStb_stb_textedit_clear_state :: proc(state : ^ImStb_STB_TexteditState, is_sing
 }
 
 // API initialize
-ImStb_stb_textedit_initialize_state :: proc(state : ^ImStb_STB_TexteditState, is_single_line : bool)
+stb_textedit_initialize_state :: proc(state : ^ImStb_STB_TexteditState, is_single_line : bool)
 {
-	ImStb_stb_textedit_clear_state(state, is_single_line)
+	stb_textedit_clear_state(state, is_single_line)
 }
 
-ImStb_stb_textedit_paste :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_TexteditState, ctext : []IMSTB_TEXTEDIT_CHARTYPE) -> i32
+stb_textedit_paste :: proc(str : ^IMSTB_TEXTEDIT_STRING, state : ^ImStb_STB_TexteditState, ctext : []IMSTB_TEXTEDIT_CHARTYPE) -> i32
 {
-	return ImStb_stb_textedit_paste_internal(str, state, ctext)
+	return stb_textedit_paste_internal(str, state, ctext)
 }
 
 /*
@@ -37611,9 +37616,9 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 // stb_textedit internally allows for a single undo record to do addition and deletion, but somehow, calling
 // the stb_textedit_paste() function creates two separate records, so we perform it manually. (FIXME: Report to nothings/stb?)
-ImStb_stb_textedit_replace :: proc(str : ^ImGuiInputTextState, state : ^ImStb_STB_TexteditState, text : []IMSTB_TEXTEDIT_CHARTYPE)
+stb_textedit_replace :: proc(str : ^ImGuiInputTextState, state : ^ImStb_STB_TexteditState, text : []IMSTB_TEXTEDIT_CHARTYPE)
 {
-	ImStb_stb_text_makeundo_replace(str, state, 0, str.TextLen, cast(i32)len(text))
+	stb_text_makeundo_replace(str, state, 0, str.TextLen, cast(i32)len(text))
 	ImStb_STB_TEXTEDIT_DELETECHARS(str, 0, str.TextLen)
 	state.select_end = 0; state.select_start = state.select_end; state.cursor = state.select_start
 	if len(text) <= 0 { return }
@@ -37644,29 +37649,29 @@ ImGuiInputTextState_deinit :: proc(this : ^ImGuiInputTextState)
 }
 
 // Cannot be inline because we call in code in stb_textedit.h implementation
-ImGuiInputTextState_OnKeyPressed :: proc(this : ^ImGuiInputTextState, key : i32)
+OnKeyPressed :: proc(this : ^ImGuiInputTextState, key : i32)
 {
-	ImStb_stb_textedit_key(this, this.Stb, key)
+	stb_textedit_key(this, this.Stb, key)
 	this.CursorFollow = true
-	ImGuiInputTextState_CursorAnimReset(this)
+	CursorAnimReset(this)
 }
 
-ImGuiInputTextState_OnCharPressed :: proc(this : ^ImGuiInputTextState, c : u32)
+OnCharPressed :: proc(this : ^ImGuiInputTextState, c : u32)
 {
 	// Convert the key to a UTF8 byte sequence.
 	// The changes we had to make to stb_textedit_key made it very much UTF-8 specific which is not too great.
 	utf8 : [5]u8
 	ImTextCharToUtf8(&utf8, c)
-	ImStb_stb_textedit_text(this, this.Stb, raw_data(&utf8)[:strlen(raw_data(&utf8))])
+	stb_textedit_text(this, this.Stb, raw_data(&utf8)[:strlen(raw_data(&utf8))])
 	this.CursorFollow = true
-	ImGuiInputTextState_CursorAnimReset(this)
+	CursorAnimReset(this)
 }
 
 // Cursor & Selection
 // Those functions are not inlined in imgui_internal.h, allowing us to hide ImStbTexteditState from that header.
 // After a user-input the cursor stays on for a while without blinking
-ImGuiInputTextState_CursorAnimReset :: proc(this : ^ImGuiInputTextState) { this.CursorAnim = -0.30 }
-ImGuiInputTextState_CursorClamp :: proc(this : ^ImGuiInputTextState)
+CursorAnimReset :: proc(this : ^ImGuiInputTextState) { this.CursorAnim = -0.30 }
+CursorClamp :: proc(this : ^ImGuiInputTextState)
 {
 	this.Stb.cursor = ImMin(this.Stb.cursor, this.TextLen); this.Stb.select_start = ImMin(this.Stb.select_start, this.TextLen); this.Stb.select_end = ImMin(this.Stb.select_end, this.TextLen)
 }
@@ -37851,7 +37856,7 @@ InputTextReconcileUndoState :: proc(state : ^ImGuiInputTextState, old_buf : []u8
 
 	insert_len : i32 = new_last_diff - first_diff + 1
 	delete_len : i32 = old_last_diff - first_diff + 1
-	if insert_len > 0 || delete_len > 0 { if p := ImStb_stb_text_createundo(&state.Stb.undostate, first_diff, delete_len, insert_len); p != nil { for i : i32 = 0; i < delete_len; i += 1 { p[i] = old_buf[first_diff + i] } } }
+	if insert_len > 0 || delete_len > 0 { if p := stb_text_createundo(&state.Stb.undostate, first_diff, delete_len, insert_len); p != nil { for i : i32 = 0; i < delete_len; i += 1 { p[i] = old_buf[first_diff + i] } } }
 }
 
 // As InputText() retain textual data and we currently provide a path for user to not retain it (via local variables)
@@ -38153,10 +38158,10 @@ InputTextEx :: proc(label : string, hint : string, buf : []u8, size_arg : ImVec2
 				is_bol : bool = (state.Stb.cursor == 0) || ImStb_STB_TEXTEDIT_GETCHAR(state, state.Stb.cursor - 1) == '\n'
 				if STB_TEXT_HAS_SELECTION(state.Stb) || !is_bol { OnKeyPressed(state, STB_TEXTEDIT_K_WORDLEFT) }
 				//state->OnKeyPressed(STB_TEXTEDIT_K_WORDRIGHT | STB_TEXTEDIT_K_SHIFT);
-				if !STB_TEXT_HAS_SELECTION(state.Stb) { ImStb_stb_textedit_prep_selection_at_cursor(state.Stb) }
+				if !STB_TEXT_HAS_SELECTION(state.Stb) { stb_textedit_prep_selection_at_cursor(state.Stb) }
 				state.Stb.cursor = ImStb_STB_TEXTEDIT_MOVEWORDRIGHT_MAC(state, state.Stb.cursor)
 				state.Stb.select_end = state.Stb.cursor
-				ImStb_stb_textedit_clamp(state, state.Stb)
+				stb_textedit_clamp(state, state.Stb)
 			}
 			else {
 				// Triple-click: Select line
@@ -41611,7 +41616,7 @@ Value_3 :: proc(prefix : ^u8, v : f32, float_format : ^u8)
 //-------------------------------------------------------------------------
 
 // Helpers for internal use
-ImGuiMenuColumns_Update :: proc(this : ^ImGuiMenuColumns, spacing : f32, window_reappearing : bool)
+Update :: proc(this : ^ImGuiMenuColumns, spacing : f32, window_reappearing : bool)
 {
 	if window_reappearing { this.Widths = 0 }
 	this.Spacing = cast(ImU16) spacing
@@ -41640,7 +41645,7 @@ ImGuiMenuColumns_CalcNextTotalWidth :: proc(this : ^ImGuiMenuColumns, update_off
 	this.NextTotalWidth = u32(offset)
 }
 
-ImGuiMenuColumns_DeclColumns :: proc(this : ^ImGuiMenuColumns, w_icon : f32, w_label : f32, w_shortcut : f32, w_mark : f32) -> f32
+DeclColumns :: proc(this : ^ImGuiMenuColumns, w_icon : f32, w_label : f32, w_shortcut : f32, w_mark : f32) -> f32
 {
 	this.Widths[0] = ImMax(this.Widths[0], cast(ImU16) w_icon)
 	this.Widths[1] = ImMax(this.Widths[1], cast(ImU16) w_label)

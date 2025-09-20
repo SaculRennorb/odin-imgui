@@ -138,12 +138,7 @@ slice_from_se :: #force_inline proc(start : [^]$T, end : ^T) -> []T
 	return start[:mem.ptr_sub(end, cast(^T)start)]
 }
 
-appendfv :: ImGuiTextBuffer_appendfv
-appendf :: ImGuiTextBuffer_appendf
-
 append :: proc { ImGuiTextIndex_append, ImGuiTextBuffer_append, ImGuiTextBuffer_append2 }
-
-c_str :: ImGuiTextBuffer_c_str
 
 memcpy :: mem.copy_non_overlapping
 
@@ -190,18 +185,9 @@ empty :: proc { ImVector_empty, ImChunkStream_empty, ImGuiTextBuffer_empty, ImGu
 
 size :: proc { ImSpan_size, ImVector_size, ImGuiTextBuffer_size, ImChunkStream_size, ImGuiTextIndex_size }
 
-pop_back :: proc { ImVector_pop_back }
-
 push_back :: proc { ImVector_push_back, ImTriangulatorNodeSpan_push_back }
-push_front :: proc { ImVector_push_front }
-
-reserve_discard :: ImVector_reserve_discard
-
-find_erase :: ImVector_find_erase
 
 Remove :: proc { ImPool_Remove_0, ImPool_Remove_1 }
-
-find :: ImVector_find
 
 set :: proc { ImSpan_set_0, ImSpan_set_1 }
 
@@ -209,43 +195,23 @@ AddText :: proc { ImDrawList_AddText_0, ImDrawList_AddText_1 }
 
 Contains :: proc { ImRect_Contains_0, ImRect_Contains_1, ImPool_Contains, ImGuiSelectionBasicStorage_Contains }
 
-front :: proc { ImVector_front }
-
 resize :: proc { ImVector_resize_0, ImVector_resize_1 }
 
 reserve :: proc { ImVector_reserve, ImGuiTextBuffer_reserve }
 
 begin :: proc{ ImChunkStream_begin, ImGuiTextBuffer_begin, ImVector_begin }
 end :: proc{ ImChunkStream_end, ImGuiTextBuffer_end, ImVector_end }
-chunk_size :: ImChunkStream_chunk_size
 
-back :: proc { ImVector_back }
-
-contains :: ImVector_contains
-
-init :: proc { ImVector_init_0, ImVector_init_1, ImGuiTextFilter_ImGuiTextRange_init_1, ImGuiStoragePair_init_0, ImGuiStoragePair_init_1, ImGuiStoragePair_init_2, ImColor_init_1, ImColor_init_2, ImColor_init_3, ImColor_init_4, ImRect_init_1, ImRect_init_2, ImRect_init_3, ImSpan_init_0, ImSpan_init_1, ImSpan_init_2, ImGuiStyleMod_init_0, ImGuiStyleMod_init_1, ImGuiStyleMod_init_2, ImGuiPtrOrIndex_init_0, ImGuiPtrOrIndex_init_1, ImDrawList_init, ImGuiKeyRoutingData_init, ImGuiWindow_init, ImGuiWindowClass_init, ImGuiWindowSettings_init, ImGuiDockNode_init, ImFontConfig_init, ImFontAtlasCustomRect_init, ImGuiMultiSelectTempData_init, ImGuiPlotArrayGetterData_init, ImGuiTabItem_init, ImGuiTableTempData_init, ImGuiTableInstanceData_init, ImGuiTableColumn_init, ImGuiTableSettings_init, ImGuiTableColumnSettings_init, ImGuiOldColumns_init, ImFontAtlas_init, ImGuiDockContextPruneNodeData_init, ImGuiTable_init, ImGuiMultiSelectState_init, ImGuiTabBar_init, ImGuiViewportP_init, init_shim_ImStbTexteditState, ImFont_init, ImGuiContext_init, ImDrawListSplitter_init, ImGuiMultiSelectIO_init, ImDrawData_init, ImDrawDataBuilder_init, ImGuiWindowTempData_init, ImGuiStorage_init, ImGuiTextBuffer_init, ImGuiIO_init, ImGuiPlatformIO_init, ImGuiStyle_init, ImDrawListSharedData_init, ImGuiKeyRoutingTable_init, ImGuiNextItemData_init, ImGuiInputTextDeactivatedState_init, ImGuiTextIndex_init, ImGuiDockContext_init, ImGuiMenuColumns_init, ImGuiNextWindowData_init, ImGuiPlatformMonitor_init, ImGuiNavItemData_init, ImGuiPayload_init, ImPool_init, ImGuiInputTextState_init, ImGuiComboPreviewData_init, ImGuiTypingSelectState_init, ImGuiPlatformImeData_init, ImChunkStream_init, ImGuiErrorRecoveryState_init, ImGuiMetricsConfig_init, ImGuiIDStackTool_init, ImTriangulatorNodeSpan_init, ImBitVector_init }
-
-init_shim_ImStbTexteditState :: #force_inline proc "contextless" (p : ^ImStbTexteditState) { p^ = {} }
+init :: proc { ImVector_init_0, ImVector_init_1, ImGuiTextFilter_ImGuiTextRange_init_1, ImGuiStoragePair_init_0, ImGuiStoragePair_init_1, ImGuiStoragePair_init_2, ImColor_init_1, ImColor_init_2, ImColor_init_3, ImColor_init_4, ImRect_init_1, ImRect_init_2, ImRect_init_3, ImSpan_init_0, ImSpan_init_1, ImSpan_init_2, ImGuiStyleMod_init_0, ImGuiStyleMod_init_1, ImGuiStyleMod_init_2, ImGuiPtrOrIndex_init_0, ImGuiPtrOrIndex_init_1, ImDrawList_init, ImGuiKeyRoutingData_init, ImGuiWindow_init, ImGuiWindowClass_init, ImGuiWindowSettings_init, ImGuiDockNode_init, ImFontConfig_init, ImFontAtlasCustomRect_init, ImGuiMultiSelectTempData_init, ImGuiPlotArrayGetterData_init, ImGuiTabItem_init, ImGuiTableTempData_init, ImGuiTableInstanceData_init, ImGuiTableColumn_init, ImGuiTableSettings_init, ImGuiTableColumnSettings_init, ImGuiOldColumns_init, ImFontAtlas_init, ImGuiDockContextPruneNodeData_init, ImGuiTable_init, ImGuiMultiSelectState_init, ImGuiTabBar_init, ImGuiViewportP_init, ImStbTexteditState_init, ImFont_init, ImGuiContext_init, ImDrawListSplitter_init, ImGuiMultiSelectIO_init, ImDrawData_init, ImDrawDataBuilder_init, ImGuiWindowTempData_init, ImGuiStorage_init, ImGuiTextBuffer_init, ImGuiIO_init, ImGuiPlatformIO_init, ImGuiStyle_init, ImDrawListSharedData_init, ImGuiKeyRoutingTable_init, ImGuiNextItemData_init, ImGuiInputTextDeactivatedState_init, ImGuiTextIndex_init, ImGuiDockContext_init, ImGuiMenuColumns_init, ImGuiNextWindowData_init, ImGuiPlatformMonitor_init, ImGuiNavItemData_init, ImGuiPayload_init, ImPool_init, ImGuiInputTextState_init, ImGuiComboPreviewData_init, ImGuiTypingSelectState_init, ImGuiPlatformImeData_init, ImChunkStream_init, ImGuiErrorRecoveryState_init, ImGuiMetricsConfig_init, ImGuiIDStackTool_init, ImTriangulatorNodeSpan_init, ImBitVector_init, ImFontBuildSrcData_init }
 
 Add :: proc { ImRect_Add_0, ImRect_Add_1, ImPool_Add }
 
 GetID :: proc { ImGuiWindow_GetID_0, ImGuiWindow_GetID_1, ImGuiWindow_GetID_2, ImGuiWindow_GetID_3, GetID_0, GetID_1, GetID_2, GetID_3 }
 
 deinit :: proc { \
-	ImVector_deinit, ImDrawListSplitter_deinit, ImGuiViewport_deinit, ImPool_deinit, ImGuiViewportP_deinit, ImGuiTable_deinit, ImDrawList_deinit, ImGuiDockNode_deinit, ImFontAtlas_deinit, ImGuiWindow_deinit, ImFont_deinit, ImDrawData_deinit, ImDrawDataBuilder_deinit, ImGuiWindowTempData_deinit, ImGuiStorage_deinit, ImGuiTextBuffer_deinit, ImGuiIO_deinit, ImGuiPlatformIO_deinit, ImDrawListSharedData_deinit, ImGuiKeyRoutingTable_deinit, ImGuiMultiSelectIO_deinit, ImGuiInputTextState_deinit, ImChunkStream_deinit, ImGuiIDStackTool_deinit, ImGuiInputTextDeactivatedState_deinit, ImGuiTextIndex_deinit, ImGuiDockContext_deinit, ImBitVector_deinit \
-	, deinit_stub_u8, deinit_stub_ImGuiMultiSelectTempData, deinit_stub_ImStb_STB_TexteditState, deinit_stub_ImGuiTabBar, deinit_stub_ImGuiMultiSelectState, deinit_stub_ImGuiListClipperData, deinit_stub_ImGuiTableTempData, deinit_stub_ImGuiContext, deinit_stub_ImGuiOldColumns, deinit_stub_ImFontBuildSrcData \
+	ImVector_deinit, ImDrawListSplitter_deinit, ImGuiViewport_deinit, ImPool_deinit, ImGuiViewportP_deinit, ImGuiTable_deinit, ImDrawList_deinit, ImGuiDockNode_deinit, ImFontAtlas_deinit, ImGuiWindow_deinit, ImFont_deinit, ImDrawData_deinit, ImDrawDataBuilder_deinit, ImGuiWindowTempData_deinit, ImGuiStorage_deinit, ImGuiTextBuffer_deinit, ImGuiIO_deinit, ImGuiPlatformIO_deinit, ImDrawListSharedData_deinit, ImGuiKeyRoutingTable_deinit, ImGuiMultiSelectIO_deinit, ImGuiInputTextState_deinit, ImChunkStream_deinit, ImGuiIDStackTool_deinit, ImGuiInputTextDeactivatedState_deinit, ImGuiTextIndex_deinit, ImGuiDockContext_deinit, ImBitVector_deinit, ImGuiMultiSelectTempData_deinit, ImGuiTabBar_deinit, ImGuiListClipperData_deinit, ImGuiTableTempData_deinit, ImGuiContext_deinit, ImGuiOldColumns_deinit, ImFontBuildSrcData_deinit, ImGuiMultiSelectState_deinit, ImStb_STB_TexteditState_deinit, deinit_stub_u8
 }
-// might be a issue of missin implicit destructors
 deinit_stub_u8 :: #force_inline proc "contextless" (_ : ^u8) { }
-deinit_stub_ImGuiMultiSelectTempData :: #force_inline proc "contextless" (_ : ^ImGuiMultiSelectTempData) { }
-deinit_stub_ImStb_STB_TexteditState :: #force_inline proc "contextless" (_ : ^ImStb_STB_TexteditState) { }
-deinit_stub_ImGuiTabBar :: #force_inline proc "contextless" (_ : ^ImGuiTabBar) { }
-deinit_stub_ImGuiMultiSelectState :: #force_inline proc "contextless" (_ : ^ImGuiMultiSelectState) { }
-deinit_stub_ImGuiListClipperData :: #force_inline proc "contextless" (_ : ^ImGuiListClipperData) { }
-deinit_stub_ImGuiTableTempData :: #force_inline proc "contextless" (_ : ^ImGuiTableTempData) { }
-deinit_stub_ImGuiContext :: #force_inline proc "contextless" (_ : ^ImGuiContext) { }
-deinit_stub_ImGuiOldColumns :: #force_inline proc "contextless" (_ : ^ImGuiOldColumns) { }
-deinit_stub_ImFontBuildSrcData :: #force_inline proc "contextless" (_ : ^ImFontBuildSrcData) { }
 
 Expand :: proc { ImRect_Expand_0, ImRect_Expand_1 }
 
@@ -289,75 +255,26 @@ ImDrawList_AddText :: proc { ImDrawList_AddText_0, ImDrawList_AddText_1 }
 
 ItemSize :: proc{ ItemSize_0, ItemSize_1 }
 
-_ClearFreeMemory :: ImDrawList__ClearFreeMemory
-
 ClearFreeMemory :: proc { ImDrawListSplitter_ClearFreeMemory, ImGuiInputTextState_ClearFreeMemory, ImGuiInputTextDeactivatedState_ClearFreeMemory }
-
-GetColumnSettings :: ImGuiTableSettings_GetColumnSettings
-
-Overlaps :: ImRect_Overlaps
-
-AddRectFilled :: ImDrawList_AddRectFilled
-
-AddRectFilledMultiColor :: ImDrawList_AddRectFilledMultiColor
 
 GetForegroundDrawList :: proc { GetForegroundDrawList_w, GetForegroundDrawList_vp }
 
 GetCenter :: proc { ImRect_GetCenter, ImGuiViewport_GetCenter }
-GetWidth :: ImRect_GetWidth
-GetHeight :: ImRect_GetHeight
-
-_CalcCircleAutoSegmentCount :: ImDrawList__CalcCircleAutoSegmentCount
-
-AddCircleFilled :: ImDrawList_AddCircleFilled
-
-AddCircle :: ImDrawList_AddCircle
 
 Begin :: proc { Begin_, ImGuiListClipper_Begin }
 
-IncludeItemByIndex :: ImGuiListClipper_IncludeItemByIndex
-
-IncludeItemsByIndex :: ImGuiListClipper_IncludeItemsByIndex
-
-Step :: ImGuiListClipper_Step
-
 PushID :: proc { PushID_0, PushID_1, PushID_2, PushID_3 }
-
-GetIndex :: ImPool_GetIndex
-
-AddRect :: ImDrawList_AddRect
-AddLine :: ImDrawList_AddLine
-AddPolyline :: ImDrawList_AddPolyline
-
-PathLineTo :: ImDrawList_PathLineTo
-
-PathLineToMergeDuplicate :: ImDrawList_PathLineToMergeDuplicate
 
 ClearFlags :: proc { ImGuiNextItemData_ClearFlags, ImGuiNextWindowData_ClearFlags }
 
-PathStroke :: ImDrawList_PathStroke
-
-PathArcTo :: ImDrawList_PathArcTo
-PathArcToFast :: ImDrawList_PathArcToFast
-_PathArcToFastEx :: ImDrawList__PathArcToFastEx
 
 Clear :: proc { ImPool_Clear, ImDrawData_Clear, ImBitVector_Clear, ImGuiPayload_Clear, ImGuiStorage_Clear, ImGuiTextFilter_Clear, ImGuiNavItemData_Clear, ImDrawListSplitter_Clear, ImGuiKeyRoutingTable_Clear, ImFontGlyphRangesBuilder_Clear, ImGuiTypingSelectState_Clear, ImGuiMultiSelectTempData_Clear, ImFontAtlas_Clear, ImGuiSelectionBasicStorage_Clear }
 
-GetSize :: ImRect_GetSize
-
-ClipWith :: ImRect_ClipWith
-
-ClipWithFull :: ImRect_ClipWithFull
-
 LogTextV :: proc { LogTextV_0, LogTextV_1 }
-
-CalcTextSizeA :: ImFont_CalcTextSizeA
 
 PushStyleColor :: proc { PushStyleColor_0, PushStyleColor_1 }
 
 ImIsPowerOfTwo :: proc { ImIsPowerOfTwo_0, ImIsPowerOfTwo_1 }
-
-PushTextureID :: ImDrawList_PushTextureID
 
 PushClipRect :: proc { ImDrawList_PushClipRect, PushClipRect_ }
 
@@ -373,44 +290,15 @@ Shortcut :: proc { Shortcut_0, Shortcut_1 }
 
 PopClipRect :: proc { PopClipRect_, ImDrawList_PopClipRect }
 
-ContainsWithPad :: ImRect_ContainsWithPad
-
-GetMainRect :: ImGuiViewportP_GetMainRect
-
-GetVoidPtr :: ImGuiStorage_GetVoidPtr
-GetVoidPtrRef :: ImGuiStorage_GetVoidPtrRef
-SetVoidPtr :: ImGuiStorage_SetVoidPtr
-GetVarPtr :: ImGuiDataVarInfo_GetVarPtr
-
 IsPopupOpen :: proc{ IsPopupOpen_0, IsPopupOpen_1 }
 
 SetScrollFromPosX :: proc { SetScrollFromPosX_0, SetScrollFromPosX_1 }
 SetScrollFromPosY :: proc { SetScrollFromPosY_0, SetScrollFromPosY_1 }
 
-Reset :: ImGuiListClipperData_Reset
-
-Split :: ImDrawListSplitter_Split
-
-Merge :: ImDrawListSplitter_Merge
-
-SetCurrentChannel :: ImDrawListSplitter_SetCurrentChannel
-
 index_from_ptr :: proc{ ImSpan_index_from_ptr, ImVector_index_from_ptr }
-
-GetByKey :: ImPool_GetByKey
-
-GetOrAddByKey :: ImPool_GetOrAddByKey
-
-SeekCursorForItem :: ImGuiListClipper_SeekCursorForItem
 
 ImTextCountUtf8BytesFromChar :: proc { ImTextCountUtf8BytesFromChar_0, ImTextCountUtf8BytesFromChar_1 }
 
-RenderChar :: ImFont_RenderChar
-
-GetByIndex :: ImPool_GetByIndex
-
-CalcFontSize :: ImGuiWindow_CalcFontSize
-GetIDFromPos :: ImGuiWindow_GetIDFromPos
 SetWindowPos :: proc { SetWindowPos_0, SetWindowPos_1, SetWindowPos_2 }
 
 MarkIniSettingsDirty :: proc { MarkIniSettingsDirty_0, MarkIniSettingsDirty_1 }
@@ -419,146 +307,30 @@ SetWindowSize :: proc { SetWindowSize_0, SetWindowSize_1, SetWindowSize_2 }
 
 SetWindowCollapsed :: proc { SetWindowCollapsed_0, SetWindowCollapsed_1, SetWindowCollapsed_2 }
 
-ChannelsSplit :: ImDrawList_ChannelsSplit
-ChannelsSetCurrent :: ImDrawList_ChannelsSetCurrent
-
-GetInt :: ImGuiStorage_GetInt
-
-CursorClamp :: ImGuiInputTextState_CursorClamp
-
 GetKeyData :: proc { GetKeyData_0, GetKeyData_k }
 
-TitleBarRect :: ImGuiWindow_TitleBarRect
-
 Rect :: proc{ ImGuiWindow_Rect, ImGuiDockNode_Rect }
-
-GetWorkRect :: ImGuiViewportP_GetWorkRect
-GetBuildWorkRect :: ImGuiViewportP_GetBuildWorkRect
-UpdateWorkRect :: ImGuiViewportP_UpdateWorkRect
-
-Update :: ImGuiMenuColumns_Update
-
-IsLoaded :: ImFont_IsLoaded
-
-_SetTextureID :: ImDrawList__SetTextureID
 
 TestBit :: proc{ ImBitArray_TestBit, ImBitVector_TestBit }
 
 IsKeyChordPressed :: proc { IsKeyChordPressed_0, IsKeyChordPressed_1 }
 
-Translate :: ImRect_Translate
-
-GetIDFromRectangle :: ImGuiWindow_GetIDFromRectangle
-
-next_chunk :: ImChunkStream_next_chunk
-ptr_from_offset :: ImChunkStream_ptr_from_offset
-
-insert :: ImVector_insert
-
-split :: ImGuiTextFilter_ImGuiTextRange_split
-
-offset_from_ptr :: ImChunkStream_offset_from_ptr
-
 IsKeyPressed :: proc { IsKeyPressed_0, IsKeyPressed_1 }
-
-IsFloatingNode :: ImGuiDockNode_IsFloatingNode
-IsCentralNode :: ImGuiDockNode_IsCentralNode
-IsDockSpace :: ImGuiDockNode_IsDockSpace
-IsRootNode :: ImGuiDockNode_IsRootNode
-IsHiddenTabBar :: ImGuiDockNode_IsHiddenTabBar
-IsNoTabBar :: ImGuiDockNode_IsNoTabBar
-IsSplitNode :: ImGuiDockNode_IsSplitNode
-IsEmpty :: ImGuiDockNode_IsEmpty
-UpdateMergedFlags :: ImGuiDockNode_UpdateMergedFlags
-IsLeafNode :: ImGuiDockNode_IsLeafNode
-
-IsDataType :: ImGuiPayload_IsDataType
-
-MenuBarRect :: ImGuiWindow_MenuBarRect
-
-GetBL :: ImRect_GetBL
-GetTL :: ImRect_GetTL
-GetBR :: ImRect_GetBR
-GetTR :: ImRect_GetTR
-IsInverted :: ImRect_IsInverted
-GetArea :: ImRect_GetArea
-
-PushClipRectFullScreen :: ImDrawList_PushClipRectFullScreen
-
-IsPreview :: ImGuiPayload_IsPreview
-IsDelivery :: ImGuiPayload_IsDelivery
 
 PushStyleVar :: proc { PushStyleVar_f, PushStyleVar_v2 }
 
-CursorAnimReset :: ImGuiInputTextState_CursorAnimReset
-
-stb_textedit_initialize_state :: ImStb_stb_textedit_initialize_state
-stb_textedit_drag :: ImStb_stb_textedit_drag
-stb_textedit_click :: ImStb_stb_textedit_click
-stb_textedit_cut :: ImStb_stb_textedit_cut
-stb_textedit_paste :: ImStb_stb_textedit_paste
-stb_textedit_replace :: ImStb_stb_textedit_replace
-
-FindGlyph :: ImFont_FindGlyph
 SelectAll :: proc { ImGuiInputTextState_SelectAll, ImGuiInputTextCallbackData_SelectAll }
 HasSelection :: proc { ImGuiInputTextState_HasSelection, ImGuiInputTextCallbackData_HasSelection }
 ClearSelection :: proc { ImGuiInputTextState_ClearSelection, ImGuiInputTextCallbackData_ClearSelection }
 
-OnKeyPressed :: ImGuiInputTextState_OnKeyPressed
-OnCharPressed :: ImGuiInputTextState_OnCharPressed
-
 SetScrollY :: proc { SetScrollY_0, SetScrollY_1 }
 SetScrollX :: proc { SetScrollX_0, SetScrollX_1 }
 
-GetCharAdvance :: ImFont_GetCharAdvance
-
-GetMouseCursorTexData :: ImFontAtlas_GetMouseCursorTexData
-
-AddImage :: ImDrawList_AddImage
-AddImageQuad :: ImDrawList_AddImageQuad
-AddImageRounded :: ImDrawList_AddImageRounded
-PopTextureID :: ImDrawList_PopTextureID
-PrimVtx :: ImDrawList_PrimVtx
-PrimWriteVtx :: ImDrawList_PrimWriteVtx
-AddTriangle :: ImDrawList_AddTriangle
-AddTriangleFilled :: ImDrawList_AddTriangleFilled
-PathFillConvex :: ImDrawList_PathFillConvex
-
 SetBit :: proc { ImBitArray_SetBit, ImBitVector_SetBit, ImFontGlyphRangesBuilder_SetBit }
-
-ClearTexData :: ImFontAtlas_ClearTexData
-GetGlyphRangesDefault :: ImFontAtlas_GetGlyphRangesDefault
 
 size_in_bytes :: proc { ImSpan_size_in_bytes, ImVector_size_in_bytes }
 
-Create :: ImBitVector_Create
-
-Init :: ImTriangulator_Init
-GetNextTriangle :: ImTriangulator_GetNextTriangle
-
-_PopUnusedDrawCmd :: ImDrawList__PopUnusedDrawCmd
-AddDrawCmd :: ImDrawList_AddDrawCmd
-
-clear_delete :: ImVector_clear_delete
-
-PrimReserve :: ImDrawList_PrimReserve
-PrimUnReserve :: ImDrawList_PrimUnreserve
-
-PrimRectUV :: ImDrawList_PrimRectUV
-
-GetIntRef :: ImGuiStorage_GetIntRef
-
-shrink :: ImVector_shrink
-
-Unlink :: ImTriangulatorNode_Unlink
-
 find_erase_unsorted :: proc{ ImVector_find_erase_unsorted, ImTriangulatorNodeSpan_find_erase_unsorted }
-
-AddGlyph :: ImFont_AddGlyph
-
-clear_destruct :: ImVector_clear_destruct
-
-SetInt :: ImGuiStorage_SetInt
 
 GetIDWithSeed :: proc { GetIDWithSeed_0, GetIDWithSeed_1 }
 
@@ -568,93 +340,15 @@ BeginChild :: proc { BeginChild_0, BeginChild_1 }
 
 IsKeyDown :: proc { IsKeyDown_0, IsKeyDown_1 }
 
-ClearInputKeys :: ImGuiIO_ClearInputKeys
-
-TranslateY :: ImRect_TranslateY
-TranslateX :: ImRect_TranslateX
-
-alloc_chunk :: ImChunkStream_alloc_chunk
-
-GetName :: ImGuiWindowSettings_GetName
-
-ClearRequestFlags :: ImGuiViewportP_ClearRequestFlags
-
 Reserve :: proc{ ImPool_Reserve, ImSpanAllocator_Reserve }
-
-SetLocalFlags :: ImGuiDockNode_SetLocalFlags
-
-DeclColumns :: ImGuiMenuColumns_DeclColumns
-
-ToVec4 :: ImRect_ToVec4
-
-SetCircleTessellationMaxError :: ImDrawListSharedData_SetCircleTessellationMaxError
-
-ChannelsMerge :: ImDrawList_ChannelsMerge
 
 swap :: proc { ImVector_swap, ImChunkStream_swap }
 
 IsKeyReleased :: proc { IsKeyReleased_0, IsKeyReleased_1 }
 
-ClearInputMouse :: ImGuiIO_ClearInputMouse
-
 SetItemKeyOwner :: proc { SetItemKeyOwner_0, SetItemKeyOwner_1 }
 
-IsBuilt :: ImFontAtlas_IsBuilt
-
 OpenPopup :: proc { OpenPopup_0, OpenPopup_1 }
-
-IsPacked :: ImFontAtlasCustomRect_IsPacked
-
-ClearOutputData :: ImFont_ClearOutputData
-
-GetCustomRectByIndex :: ImFontAtlas_GetCustomRectByIndex
-
-AddCustomRectRegular :: ImFontAtlas_AddCustomRectRegular
-
-CalcCustomRectUV :: ImFontAtlas_CalcCustomRectUV
-
-BuildLookupTable :: ImFont_BuildLookupTable
-
-FindGlyphNoFallback :: ImFont_FindGlyphNoFallback
-
-IsGlyphRangeUnused :: ImFont_IsGlyphRangeUnused
-
-get_line_begin :: ImGuiTextIndex_get_line_begin
-get_line_end :: ImGuiTextIndex_get_line_end
-
-_TryMergeDrawCmds :: ImDrawList__TryMergeDrawCmds
-
-BuildSortByKey :: ImGuiStorage_BuildSortByKey
-
-GetMapSize :: ImPool_GetMapSize
-TryGetMapData :: ImPool_TryGetMapData
-GetAliveCount :: ImPool_GetAliveCount
-
-GetArenaSizeInBytes :: ImSpanAllocator_GetArenaSizeInBytes
-SetArenaBasePtr :: ImSpanAllocator_SetArenaBasePtr
-GetSpan :: ImSpanAllocator_GetSpan
-GetSpanPtrBegin :: ImSpanAllocator_GetSpanPtrBegin
-GetSpanPtrEnd :: ImSpanAllocator_GetSpanPtrEnd
-
-AddQuadFilled :: ImDrawList_AddQuadFilled
-
-SetTexID :: ImFontAtlas_SetTexID
-GetTexDataAsRGBA32 :: ImFontAtlas_GetTexDataAsRGBA32
-
-GetTexID :: ImDrawCmd_GetTexID
-
-AddKeyEvent :: ImGuiIO_AddKeyEvent
-AddKeyAnalogEvent :: ImGuiIO_AddKeyAnalogEvent
-SetKeyEventNativeData :: ImGuiIO_SetKeyEventNativeData
-AddMousePosEvent :: ImGuiIO_AddMousePosEvent
-AddMouseViewportEvent :: ImGuiIO_AddMouseViewportEvent
-AddMouseSourceEvent :: ImGuiIO_AddMouseSourceEvent
-AddMouseButtonEvent :: ImGuiIO_AddMouseButtonEvent
-AddMouseWheelEvent :: ImGuiIO_AddMouseWheelEvent
-AddInputCharacter :: ImGuiIO_AddInputCharacter
-AddFocusEvent :: ImGuiIO_AddFocusEvent
-AddInputCharacterUTF16 :: ImGuiIO_AddInputCharacterUTF16
-
 
 parse_int_pair_prefixed :: proc(line : string, offset : ^int, prefix : string, x : ^i64, $radix_x : int, y : ^i64, $radix_y : int) -> (ok : bool)
 {

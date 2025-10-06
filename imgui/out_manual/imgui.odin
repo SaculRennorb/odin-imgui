@@ -2243,27 +2243,27 @@ IMGUI_DEBUG_LOG :: #force_inline proc "contextless" (args : ..any) //TODO @gen: 
 
 NewWrapper :: struct { }
 // This is only required so we can use the symmetrical new()
-IM_ALLOC :: #force_inline proc (#any_int _SIZE : uint) -> rawptr
+IM_ALLOC :: #force_inline proc (#any_int _SIZE : uint, loc := #caller_location) -> rawptr
 {
-	return MemAlloc(_SIZE)
+	return MemAlloc(_SIZE, loc)
 }
 
-IM_FREE :: #force_inline proc (_PTR : rawptr) { MemFree(_PTR) }
+IM_FREE :: #force_inline proc (_PTR : rawptr, loc := #caller_location) { MemFree(_PTR, loc) }
 
-IM_NEW_MEM :: #force_inline proc ($_TYPE : typeid)  -> ^_TYPE
+IM_NEW_MEM :: #force_inline proc ($_TYPE : typeid, loc := #caller_location)  -> ^_TYPE
 {
-	return transmute(^_TYPE)MemAlloc(size_of(_TYPE))
+	return transmute(^_TYPE)MemAlloc(size_of(_TYPE), loc)
 }
 
-IM_NEW :: #force_inline proc ($_TYPE : typeid)  -> ^_TYPE
+IM_NEW :: #force_inline proc ($_TYPE : typeid, loc := #caller_location)  -> ^_TYPE
 {
-	ptr := transmute(^_TYPE)MemAlloc(size_of(_TYPE))
+	ptr := transmute(^_TYPE)MemAlloc(size_of(_TYPE), loc)
 	
 	init(ptr)
 	return ptr
 }
 
-IM_DELETE :: proc(p : ^$T) { if p != nil { deinit(p); MemFree(p) } }
+IM_DELETE :: proc(p : ^$T, loc := #caller_location) { if p != nil { deinit(p); MemFree(p, loc) } }
 
 //-----------------------------------------------------------------------------
 // Vector<>
@@ -2283,7 +2283,7 @@ Vector :: struct($T : typeid) {
 	Data : [^]T,
 }
 
-Vector_deinit :: proc(this : ^Vector($T)) { if this.Data != nil { IM_FREE(this.Data) } }
+Vector_deinit :: proc(this : ^Vector($T), loc := #caller_location) { if this.Data != nil { IM_FREE(this.Data, loc) } }
 
 // Constructors, destructor
 Vector_init_0 :: #force_inline proc(this : ^Vector($T))
@@ -2298,8 +2298,9 @@ Vector_init_1 :: #force_inline proc(this : ^Vector($T), src : ^Vector(T))
 }
 
 // Important: does not destruct anything
-Vector_clear :: #force_inline proc(this : ^Vector($T)) { if this.Data != nil {this.Capacity = 0; this.Size = this.Capacity; IM_FREE(this.Data); this.Data = nil
-} }
+Vector_clear :: #force_inline proc(this : ^Vector($T), loc := #caller_location) {
+	if this.Data != nil { this.Capacity = 0; this.Size = this.Capacity; IM_FREE(this.Data, loc); this.Data = nil }
+}
 
 // Important: never called automatically! always explicit.
 clear_delete :: #force_inline proc(this : ^Vector($T))
@@ -2354,15 +2355,15 @@ Vector__grow_capacity :: #force_inline proc(this : ^Vector($T), sz : i32) -> i32
 	return new_capacity > sz ? new_capacity : sz
 }
 
-Vector_resize_0 :: #force_inline proc(this : ^Vector($T), new_size : i32)
+Vector_resize_0 :: #force_inline proc(this : ^Vector($T), new_size : i32, loc := #caller_location)
 {
-	if new_size > this.Capacity { reserve(this, Vector__grow_capacity(this, new_size)) };
+	if new_size > this.Capacity { reserve(this, Vector__grow_capacity(this, new_size), loc) };
 	this.Size = new_size
 }
 
-Vector_resize_1 :: #force_inline proc(this : ^Vector($T), new_size : i32, v : T)
+Vector_resize_1 :: #force_inline proc(this : ^Vector($T), new_size : i32, v : T, loc := #caller_location)
 {
-	if new_size > this.Capacity { reserve(this, Vector__grow_capacity(this, new_size)) };
+	if new_size > this.Capacity { reserve(this, Vector__grow_capacity(this, new_size), loc) };
 	if new_size > this.Size {
 		for n : i32 = this.Size; n < new_size; n += 1 {
 			this.Data[n] = v
@@ -2377,23 +2378,23 @@ shrink :: #force_inline proc(this : ^Vector($T), new_size : i32)
 	IM_ASSERT(new_size <= this.Size); this.Size = new_size
 }
 
-Vector_reserve :: #force_inline proc(this : ^Vector($T), new_capacity : i32)
+Vector_reserve :: #force_inline proc(this : ^Vector($T), new_capacity : i32, loc := #caller_location)
 {
 	if new_capacity <= this.Capacity { return }
-	new_data : ^T = cast(^T) IM_ALLOC(cast(uint) new_capacity * size_of(T))
+	new_data : ^T = cast(^T) IM_ALLOC(cast(uint) new_capacity * size_of(T), loc)
 	if this.Data != nil {
 		memcpy(new_data, this.Data, cast(int) this.Size * size_of(T))
-		IM_FREE(this.Data)
+		IM_FREE(this.Data, loc)
 	}
 	this.Data = new_data
 	this.Capacity = new_capacity
 }
 
-reserve_discard :: #force_inline proc(this : ^Vector($T), new_capacity : i32)
+reserve_discard :: #force_inline proc(this : ^Vector($T), new_capacity : i32, loc := #caller_location)
 {
 	if new_capacity <= this.Capacity { return }
-	if this.Data != nil { IM_FREE(this.Data) }
-	this.Data = cast(^T) IM_ALLOC(cast(uint) new_capacity * size_of(T))
+	if this.Data != nil { IM_FREE(this.Data, loc) }
+	this.Data = cast(^T) IM_ALLOC(cast(uint) new_capacity * size_of(T), loc)
 	this.Capacity = new_capacity
 }
 
@@ -10385,7 +10386,7 @@ SetCurrentContext :: proc "contextless" (ctx : ^Context)
 // - Those functions are not reliant on the current context.
 // - DLL users: heaps and globals are not shared across DLL boundaries! You will need to call SetCurrentContext() + SetAllocatorFunctions()
 //   for each static/DLL boundary you are calling from. Read "Context and Memory Allocators" section of imgui.cpp for more details.
-SetAllocatorFunctions :: proc "contextless" (alloc_func : MemAllocFunc, free_func : MemFreeFunc, user_data : rawptr)
+SetAllocatorFunctions :: proc "contextless" (alloc_func : MemAllocFunc, free_func : MemFreeFunc, user_data : rawptr  =nil)
 {
 	GImAllocatorAllocFunc = alloc_func
 	GImAllocatorFreeFunc = free_func
@@ -11342,24 +11343,24 @@ CalcWrapWidthForPos :: proc(pos : Vec2, wrap_pos_x : f32) -> f32
 }
 
 // IM_ALLOC() == Gui::MemAlloc()
-MemAlloc :: proc(#any_int size : uint) -> rawptr
+MemAlloc :: proc(#any_int size : uint, loc := #caller_location) -> rawptr
 {
 	ptr : rawptr = GImAllocatorAllocFunc(size, GImAllocatorUserData)
 	when ! IMGUI_DISABLE_DEBUG_TOOLS {
 		if ctx : ^Context = GImGui; ctx != nil { 
-			DebugAllocHook(&ctx.DebugAllocInfo, ctx.FrameCount, ptr, size)
+			DebugAllocHook(&ctx.DebugAllocInfo, ctx.FrameCount, ptr, size, loc)
 		}
 	} // preproc endif
 	return ptr
 }
 
 // IM_FREE() == Gui::MemFree()
-MemFree :: proc(ptr : rawptr)
+MemFree :: proc(ptr : rawptr, loc := #caller_location)
 {
 	when ! IMGUI_DISABLE_DEBUG_TOOLS {
 	if ptr != nil { 
 		if ctx : ^Context = GImGui; ctx != nil {
-			DebugAllocHook(&ctx.DebugAllocInfo, ctx.FrameCount, ptr, ~uint(0))
+			DebugAllocHook(&ctx.DebugAllocInfo, ctx.FrameCount, ptr, ~uint(0), loc)
 		}
 	}
 	} // preproc endif
@@ -11369,10 +11370,10 @@ MemFree :: proc(ptr : rawptr)
 // Debug Tools
 // size >= 0 : alloc, size = -1 : free
 // We record the number of allocation in recent frames, as a way to audit/sanitize our guiding principles of "no allocations on idle/repeating frames"
-DebugAllocHook :: proc(info : ^DebugAllocInfo, frame_count : i32, ptr : rawptr, size : uint)
+DebugAllocHook :: proc(info : ^DebugAllocInfo, frame_count : i32, ptr : rawptr, size : uint, loc : runtime.Source_Code_Location)
 {
+	_, _ = ptr, loc
 	entry : ^DebugAllocEntry = &info.LastEntriesBuf[info.LastEntriesIdx]
-	IM_UNUSED(ptr)
 	if entry.FrameCount != frame_count {
 		info.LastEntriesIdx = (info.LastEntriesIdx + 1) % cast(i16) IM_ARRAYSIZE(info.LastEntriesBuf)
 		entry = &info.LastEntriesBuf[info.LastEntriesIdx]
@@ -11380,12 +11381,12 @@ DebugAllocHook :: proc(info : ^DebugAllocInfo, frame_count : i32, ptr : rawptr, 
 		entry.FreeCount = 0; entry.AllocCount = entry.FreeCount
 	}
 	if size != ~uint(0) {
-		//printf("[%05d] MemAlloc(%d) -> 0x%p\n", frame_count, (int)size, ptr);
+		when ENABLE_ALLOCATION_LOG { fmt.printf("[%05d] MemAlloc % 8d %p %v %v\n", frame_count, cast(int)size, ptr, loc.procedure, loc); }
 		post_incr(&entry.AllocCount)
 		post_incr(&info.TotalAllocCount)
 	}
 	else {
-		//printf("[%05d] MemFree(0x%p)\n", frame_count, ptr);
+		when ENABLE_ALLOCATION_LOG { fmt.printf("[%05d] MemFree           %p %v %v\n", frame_count, ptr, loc.procedure, loc); }
 		post_incr(&entry.FreeCount)
 		post_incr(&info.TotalFreeCount)
 	}
@@ -14488,7 +14489,7 @@ SetLastItemDataForWindow :: proc(window : ^Window, rect : Rect)
 	else { SetLastItemData(window.MoveId, g.CurrentItemFlags, IsMouseHoveringRect(rect.Min, rect.Max, false) ? ItemStatusFlags_.ItemStatusFlags_HoveredRect : {}, rect) }
 }
 
-End :: proc()
+End_ :: proc()
 {
 	g : ^Context = GImGui
 	window : ^Window = g.CurrentWindow

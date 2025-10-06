@@ -25,6 +25,7 @@ package test
 // It is very strongly recommended to NOT disable the demo windows and debug tool during development. They are extremely useful in day to day work. Please read comments in imgui_demo.cpp.
 IMGUI_DISABLE_DEMO_WINDOWS :: false                        // Disable demo windows: ShowDemoWindow()/ShowStyleEditor() will be empty.
 IMGUI_DISABLE_DEBUG_TOOLS :: false                         // Disable metrics/debugger and other debug tools: ShowMetricsWindow(), ShowDebugLogWindow() and ShowIDStackToolWindow() will be empty.
+ENABLE_ALLOCATION_LOG :: false
 
 //---- Don't implement some functions to reduce linkage requirements.
 IMGUI_DISABLE_WIN32_DEFAULT_CLIPBOARD_FUNCTIONS :: ODIN_OS != .Windows   // [Win32] Don't implement default clipboard handler. Won't use and link with OpenClipboard/GetClipboardData/CloseClipboard etc. (user32.lib/.a, kernel32.lib/.a)

@@ -263,6 +263,8 @@ GetCenter :: proc { Rect_GetCenter, Viewport_GetCenter }
 
 Begin :: proc { Begin_, ListClipper_Begin }
 
+End :: proc { End_, ListClipper_End }
+
 PushID :: proc { PushID_0, PushID_1, PushID_2, PushID_3 }
 
 ClearFlags :: proc { NextItemData_ClearFlags, NextWindowData_ClearFlags }

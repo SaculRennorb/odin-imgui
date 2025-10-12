@@ -42226,7 +42226,7 @@ GetTabBarRefFromTabBar :: proc(tab_bar : ^TabBar) -> PtrOrIndex
 	return v
 }
 
-BeginTabBar :: proc(str_id : string, flags : TabBarFlags) -> bool
+BeginTabBar :: proc(str_id : string, flags : TabBarFlags = {}) -> bool
 {
 	g : ^Context = GImGui
 	window : ^Window = g.CurrentWindow
@@ -42898,7 +42898,7 @@ TabBarTabListPopupButton :: proc(tab_bar : ^TabBar) -> ^TabItem
 // - TabItemLabelAndCloseButton() [Internal]
 //-------------------------------------------------------------------------
 
-BeginTabItem :: proc(label : string, p_open : ^bool, flags : TabItemFlags) -> bool
+BeginTabItem :: proc(label : string, p_open : ^bool = nil, flags : TabItemFlags = {}) -> bool
 {
 	g : ^Context = GImGui
 	window : ^Window = g.CurrentWindow

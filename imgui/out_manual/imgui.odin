@@ -8876,7 +8876,7 @@ HashStr_p :: proc(data_p : [^]u8, data_size : uint = 0, seed : ID = 0) -> ID
 			crc = step(crc, c)
 		}
 	}
-	else {
+	else if data != nil {
 		for {
 			c : u8 = post_incr(&data)^
 			if c == 0 { break }
@@ -8904,7 +8904,7 @@ HashStr_p :: proc(data_p : [^]u8, data_size : uint = 0, seed : ID = 0) -> ID
 			crc = step(crc, c)
 		}
 	}
-	else {
+	else if data != nil {
 		for {
 			c : u8 = post_incr(&data)^
 			if c == 0 { break }
@@ -10196,7 +10196,7 @@ RenderTextWrapped :: proc(pos : Vec2, text : string, wrap_width : f32)
 // FIXME-OPT: Since we have or calculate text_size we could coarse clip whole block immediately, especally for text above draw_list->DrawList.
 // Effectively as this is called from widget doing their own coarse clipping it's not very valuable presently. Next time function will take
 // better advantage of the render function taking size into account for coarse clipping.
-RenderTextClippedEx :: proc(draw_list : ^DrawList, pos_min : Vec2, pos_max : Vec2, text : string, text_size_if_known : ^Vec2, align : ^Vec2 = &{}, clip_rect : ^Rect = nil)
+RenderTextClippedEx :: proc(draw_list : ^DrawList, pos_min : Vec2, pos_max : Vec2, text : string, text_size_if_known : ^Vec2, align : Vec2 = {}, clip_rect : ^Rect = nil)
 {
 	// Perform CPU side clipping for single clipped element to avoid using scissor state
 	pos : Vec2 = pos_min
@@ -10224,7 +10224,7 @@ RenderTextClippedEx :: proc(draw_list : ^DrawList, pos_min : Vec2, pos_max : Vec
 	}
 }
 
-RenderTextClipped :: proc(pos_min : Vec2, pos_max : Vec2, text : string, text_size_if_known : ^Vec2, align : ^Vec2 = &{}, clip_rect : ^Rect = nil)
+RenderTextClipped :: proc(pos_min : Vec2, pos_max : Vec2, text : string, text_size_if_known : ^Vec2, align : Vec2 = {}, clip_rect : ^Rect = nil)
 {
 	// Hide anything after a '##' string
 	text_display_end := FindRenderedTextEnd(text)
@@ -10277,12 +10277,12 @@ RenderTextEllipsis :: proc(draw_list : ^DrawList, pos_min : Vec2, pos_max : Vec2
 		}
 
 		// Render text, render ellipsis
-		RenderTextClippedEx(draw_list, pos_min, Vec2{clip_max_x, pos_max.y}, text[:text_end_ellipsis], &text_size, &Vec2{0.0, 0.0})
+		RenderTextClippedEx(draw_list, pos_min, Vec2{clip_max_x, pos_max.y}, text[:text_end_ellipsis], &text_size, Vec2{0.0, 0.0})
 		ellipsis_pos : Vec2 = Trunc(Vec2{pos_min.x + text_size_clipped_x, pos_min.y})
 		if ellipsis_pos.x + ellipsis_width <= ellipsis_max_x { for i : i16 = 0; i < font.EllipsisCharCount; i, ellipsis_pos.x = i + 1, ellipsis_pos.x + font.EllipsisCharStep * font_scale { RenderChar(font, draw_list, font_size, ellipsis_pos, GetColorU32(Col_.Col_Text), font.EllipsisChar) } }
 	}
 	else {
-		RenderTextClippedEx(draw_list, pos_min, Vec2{clip_max_x, pos_max.y}, text[:text_end_full], &text_size, &Vec2{0.0, 0.0})
+		RenderTextClippedEx(draw_list, pos_min, Vec2{clip_max_x, pos_max.y}, text[:text_end_full], &text_size, Vec2{0.0, 0.0})
 	}
 
 	if g.LogEnabled { pos_min := pos_min; LogRenderedText(&pos_min, text[:text_end_full], false) }
@@ -13591,7 +13591,7 @@ RenderWindowTitleBarContents :: proc(window : ^Window, title_bar_rect : Rect, na
 	}
 	//if (g.IO.KeyShift) window->DrawList->AddRect(layout_r.Min, layout_r.Max, IM_COL32(255, 128, 0, 255)); // [DEBUG]
 	//if (g.IO.KeyCtrl) window->DrawList->AddRect(clip_r.Min, clip_r.Max, IM_COL32(255, 128, 0, 255)); // [DEBUG]
-	RenderTextClipped(layout_r.Min, layout_r.Max, name, &text_size, &style.WindowTitleAlign, &clip_r)
+	RenderTextClipped(layout_r.Min, layout_r.Max, name, &text_size, style.WindowTitleAlign, &clip_r)
 }
 
 UpdateWindowParentAndRootLinks :: proc(window : ^Window, flags : WindowFlags, parent_window : ^Window)
@@ -18539,7 +18539,7 @@ BeginPopup :: proc(str_id : string, flags : WindowFlags = {}) -> bool
 // Note that popup visibility status is owned by Dear Gui (and manipulated with e.g. OpenPopup).
 // - *p_open set back to false in BeginPopupModal() when popup is not open.
 // - if you set *p_open to false before calling BeginPopupModal(), it will close the popup.
-BeginPopupModal :: proc(name : string, p_open : ^bool, flags : WindowFlags) -> bool
+BeginPopupModal :: proc(name : string, p_open : ^bool = nil, flags : WindowFlags = {}) -> bool
 {
 	g : ^Context = GImGui
 	window : ^Window = g.CurrentWindow
@@ -26464,7 +26464,7 @@ ShowMetricsWindow :: proc(p_open : ^bool)
 		DebugNodeWindowsList(&g.WindowsFocusOrder, "By focus order (root windows)")
 		if TreeNode("By submission order (begin stack)") {
 			// Here we display windows in their submitted order/hierarchy, however note that the Begin stack doesn't constitute a Parent<>Child relationship!
-			temp_buffer : ^Vector(^Window) = &g.WindowsTempSortBuffer
+			temp_buffer := &g.WindowsTempSortBuffer
 			resize(temp_buffer, 0)
 			for window in g.Windows.Data[:g.Windows.Size] { if window.LastFrameActive + 1 >= g.FrameCount { push_back(temp_buffer, window) } }
 
@@ -26936,7 +26936,7 @@ DebugBreakButton :: proc(label : string, description_of_location : string) -> bo
 
 	RenderNavCursor(bb, id)
 	RenderFrame(bb.Min, bb.Max, GetColorU32(col4f), true, g.Style.FrameRounding)
-	RenderTextClipped(bb.Min, bb.Max, label, &label_size, &g.Style.ButtonTextAlign, &bb)
+	RenderTextClipped(bb.Min, bb.Max, label, &label_size, g.Style.ButtonTextAlign, &bb)
 
 	IMGUI_TEST_ENGINE_ITEM_INFO(g, id, label, g.LastItemData.StatusFlags)
 	return pressed
@@ -32810,7 +32810,7 @@ LabelTextV :: proc(label : string, fmt : string, args : []any)
 	if !ItemAdd(total_bb, 0) { return }
 
 	// Render
-	RenderTextClipped(value_bb.Min + style.FramePadding, value_bb.Max, string_from_se(value_text_begin, value_text_end), &value_size, &Vec2{0.0, 0.0})
+	RenderTextClipped(value_bb.Min + style.FramePadding, value_bb.Max, string_from_se(value_text_begin, value_text_end), &value_size, Vec2{0.0, 0.0})
 	if label_size.x > 0.0 { RenderText(Vec2{value_bb.Max.x + style.ItemInnerSpacing.x, value_bb.Min.y + style.FramePadding.y}, label) }
 }
 
@@ -33141,7 +33141,7 @@ ButtonEx :: proc(label : string, size_arg : Vec2 = {}, flags : ButtonFlags = {})
 	RenderFrame(bb.Min, bb.Max, col, true, style.FrameRounding)
 
 	if g.LogEnabled { LogSetNextTextDecoration("[", "]") }
-	RenderTextClipped(bb.Min + style.FramePadding, bb.Max - style.FramePadding, label, &label_size, &style.ButtonTextAlign, &bb)
+	RenderTextClipped(bb.Min + style.FramePadding, bb.Max - style.FramePadding, label, &label_size, style.ButtonTextAlign, &bb)
 
 	// Automatically close popups
 	//if (pressed && !(flags & ButtonFlags_DontClosePopups) && (window->Flags & WindowFlags_Popup))
@@ -33699,7 +33699,7 @@ ProgressBar :: proc(fraction : f32, size_arg : Vec2, overlay : string)
 		overlay_size : Vec2 = CalcTextSize(overlay)
 		if overlay_size.x > 0.0 {
 			text_x : f32 = is_indeterminate ? (bb.Min.x + bb.Max.x - overlay_size.x) * 0.5 : Lerp(bb.Min.x, bb.Max.x, fill_n1) + style.ItemSpacing.x
-			RenderTextClipped(Vec2{Clamp(text_x, bb.Min.x, bb.Max.x - overlay_size.x - style.ItemInnerSpacing.x), bb.Min.y}, bb.Max, overlay, &overlay_size, &Vec2{0.0, 0.5}, &bb)
+			RenderTextClipped(Vec2{Clamp(text_x, bb.Min.x, bb.Max.x - overlay_size.x - style.ItemInnerSpacing.x), bb.Min.y}, bb.Max, overlay, &overlay_size, Vec2{0.0, 0.5}, &bb)
 		}
 	}
 }
@@ -34092,7 +34092,7 @@ CalcMaxPopupHeightFromItemCount :: proc(items_count : i32) -> f32
 	return (g.FontSize + g.Style.ItemSpacing.y) * cast(f32) items_count - g.Style.ItemSpacing.y + (g.Style.WindowPadding.y * 2)
 }
 
-BeginCombo :: proc(label : string, preview_value : string, flags : ComboFlags) -> bool
+BeginCombo :: proc(label : string, preview_value : string, flags : ComboFlags = {}) -> bool
 {
 	g : ^Context = GImGui
 	window : ^Window = GetCurrentWindow()
@@ -34147,7 +34147,7 @@ BeginCombo :: proc(label : string, preview_value : string, flags : ComboFlags) -
 	// Render preview and label
 	if preview_value != "" && (flags & ComboFlags_.ComboFlags_NoPreview) == {} {
 		if g.LogEnabled { LogSetNextTextDecoration("{", "}") }
-		RenderTextClipped(bb.Min + style.FramePadding, Vec2{value_x2, bb.Max.y}, preview_value, nil, nil)
+		RenderTextClipped(bb.Min + style.FramePadding, Vec2{value_x2, bb.Max.y}, preview_value, nil)
 	}
 	if label_size.x > 0 { RenderText(Vec2{bb.Max.x + style.ItemInnerSpacing.x, bb.Min.y + style.FramePadding.y}, label) }
 
@@ -34844,7 +34844,7 @@ DragScalar :: proc(label : string, data_type : DataType, p_data : rawptr, v_spee
 	value_buf : [64]u8
 	value_buf_len := DataTypeFormatString(value_buf[:], data_type, p_data, format)
 	if g.LogEnabled { LogSetNextTextDecoration("{", "}") }
-	RenderTextClipped(frame_bb.Min, frame_bb.Max, string_from_slice(value_buf[:value_buf_len], false), nil, &Vec2{0.5, 0.5})
+	RenderTextClipped(frame_bb.Min, frame_bb.Max, string_from_slice(value_buf[:value_buf_len], false), nil, Vec2{0.5, 0.5})
 
 	if label_size.x > 0.0 { RenderText(Vec2{frame_bb.Max.x + style.ItemInnerSpacing.x, frame_bb.Min.y + style.FramePadding.y}, label) }
 
@@ -35399,7 +35399,7 @@ SliderScalar :: proc(label : string, data_type : DataType, p_data : rawptr, p_mi
 	value_buf : [64]u8
 	value_buf_len := DataTypeFormatString(value_buf[:], data_type, p_data, format)
 	if g.LogEnabled { LogSetNextTextDecoration("{", "}") }
-	RenderTextClipped(frame_bb.Min, frame_bb.Max, string_from_slice(value_buf[:value_buf_len], false), nil, &Vec2{0.5, 0.5})
+	RenderTextClipped(frame_bb.Min, frame_bb.Max, string_from_slice(value_buf[:value_buf_len], false), nil, Vec2{0.5, 0.5})
 
 	if label_size.x > 0.0 { RenderText(Vec2{frame_bb.Max.x + style.ItemInnerSpacing.x, frame_bb.Min.y + style.FramePadding.y}, label) }
 
@@ -35550,7 +35550,7 @@ VSliderScalar :: proc(label : string, size : Vec2, data_type : DataType, p_data 
 	// For the vertical slider we allow centered text to overlap the frame padding
 	value_buf : [64]u8
 	value_buf_len := DataTypeFormatString(value_buf[:], data_type, p_data, format)
-	RenderTextClipped(Vec2{frame_bb.Min.x, frame_bb.Min.y + style.FramePadding.y}, frame_bb.Max, string_from_slice(value_buf[:value_buf_len], false), nil, &Vec2{0.5, 0.0})
+	RenderTextClipped(Vec2{frame_bb.Min.x, frame_bb.Min.y + style.FramePadding.y}, frame_bb.Max, string_from_slice(value_buf[:value_buf_len], false), nil, Vec2{0.5, 0.0})
 	if label_size.x > 0.0 { RenderText(Vec2{frame_bb.Max.x + style.ItemInnerSpacing.x, frame_bb.Min.y + style.FramePadding.y}, label) }
 
 	return value_changed
@@ -40257,7 +40257,7 @@ Selectable_0 :: proc(label : string, selected : bool = false, flags : Selectable
 		else if window.DC.CurrentColumns != nil { PopColumnsBackground() }
 	}
 
-	if is_visible { RenderTextClipped(text_min, text_max, label, &label_size, &style.SelectableTextAlign, &bb) }
+	if is_visible { RenderTextClipped(text_min, text_max, label, &label_size, style.SelectableTextAlign, &bb) }
 
 	// Automatically close popups
 	if pressed && (window.Flags & WindowFlags_.WindowFlags_Popup) != {} && (flags & SelectableFlags_.SelectableFlags_NoAutoClosePopups) == {} && (g.LastItemData.ItemFlags & ItemFlags_.ItemFlags_AutoClosePopups) != {} { CloseCurrentPopup() }
@@ -41535,7 +41535,7 @@ PlotEx :: proc(plot_type : PlotType, label : string, values_getter : proc(data :
 	}
 
 	// Text overlay
-	if overlay_text != "" { RenderTextClipped(Vec2{frame_bb.Min.x, frame_bb.Min.y + style.FramePadding.y}, frame_bb.Max, overlay_text, nil, &Vec2{0.5, 0.0}) }
+	if overlay_text != "" { RenderTextClipped(Vec2{frame_bb.Min.x, frame_bb.Min.y + style.FramePadding.y}, frame_bb.Max, overlay_text, nil, Vec2{0.5, 0.0}) }
 
 	if label_size.x > 0.0 { RenderText(Vec2{frame_bb.Max.x + style.ItemInnerSpacing.x, inner_bb.Min.y}, label) }
 
@@ -41841,7 +41841,7 @@ IsRootOfOpenMenuSet :: proc() -> bool
 	return upper_popup.Window != nil && (upper_popup.Window.Flags & WindowFlags_.WindowFlags_ChildMenu) != {} && IsWindowChildOf(upper_popup.Window, window, true, false)
 }
 
-BeginMenuEx :: proc(label : string, icon : string, enabled : bool) -> bool
+BeginMenuEx :: proc(label : string, icon : string, enabled : bool = true) -> bool
 {
 	window : ^Window = GetCurrentWindow()
 	if window.SkipItems { return false }
@@ -42048,7 +42048,7 @@ BeginMenuEx :: proc(label : string, icon : string, enabled : bool) -> bool
 	return menu_is_open
 }
 
-BeginMenu :: proc(label : string, enabled : bool) -> bool
+BeginMenu :: proc(label : string, enabled : bool = true) -> bool
 {
 	return BeginMenuEx(label, "", enabled)
 }

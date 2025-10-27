@@ -18865,7 +18865,7 @@ SetNextWindowFocus :: proc()
 
 // is current window focused? or its root/child, depending on flags. see flags for options.
 // Similar to IsWindowHovered()
-IsWindowFocused :: proc(flags : FocusedFlags) -> bool
+IsWindowFocused :: proc(flags : FocusedFlags = {}) -> bool
 {
 	g : ^Context = GImGui
 	ref_window : ^Window = g.NavWindow

@@ -24958,7 +24958,7 @@ DockSpace :: proc(dockspace_id : ID, size_arg : Vec2 = {}, flags : DockNodeFlags
 // The limitation with this call is that your window won't have a local menu bar, but you can also use BeginMainMenuBar().
 // Even though we could pass window flags, it would also require the user to be able to call BeginMenuBar() somehow meaning we can't Begin/End in a single function.
 // If you really want a menu bar inside the same window as the one hosting the dockspace, you will need to copy this code somewhere and tweak it.
-DockSpaceOverViewport :: proc(dockspace_id : ID, viewport : ^Viewport, dockspace_flags : DockNodeFlags, window_class : ^WindowClass) -> ID
+DockSpaceOverViewport :: proc(dockspace_id : ID = 0, viewport : ^Viewport = nil, dockspace_flags : DockNodeFlags = {}, window_class : ^WindowClass = nil) -> ID
 {
 	viewport := viewport
 	if viewport == nil { viewport = GetMainViewport() }

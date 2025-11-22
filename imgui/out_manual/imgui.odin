@@ -17868,7 +17868,7 @@ CalcNextScrollFromScrollTargetAndClamp :: proc(window : ^Window) -> Vec2
 }
 
 // Early work-in-progress API (ScrollToItem() will become public)
-ScrollToItem :: proc(flags : ScrollFlags)
+ScrollToItem :: proc(flags : ScrollFlags = {})
 {
 	g : ^Context = GImGui
 	window : ^Window = g.CurrentWindow

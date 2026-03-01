@@ -35972,7 +35972,7 @@ InputTextWithHint :: proc(label : string, hint : string, buf : []u8, flags : Inp
 }
 
 // This is only used in the path where the multiline widget is inactivate.
-InputTextCalcTextLenAndLineCount :: proc(text : string) -> i32
+InputTextCalcLineCount :: proc(text : string) -> i32
 {
 	line_count : i32 = 0
 	for c in text {
@@ -38706,8 +38706,9 @@ else { OnKeyPressed(state, (is_startend_key_down ? STB_TEXTEDIT_K_TEXTEND : STB_
 	else {
 		// Render text only (no selection, no cursor)
 		if is_multiline {
+			buf_display_end = buf_display[strlen(buf_display):]
 			// We don't need width
-			text_size = Vec2{inner_size.x, cast(f32)InputTextCalcTextLenAndLineCount(string_from_se(buf_display, cast(^u8)buf_display_end)) * g.FontSize}
+			text_size = Vec2{inner_size.x, cast(f32)InputTextCalcLineCount(string_from_se(buf_display, cast(^u8)buf_display_end)) * g.FontSize}
 		}
 		else if !is_displaying_hint && g.ActiveId == id { buf_display_end = buf_display[state.TextLen:] }
 		else if !is_displaying_hint { buf_display_end = buf_display[strlen(buf_display):] }

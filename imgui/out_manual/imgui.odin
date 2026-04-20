@@ -38345,7 +38345,7 @@ else { OnKeyPressed(state, (is_startend_key_down ? STB_TEXTEDIT_K_TEXTEND : STB_
 				reserve(&g.TempBuffer, ie - ib + 1)
 				memcpy(g.TempBuffer.Data, mem.ptr_offset(state.TextSrc, cast(int)ib), int(ie - ib))
 				g.TempBuffer.Data[ie - ib] = 0
-				SetClipboardText(string_from_cstr(cast(cstring)g.TempBuffer.Data, ie - ib))
+				SetClipboardText(string_from_cstr(cast(cstring)g.TempBuffer.Data, ie - ib + 1))
 			}
 			if is_cut {
 				if !HasSelection(state) { SelectAll(state) }
